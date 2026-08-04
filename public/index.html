@@ -207,6 +207,245 @@
   .toast.show { opacity: 1; }
 
   .loading-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; gap: 10px; color: var(--text-dim); font-size: 13px; }
+
+  /* casino */
+  .casino-wrap { padding-top: 20px; padding-bottom: 60px; }
+  .casino-table {
+    background: radial-gradient(circle at 50% 0%, #14301f 0%, #0d1e14 70%);
+    border: 1px solid var(--border); border-radius: 16px; padding: 24px 18px; margin-bottom: 20px;
+  }
+  .bj-row-label { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .bj-total { font-family: var(--font-mono); color: var(--green); background: var(--green-bg); border-radius: 5px; padding: 1px 7px; font-size: 11px; transition: transform 0.15s ease; animation: bjTotalPop 0.25s ease; }
+  @keyframes bjTotalPop { 0% { transform: scale(0.7); opacity: 0.3; } 100% { transform: scale(1); opacity: 1; } }
+  .bj-hand { display: flex; gap: 8px; min-height: 84px; align-items: center; flex-wrap: wrap; margin-bottom: 22px; perspective: 700px; }
+  .bj-card {
+    width: 54px; height: 76px; border-radius: 7px; background: #f5f3ee; color: #17181c;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 17px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.08);
+    transform-style: preserve-3d; transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .bj-card:not(.back):hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.4); }
+  .bj-card.red { color: #d3273e; }
+  .bj-card .bj-suit { font-size: 18px; margin-top: 2px; }
+  .bj-card.back {
+    background: repeating-linear-gradient(45deg, #1c3f2b, #1c3f2b 5px, #16321f 5px, #16321f 10px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .bj-card.bj-deal {
+    animation: bjDeal 0.75s cubic-bezier(.19,1.15,.32,1) both;
+    animation-delay: var(--bj-delay, 0ms);
+  }
+  @keyframes bjDeal {
+    0% { opacity: 0; transform: translate(-70px, -90px) rotate(-25deg) scale(0.5); }
+    55% { opacity: 1; }
+    100% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  }
+  .bj-card.bj-flip { animation: bjFlip 0.75s cubic-bezier(.3,.1,.2,1) both; animation-delay: var(--bj-delay, 0ms); }
+  @keyframes bjFlip {
+    0% { transform: rotateY(-100deg) scale(0.92); filter: brightness(0.6); }
+    60% { transform: rotateY(12deg) scale(1.02); filter: brightness(1); }
+    100% { transform: rotateY(0deg) scale(1); filter: brightness(1); }
+  }
+  .bj-result-banner { text-align: center; padding: 10px 0; border-radius: 8px; font-size: 13.5px; font-weight: 700; margin-bottom: 18px; position: relative; overflow: visible; }
+  .bj-result-banner.bj-fresh { animation: bjBannerPop 0.4s cubic-bezier(.3,1.6,.4,1) both; }
+  @keyframes bjBannerPop { 0% { opacity: 0; transform: scale(0.82) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+  .bj-result-banner.win, .bj-result-banner.blackjack { background: var(--green-bg); color: var(--green); }
+  .bj-result-banner.lose { background: var(--red-bg); color: var(--red); }
+  .bj-result-banner.push { background: var(--amber-bg); color: var(--amber); }
+  .bj-particles { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  .bj-particle { position: absolute; font-size: 15px; opacity: 0; animation: bjParticle 0.9s ease-out both; animation-delay: var(--bj-pdelay, 0ms); }
+  @keyframes bjParticle {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+    18% { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx, 0px), -42px) scale(1); }
+  }
+  .bj-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bj-btn { flex: 1; min-width: 100px; padding: 12px 0; border-radius: 8px; font-size: 13px; font-weight: 700; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); transition: transform 0.1s ease, border-color 0.15s ease; }
+  .bj-btn:hover { border-color: #414560; }
+  .bj-btn:active { transform: scale(0.96); }
+  .bj-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .bj-btn:disabled:active { transform: none; }
+  .bj-btn.primary { background: var(--green); color: #06120c; border: none; }
+  .bj-btn.danger { color: var(--red); border-color: rgba(255,77,94,0.35); }
+  .casino-table { transition: box-shadow 0.3s ease; }
+  .casino-table.bj-dealing { animation: bjTableGlow 1.1s ease-in-out infinite; }
+  @keyframes bjTableGlow { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 0 1px rgba(46,213,138,0.25), 0 0 26px rgba(46,213,138,0.14); } }
+  .wallet-balance { display: inline-block; transition: color 0.2s ease; }
+  .wallet-balance.bj-pulse-win { animation: bjBalancePulse 0.5s ease; color: var(--green); }
+  .wallet-balance.bj-pulse-lose { animation: bjBalancePulse 0.5s ease; color: var(--red); }
+  @keyframes bjBalancePulse { 0% { transform: scale(1); } 35% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+  /* mise en page façon table de casino : panneau de mise + table à part */
+  .bj-layout { display: flex; flex-direction: column; gap: 14px; }
+  @media (min-width: 760px) { .bj-layout { flex-direction: row; align-items: flex-start; } }
+
+  .bj-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; width: 100%; flex-shrink: 0;
+  }
+  @media (min-width: 760px) { .bj-panel { width: 270px; position: sticky; top: 76px; } }
+
+  .bj-panel-label { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .bj-panel-label-sub { font-size: 10px; font-weight: 600; color: var(--text-faint); text-transform: none; letter-spacing: normal; }
+
+  .bj-panel-input-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .bj-panel-input-row input {
+    flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--font-mono); font-size: 15px; font-weight: 700; padding: 10px 12px; outline: none;
+  }
+  .bj-panel-input-row input:disabled { opacity: 0.5; }
+  .bj-mini-btn {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-dim); font-size: 11.5px; font-weight: 700;
+    transition: transform 0.1s ease, border-color 0.15s ease;
+  }
+  .bj-mini-btn:hover:not(:disabled) { color: var(--text); border-color: #414560; }
+  .bj-mini-btn:active:not(:disabled) { transform: scale(0.92); }
+  .bj-mini-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .bj-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0 10px; }
+  .bj-bet-btn { width: 100%; }
+
+  .bj-table {
+    position: relative; flex: 1; min-width: 0;
+    background: radial-gradient(circle at 50% 0%, #14301f 0%, #0d1e14 70%);
+    border: 1px solid var(--border); border-radius: 16px; padding: 24px 18px; margin-bottom: 0;
+    min-height: 360px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .bj-table-emblem { position: absolute; top: 14px; right: 16px; width: 38px; height: 38px; opacity: 0.55; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45)); }
+  .bj-table-emblem img { width: 100%; height: 100%; object-fit: contain; }
+
+  .bj-idle { text-align: center; padding: 30px 10px; }
+  .bj-ribbon {
+    display: inline-block; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.4); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 11px 30px; margin-bottom: 12px;
+    clip-path: polygon(3% 0, 97% 0, 100% 50%, 97% 100%, 3% 100%, 0 50%);
+  }
+  .bj-idle-sub { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.22); text-transform: uppercase; letter-spacing: 0.05em; }
+  .bj-bet-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .bj-bet-row input {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--font-mono); font-size: 15px; font-weight: 700; padding: 10px 12px; outline: none;
+  }
+  .bj-rules { font-size: 11.5px; color: var(--text-faint); line-height: 1.6; margin-top: 14px; }
+
+  /* casino lobby (grille de jeux façon Stake) */
+  .lobby-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (min-width: 560px) { .lobby-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 860px) { .lobby-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (min-width: 1080px) { .lobby-grid { grid-template-columns: repeat(5, 1fr); } }
+
+  .lobby-card { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); transition: transform 0.15s ease, border-color 0.15s ease; }
+  .lobby-card:hover { transform: translateY(-3px); border-color: #35384a; }
+  .lobby-card.disabled:hover { transform: none; }
+
+  .lobby-card-art {
+    aspect-ratio: 3 / 4; position: relative; display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: flex-end; padding: 14px 12px; text-align: left;
+  }
+  .lobby-card-icon { position: absolute; top: 16px; right: 12px; font-size: 40px; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.35)); }
+  .lobby-card-kicker { font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); text-transform: uppercase; }
+  .lobby-card-title { font-size: 15.5px; font-weight: 800; color: #fff; line-height: 1.2; margin-top: 2px; text-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+  .lobby-card.disabled .lobby-card-art { filter: grayscale(0.35) brightness(0.7); }
+  .lobby-card-art-poster { background-size: cover; background-position: center top; padding: 0; }
+  .lobby-lock { position: absolute; top: 10px; left: 10px; font-size: 11px; background: rgba(0,0,0,0.5); border-radius: 6px; padding: 3px 7px; color: #fff; }
+
+  .lobby-card-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); padding: 9px 12px; }
+  .lobby-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; box-shadow: 0 0 6px var(--green); }
+  .lobby-dot.off { background: var(--text-faint); box-shadow: none; }
+  .lobby-card-icon-img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.35)); }
+  .logo-badge-img { padding: 0; overflow: hidden; }
+  .logo-badge-img img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* mines */
+  .mn-select {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 10px 12px; font-family: var(--font-mono); font-weight: 700; font-size: 14px;
+    margin-bottom: 10px; outline: none; appearance: none;
+  }
+  .mn-select:disabled { opacity: 0.5; }
+  .mn-readout {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-family: var(--font-mono); font-weight: 700; font-size: 14px; margin-bottom: 4px;
+  }
+  .mn-readout-green { color: var(--green); }
+  .mn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; width: 100%; max-width: 440px; margin: 0 auto; }
+  .mn-tile {
+    aspect-ratio: 1 / 1; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center; padding: 15%;
+    transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .mn-tile:hover:not(:disabled) { transform: translateY(-2px); border-color: #414560; background: #20232e; }
+  .mn-tile:active:not(:disabled) { transform: scale(0.94); }
+  .mn-tile:disabled { cursor: not-allowed; }
+  .mn-tile img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); }
+  .mn-tile.mn-gem { background: var(--green-bg); border-color: rgba(16,207,124,0.4); }
+  .mn-tile.mn-mine { background: var(--red-bg); border-color: rgba(255,77,94,0.45); }
+  .mn-tile.mn-dim { opacity: 0.35; }
+  .mn-tile.mn-fresh { animation: mnPop 0.3s cubic-bezier(.3,1.6,.4,1) both; }
+  @keyframes mnPop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .mn-tile.mn-mine.mn-fresh { animation: mnShake 0.4s ease both; }
+  @keyframes mnShake {
+    0% { transform: scale(0.5); }
+    30% { transform: scale(1.15) rotate(-6deg); }
+    55% { transform: scale(1) rotate(5deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  /* flip */
+  .cf-side-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .cf-side-btn {
+    flex: 1; padding: 10px 0; border-radius: 8px; font-size: 12.5px; font-weight: 700;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+  .cf-side-btn:disabled { cursor: not-allowed; }
+  .cf-side-btn.amber.active { background: var(--amber-bg); color: var(--amber); border-color: rgba(242,183,63,0.45); }
+  .cf-side-btn.green.active { background: var(--green-bg); color: var(--green); border-color: rgba(16,207,124,0.45); }
+  .cf-side-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .cf-side-dot.amber { background: var(--amber); }
+  .cf-side-dot.green { background: var(--green); }
+  .cf-side-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
+
+  .cf-stage { display: flex; align-items: center; justify-content: center; padding: 30px 10px 10px; perspective: 900px; }
+  .cf-coin {
+    position: relative; width: 190px; height: 190px; border-radius: 50%;
+    background: conic-gradient(from -40deg, #ffd875, var(--amber) 35%, #a3690f 65%, var(--amber) 90%, #ffd875);
+    box-shadow: 0 10px 28px rgba(242,183,63,0.25), inset 0 0 0 2px rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    transform-style: preserve-3d;
+  }
+  .cf-coin.pile {
+    background: conic-gradient(from -40deg, #7fe8b3, var(--green) 35%, #0a6b40 65%, var(--green) 90%, #7fe8b3);
+    box-shadow: 0 10px 28px rgba(16,207,124,0.25), inset 0 0 0 2px rgba(255,255,255,0.08);
+  }
+  .cf-coin-hole {
+    width: 64%; height: 64%; border-radius: 50%; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; padding: 14%;
+  }
+  .cf-coin-hole img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); }
+  .cf-coin.spinning { animation: cfSpin 0.9s cubic-bezier(.4,.1,.3,1) both; }
+  @keyframes cfSpin {
+    0% { transform: rotateY(0deg) scale(1); }
+    50% { transform: rotateY(900deg) scale(1.06); }
+    100% { transform: rotateY(1440deg) scale(1); }
+  }
+  .cf-result-label { text-align: center; margin: 14px 0 0; font-size: 13.5px; font-weight: 700; }
+  .cf-result-label.win { color: var(--green); }
+  .cf-result-label.lose { color: var(--red); }
+
+  .cf-history-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 24px; }
+  .cf-history-title { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .cf-history-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cf-history-chip {
+    width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cf-history-chip img { width: 16px; height: 16px; object-fit: contain; }
+  .cf-history-empty { font-size: 12px; color: var(--text-faint); }
 </style>
 </head>
 <body>
@@ -330,6 +569,29 @@ const state = {
 
   adminForm: { title: "", category: "guerre", yes: 50, closes: "" },
   adminBusy: false,
+
+  blackjack: null,       // état de la partie en cours renvoyé par le serveur (ou null)
+  bjBetAmount: 100,
+  bjBusy: false,
+  bjError: "",
+  casinoGame: null,      // null = lobby | 'blackjack' = table en cours
+  bjAnim: { playerCount: 0, dealerHidden: [] }, // suivi pour savoir quelles cartes sont "nouvelles" à animer
+  bjJustResolved: false, // vrai le rendu qui suit juste la résolution d'une main (pour jouer l'animation du bandeau une seule fois)
+
+  mines: null,           // état de la partie de Mines en cours renvoyé par le serveur (ou null)
+  minesBetAmount: 100,
+  minesCount: 3,
+  minesBusy: false,
+  minesError: "",
+  minesAnim: new Set(),  // cases déjà affichées comme révélées lors du dernier rendu (pour l'animation "mn-fresh")
+
+  flip: null,            // dernier résultat de Flip renvoyé par le serveur (ou null)
+  flipBetAmount: 100,
+  flipSide: "face",       // "face" ou "pile", choisi par le joueur avant de lancer
+  flipBusy: false,
+  flipSpinning: false,   // vrai pendant l'animation de la pièce, pour retarder l'affichage du résultat
+  flipError: "",
+  flipHistory: [],        // historique des derniers résultats (les plus récents en tête)
 };
 
 /* ---------- helpers ---------- */
@@ -893,6 +1155,7 @@ function render() {
   }
   if (state.view === "auth" || !state.account) { renderAuth(); return; }
   if (state.view === "admin" && state.account.isAdmin) { renderAdmin(); return; }
+  if (state.view === "casino") { renderCasino(); return; }
   renderApp();
 }
 
@@ -989,6 +1252,7 @@ function renderApp() {
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="icon-btn" id="bonusBtn" title="Bonus quotidien" ${bonusReady ? "" : "style='opacity:0.4;'"}>🎁</button>
+          <button class="text-btn" id="casinoBtn">🎰 Casino</button>
           <button class="text-btn" id="depositBtn">💳 Déposer</button>
           <button class="text-btn" id="withdrawBtn">🏧 Retirer</button>
           <button class="text-btn" id="referralBtn">🤝 Parrainage</button>
@@ -1042,6 +1306,7 @@ function renderApp() {
   document.getElementById("searchInput").addEventListener("input", e => { state.query = e.target.value; render(); });
   document.getElementById("logoutBtn").addEventListener("click", handleLogout);
   document.getElementById("bonusBtn").addEventListener("click", claimBonus);
+  document.getElementById("casinoBtn").addEventListener("click", openCasino);
   document.getElementById("depositBtn").addEventListener("click", openDepositModal);
   document.getElementById("withdrawBtn").addEventListener("click", openWithdrawModal);
   document.getElementById("referralBtn").addEventListener("click", openReferralModal);
@@ -1114,6 +1379,729 @@ function withdrawalLineHtml(w) {
   const color = w.status === "pending" ? "var(--amber)" : w.status === "approved" ? "var(--green)" : "var(--red)";
   const date = new Date(w.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${w.amount} 💎 · demandé le ${date}</p>`;
+}
+
+/* ---------- casino : lobby ---------- */
+
+const CASINO_GAMES = [
+  { id: "blackjack", title: "Blackjack", poster: "/casino/blackjack-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#a4172c)", enabled: true },
+  { id: "dice",      title: "Dice",      poster: "/casino/dice-poster.png", gradient: "linear-gradient(165deg,#9c6bff,#5b21b6)", enabled: false },
+  { id: "mines",     title: "Mines",     poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
+  { id: "hilo",      title: "Hilo",      poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
+  { id: "flip",      title: "Flip",      poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
+];
+
+function openCasino() {
+  state.view = "casino";
+  state.casinoGame = null;
+  render();
+}
+
+function backToCasinoLobby() {
+  state.casinoGame = null;
+  render();
+}
+
+function lobbyCardHtml(g) {
+  if (g.poster) {
+    return `
+      <div class="lobby-card ${g.enabled ? "" : "disabled"}" data-lobby="${g.id}">
+        <div class="lobby-card-art lobby-card-art-poster" style="background-image:url('${g.poster}');">
+          ${!g.enabled ? `<span class="lobby-lock">🔒</span>` : ""}
+        </div>
+        <div class="lobby-card-status">
+          <span class="lobby-dot ${g.enabled ? "" : "off"}"></span>
+          ${g.enabled ? "Disponible" : "Bientôt disponible"}
+        </div>
+      </div>
+    `;
+  }
+  const isImg = g.icon.startsWith("IMG:");
+  const iconHtml = isImg
+    ? `<img class="lobby-card-icon lobby-card-icon-img" src="${g.icon.slice(4)}" alt="${esc(g.title)}" />`
+    : `<div class="lobby-card-icon">${g.icon}</div>`;
+  return `
+    <div class="lobby-card ${g.enabled ? "" : "disabled"}" data-lobby="${g.id}">
+      <div class="lobby-card-art" style="background:${g.gradient};">
+        ${!g.enabled ? `<span class="lobby-lock">🔒</span>` : ""}
+        ${iconHtml}
+        <div class="lobby-card-kicker">ParaBet Originals</div>
+        <div class="lobby-card-title">${g.title}</div>
+      </div>
+      <div class="lobby-card-status">
+        <span class="lobby-dot ${g.enabled ? "" : "off"}"></span>
+        ${g.enabled ? "Disponible" : "Bientôt disponible"}
+      </div>
+    </div>
+  `;
+}
+
+function renderCasinoLobby() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">🎰</div> ParaBet Casino</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Retour</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <h2 class="section-title" style="margin-top:0;">🎰 Jeux</h2>
+      <div class="lobby-grid">${CASINO_GAMES.map(lobbyCardHtml).join("")}</div>
+      <p class="disclaimer">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. D'autres jeux arriveront bientôt.</p>
+    </div>
+  `;
+
+  document.getElementById("casinoBackBtn").addEventListener("click", async () => { state.view = "app"; await loadEverything(); render(); });
+  document.querySelectorAll("[data-lobby]").forEach(el => el.addEventListener("click", () => {
+    const g = CASINO_GAMES.find(x => x.id === el.dataset.lobby);
+    if (!g.enabled) { showToast(`${g.title} arrive bientôt sur ParaBet 👀`); return; }
+    if (g.id === "blackjack") openBlackjack();
+    else if (g.id === "mines") openMines();
+    else if (g.id === "flip") openFlip();
+  }));
+}
+
+/* ---------- casino : blackjack ---------- */
+
+async function openBlackjack() {
+  state.casinoGame = "blackjack";
+  state.bjError = "";
+  render();
+  try {
+    const s = await api("/api/casino/blackjack/state");
+    state.blackjack = s.active ? s : null;
+    // une partie déjà en cours (ex: rechargement de page) : on ne rejoue pas
+    // l'animation de distribution pour des cartes déjà posées sur la table.
+    state.bjAnim = s.active
+      ? { playerCount: s.player.length, dealerHidden: s.dealer.map(c => !!c.hidden) }
+      : { playerCount: 0, dealerHidden: [] };
+  } catch (e) { /* ignore */ }
+  state.bjJustResolved = false;
+  render();
+}
+
+function bjSuitClass(s) { return (s === "♥" || s === "♦") ? "red" : ""; }
+
+const BJ_DEAL_SLOT_MS = 260;   // pause entre chaque carte distribuée (suspense)
+const BJ_BANNER_DELAY_MS = 380; // délai avant le bandeau de résultat, le temps que les dernières cartes se posent
+
+// anim: "" | "bj-deal" | "bj-flip" — delaySlot: position dans la séquence de distribution (pour l'effet en cascade)
+function bjCardHtml(c, anim, delaySlot) {
+  const cls = anim ? ` ${anim}` : "";
+  const style = anim ? ` style="--bj-delay:${(delaySlot || 0) * BJ_DEAL_SLOT_MS}ms"` : "";
+  if (c.hidden) return `<div class="bj-card back${cls}"${style}></div>`;
+  return `<div class="bj-card ${bjSuitClass(c.s)}${cls}"${style}><span>${c.r}</span><span class="bj-suit">${c.s}</span></div>`;
+}
+
+// Compare l'état précédemment affiché (state.bjAnim) à l'état actuel du jeu pour
+// déterminer quelles cartes sont neuves (à faire "voler" sur la table) et laquelle
+// vient d'être retournée (la carte cachée du croupier), puis met à jour le suivi.
+function bjRenderHands(g) {
+  const prevPlayerCount = state.bjAnim.playerCount || 0;
+  const prevDealerHidden = state.bjAnim.dealerHidden || [];
+  const prevDealerCount = prevDealerHidden.length;
+  // le croupier retourne-t-il sa carte cachée sur ce rendu ? si oui, on laisse le
+  // temps au retournement de se jouer avant de distribuer d'éventuelles cartes en plus
+  const dealerFlips = prevDealerHidden[1] && g.dealer[1] && !g.dealer[1].hidden;
+
+  const newPlayerIdxs = [];
+  for (let i = prevPlayerCount; i < g.player.length; i++) newPlayerIdxs.push(i);
+  const newDealerIdxs = [];
+  for (let i = prevDealerCount; i < g.dealer.length; i++) newDealerIdxs.push(i);
+
+  // distribution en alternance joueur/croupier, comme à une vraie table
+  const playerDelay = {}, dealerDelay = {};
+  let slot = dealerFlips ? 1 : 0, pi = 0, di = 0;
+  while (pi < newPlayerIdxs.length || di < newDealerIdxs.length) {
+    if (pi < newPlayerIdxs.length) { playerDelay[newPlayerIdxs[pi]] = slot++; pi++; }
+    if (di < newDealerIdxs.length) { dealerDelay[newDealerIdxs[di]] = slot++; di++; }
+  }
+
+  const playerHtml = g.player.map((c, i) => {
+    if (i in playerDelay) return bjCardHtml(c, "bj-deal", playerDelay[i]);
+    return bjCardHtml(c, "", 0);
+  }).join("");
+
+  const dealerHtml = g.dealer.map((c, i) => {
+    if (i in dealerDelay) return bjCardHtml(c, "bj-deal", dealerDelay[i]);
+    if (prevDealerHidden[i] && !c.hidden) return bjCardHtml(c, "bj-flip", 0);
+    return bjCardHtml(c, "", 0);
+  }).join("");
+
+  state.bjAnim.playerCount = g.player.length;
+  state.bjAnim.dealerHidden = g.dealer.map(c => !!c.hidden);
+
+  return { playerHtml, dealerHtml };
+}
+
+function bjParticlesHtml(result) {
+  if (result !== "win" && result !== "blackjack") return "";
+  const emojis = result === "blackjack" ? ["🂡", "✨", "💎", "🔥", "✨"] : ["✨", "💎", "🎉", "✨", "💎"];
+  return `<div class="bj-particles">${emojis.map((e, i) =>
+    `<span class="bj-particle" style="--dx:${Math.round((i - (emojis.length - 1) / 2) * 24)}px; --bj-pdelay:${BJ_BANNER_DELAY_MS + i * 90}ms;">${e}</span>`
+  ).join("")}</div>`;
+}
+
+async function bjAction(path, body) {
+  if (state.bjBusy) return;
+  if (path === "start") state.bjAnim = { playerCount: 0, dealerHidden: [] };
+  state.bjBusy = true; state.bjError = ""; render();
+  const prevStatus = state.blackjack ? state.blackjack.status : null;
+  try {
+    const r = await api(`/api/casino/blackjack/${path}`, { method: "POST", body });
+    state.account.balance = r.balance;
+    state.blackjack = r;
+    state.bjJustResolved = prevStatus !== "finished" && r.status === "finished";
+  } catch (e) {
+    state.bjError = e.message;
+  }
+  state.bjBusy = false;
+  render();
+}
+
+function bjStart() {
+  const amount = clamp(Math.round(Number(state.bjBetAmount) || 0), BJ_MIN_BET_CLIENT, state.account.balance || BJ_MIN_BET_CLIENT);
+  bjAction("start", { amount });
+}
+function bjHit() { bjAction("hit"); }
+function bjStand() { bjAction("stand"); }
+function bjDouble() { bjAction("double"); }
+
+const BJ_MIN_BET_CLIENT = 10; // doit correspondre à BJ_MIN_BET côté serveur
+
+function renderCasino() {
+  if (state.casinoGame === "blackjack") { renderBlackjackGame(); return; }
+  if (state.casinoGame === "mines") { renderMinesGame(); return; }
+  if (state.casinoGame === "flip") { renderFlipGame(); return; }
+  renderCasinoLobby();
+}
+
+function renderBlackjackGame() {
+  const app = document.getElementById("app");
+  const g = state.blackjack;
+  const playing = g && g.status === "playing";
+  const finished = g && g.status === "finished";
+  const canDouble = playing && g.player.length === 2 && state.account.balance >= g.bet;
+  const betLocked = playing; // la mise ne peut plus être modifiée une fois la main lancée
+
+  const resultLabel = finished ? { blackjack: "🃏 Blackjack ! Tu gagnes", win: "🎉 Tu gagnes", push: "🤝 Égalité, mise rendue", lose: "💥 Tu perds" }[g.result] : "";
+  const netAmount = finished ? g.payout - g.bet : 0;
+
+  // consomme le flag : l'animation du bandeau/pulse ne doit jouer qu'une fois, pas à chaque re-render
+  const justResolved = state.bjJustResolved;
+  state.bjJustResolved = false;
+
+  const hands = g ? bjRenderHands(g) : { playerHtml: "", dealerHtml: "" };
+  const balancePulseClass = justResolved && finished ? (netAmount > 0 ? " bj-pulse-win" : netAmount < 0 ? " bj-pulse-lose" : "") : "";
+  const bannerDelayMs = justResolved ? BJ_BANNER_DELAY_MS : 0;
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge logo-badge-img"><img src="/casino/blackjack-badge.png" alt="Blackjack" /></div> Blackjack</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance${balancePulseClass}">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="bj-layout">
+
+        <div class="bj-panel">
+          <div class="bj-panel-label">
+            <span>Montant du pari</span>
+            <span class="bj-panel-label-sub">💎 fictif</span>
+          </div>
+          <div class="bj-panel-input-row">
+            <input type="number" id="bjBetInput" min="${BJ_MIN_BET_CLIENT}" max="${state.account.balance}"
+              value="${state.bjBetAmount}" ${betLocked ? "disabled" : ""} />
+            <button class="bj-mini-btn" id="bjHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
+            <button class="bj-mini-btn" id="bjDblBetBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
+          </div>
+          <div class="quick-row">
+            ${[100, 500, 1000, 5000].map(v => `<button class="quick-btn" data-bjquick="${v}" ${betLocked ? "disabled" : ""}>${v}</button>`).join("")}
+          </div>
+
+          <div class="bj-actions-grid">
+            <button class="bj-btn" id="bjHitBtn" ${!playing || state.bjBusy ? "disabled" : ""}>${state.bjBusy && playing ? "…" : "Tirer"} 🂠</button>
+            <button class="bj-btn" id="bjStandBtn" ${!playing || state.bjBusy ? "disabled" : ""}>${state.bjBusy && playing ? "…" : "Rester"} ✋</button>
+            <button class="bj-btn" id="bjSplitBtn" disabled title="Bientôt disponible">Diviser 🔀</button>
+            <button class="bj-btn" id="bjDoubleBtn" ${!canDouble || state.bjBusy ? "disabled" : ""}>${state.bjBusy && playing ? "…" : "Doubler ×2"}</button>
+          </div>
+
+          <button class="bj-btn primary bj-bet-btn" id="bjStartBtn" ${playing || state.bjBusy || state.account.balance < BJ_MIN_BET_CLIENT ? "disabled" : ""}>
+            ${state.bjBusy && !playing ? "Distribution…" : finished ? "🔁 Rejouer" : "▶️ Parier"}
+          </button>
+
+          ${state.bjError ? `<p class="auth-error">${esc(state.bjError)}</p>` : ""}
+
+          <p class="bj-rules">Le croupier tire jusqu'à 17. Un blackjack naturel (21 avec 2 cartes) paie 3 pour 2. Une victoire normale paie 1 pour 1. Égalité = mise rendue.</p>
+        </div>
+
+        <div class="bj-table${state.bjBusy ? " bj-dealing" : ""}">
+          <div class="bj-table-emblem"><img src="/casino/blackjack-badge.png" alt="" /></div>
+
+          ${g ? `
+            <div class="bj-row-label">Croupier ${finished ? `<span class="bj-total">${g.dealerTotal}</span>` : ""}</div>
+            <div class="bj-hand">${hands.dealerHtml}</div>
+
+            <div class="bj-row-label">Toi (${esc(state.account.pseudo)}) <span class="bj-total">${g.playerTotal}</span></div>
+            <div class="bj-hand">${hands.playerHtml}</div>
+
+            ${finished ? `
+              <div class="bj-result-banner ${g.result}${justResolved ? " bj-fresh" : ""}" style="${bannerDelayMs ? `animation-delay:${bannerDelayMs}ms;` : ""}">
+                ${resultLabel} — ${netAmount > 0 ? `+${netAmount}` : netAmount} 💎
+                ${justResolved ? bjParticlesHtml(g.result) : ""}
+              </div>
+            ` : ""}
+          ` : `
+            <div class="bj-idle">
+              <div class="bj-ribbon">Blackjack paie 3 pour 2</div>
+              <div class="bj-idle-sub">L'assurance paie 2 pour 1</div>
+            </div>
+          `}
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  const betInput = document.getElementById("bjBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.bjBetAmount = e.target.value; });
+  document.querySelectorAll("[data-bjquick]").forEach(b => b.addEventListener("click", () => {
+    state.bjBetAmount = clamp(Number(b.dataset.bjquick), BJ_MIN_BET_CLIENT, state.account.balance);
+    render();
+  }));
+  const halfBtn = document.getElementById("bjHalfBtn");
+  if (halfBtn) halfBtn.addEventListener("click", () => {
+    state.bjBetAmount = clamp(Math.round((Number(state.bjBetAmount) || 0) / 2), BJ_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+  const dblBetBtn = document.getElementById("bjDblBetBtn");
+  if (dblBetBtn) dblBetBtn.addEventListener("click", () => {
+    state.bjBetAmount = clamp(Math.round((Number(state.bjBetAmount) || 0) * 2), BJ_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+
+  const startBtn = document.getElementById("bjStartBtn");
+  if (startBtn) startBtn.addEventListener("click", bjStart);
+  const hitBtn = document.getElementById("bjHitBtn");
+  if (hitBtn) hitBtn.addEventListener("click", bjHit);
+  const standBtn = document.getElementById("bjStandBtn");
+  if (standBtn) standBtn.addEventListener("click", bjStand);
+  const doubleBtn = document.getElementById("bjDoubleBtn");
+  if (doubleBtn) doubleBtn.addEventListener("click", bjDouble);
+
+  renderModal();
+}
+
+/* ---------- casino : mines ---------- */
+
+const MINES_MIN_BET_CLIENT = 10; // doit correspondre à MINES_MIN_BET côté serveur
+const MINES_GRID_SIZE_CLIENT = 25;
+// Images "reskin Minecraft" fournies pour les gemmes et les bombes (100% pour le fun, aucun argent réel).
+const MINES_GEM_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/6/6c/P%C3%A9pite_d%27Endium.png/revision/latest?cb=20210730114131&path-prefix=fr";
+const MINES_BOMB_URL = "https://static.wikia.nocookie.net/stardew-valley-minecraft-datapack/images/3/3b/Bomb.png/revision/latest?cb=20210611135240";
+
+// Délégation d'événement pour les cases de la grille : un seul écouteur posé une
+// fois pour toutes sur le document (au lieu de re-attacher un listener par case à
+// chaque re-rendu), donc aucun clic ne peut jamais être "perdu" à cause d'un
+// re-rendu qui a lieu au même moment que l'interaction de l'utilisateur.
+document.addEventListener("click", (e) => {
+  const tileBtn = e.target.closest("[data-tile]");
+  if (tileBtn && !tileBtn.disabled) {
+    minesReveal(Number(tileBtn.dataset.tile));
+  }
+});
+
+async function openMines() {
+  state.casinoGame = "mines";
+  state.minesError = "";
+  render();
+  try {
+    const s = await api("/api/casino/mines/state");
+    state.mines = s.active ? s : null;
+    state.minesAnim = new Set(s.active ? s.revealed : []);
+  } catch (e) { /* ignore */ }
+  render();
+}
+
+async function minesAction(path, body) {
+  if (state.minesBusy) return;
+  if (path === "start") state.minesAnim = new Set();
+  state.minesBusy = true; state.minesError = ""; render();
+  try {
+    const r = await api(`/api/casino/mines/${path}`, { method: "POST", body });
+    state.account.balance = r.balance;
+    state.mines = r;
+  } catch (e) {
+    state.minesError = e.message;
+  }
+  state.minesBusy = false;
+  render();
+}
+
+function minesStart() {
+  const amount = clamp(Math.round(Number(state.minesBetAmount) || 0), MINES_MIN_BET_CLIENT, state.account.balance || MINES_MIN_BET_CLIENT);
+  minesAction("start", { amount, mines: state.minesCount });
+}
+function minesReveal(tile) { minesAction("reveal", { tile }); }
+function minesCashout() { minesAction("cashout"); }
+function minesRandomPick() {
+  const g = state.mines;
+  if (!g || g.status !== "playing" || state.minesBusy) return;
+  const revealedSet = new Set(g.revealed);
+  const free = [];
+  for (let i = 0; i < MINES_GRID_SIZE_CLIENT; i++) if (!revealedSet.has(i)) free.push(i);
+  if (!free.length) return;
+  minesReveal(free[Math.floor(Math.random() * free.length)]);
+}
+
+// Construit la grille : compare aux cases déjà affichées lors du rendu précédent
+// (state.minesAnim) pour savoir lesquelles viennent d'être révélées (animation
+// "mn-fresh"), puis met à jour ce suivi pour le prochain rendu.
+function minesRenderTiles(g) {
+  const prevRevealed = state.minesAnim || new Set();
+  const revealedSet = new Set(g ? g.revealed : []);
+  const finished = g && g.status !== "playing";
+  const minesSet = new Set(finished ? g.mines : []);
+
+  const html = Array.from({ length: MINES_GRID_SIZE_CLIENT }, (_, i) => {
+    let cls = "mn-tile";
+    let inner = "";
+    const isRevealed = revealedSet.has(i);
+    const isFresh = isRevealed && !prevRevealed.has(i);
+    const clickable = g && g.status === "playing" && !isRevealed && !state.minesBusy;
+
+    if (isRevealed) {
+      if (minesSet.has(i)) { cls += ` mn-mine${isFresh ? " mn-fresh" : ""}`; inner = `<img src="${MINES_BOMB_URL}" alt="bombe" />`; }
+      else { cls += ` mn-gem${isFresh ? " mn-fresh" : ""}`; inner = `<img src="${MINES_GEM_URL}" alt="gemme" />`; }
+    } else if (finished && minesSet.has(i)) {
+      cls += " mn-mine mn-dim"; inner = `<img src="${MINES_BOMB_URL}" alt="bombe" />`;
+    }
+    return `<button class="${cls}" data-tile="${i}" ${clickable ? "" : "disabled"}>${inner}</button>`;
+  }).join("");
+
+  state.minesAnim = revealedSet;
+  return html;
+}
+
+function renderMinesGame() {
+  const app = document.getElementById("app");
+  const g = state.mines;
+  const playing = !!g && g.status === "playing";
+  const finished = !!g && g.status !== "playing";
+  const betLocked = playing;
+  const revealedCount = g ? g.revealed.length : 0;
+  const gemsCount = MINES_GRID_SIZE_CLIENT - state.minesCount;
+  const multLabel = (g ? g.multiplier : 1).toFixed(2);
+  const currentWinnings = playing ? Math.round(g.bet * g.multiplier) : (finished ? g.payout : 0);
+
+  const resultBanner = finished
+    ? (g.status === "lost"
+        ? `<p class="auth-error" style="text-align:center;">💥 Boum ! Tu perds ${g.bet} 💎</p>`
+        : `<p style="text-align:center;color:var(--green);font-weight:700;margin:0 0 14px;">🎉 ${g.status === "won" ? "Toutes les gemmes trouvées ! " : ""}+${g.payout - g.bet} 💎</p>`)
+    : "";
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">💣</div> Mines</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="bj-layout">
+
+        <div class="bj-panel">
+          <div class="bj-panel-label">
+            <span>Montant du pari</span>
+            <span class="bj-panel-label-sub">💎 fictif</span>
+          </div>
+          <div class="bj-panel-input-row">
+            <input type="number" id="mnBetInput" min="${MINES_MIN_BET_CLIENT}" max="${state.account.balance}"
+              value="${state.minesBetAmount}" ${betLocked ? "disabled" : ""} />
+            <button class="bj-mini-btn" id="mnHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
+            <button class="bj-mini-btn" id="mnDblBetBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
+          </div>
+
+          <div class="bj-panel-label"><span>Mines</span></div>
+          <select id="mnMinesSelect" class="mn-select" ${betLocked ? "disabled" : ""}>
+            ${Array.from({ length: 24 }, (_, i) => i + 1).map(n => `<option value="${n}" ${state.minesCount === n ? "selected" : ""}>${n}</option>`).join("")}
+          </select>
+
+          <div class="bj-panel-label"><span>Gemmes</span></div>
+          <div class="mn-readout">${gemsCount}</div>
+
+          <button class="bj-btn primary bj-bet-btn" id="mnCashoutBtn" style="margin-top:14px;" ${!playing || state.minesBusy || revealedCount === 0 ? "disabled" : ""}>
+            Retrait${playing && revealedCount > 0 ? ` — ${currentWinnings} 💎` : ""}
+          </button>
+          <button class="bj-btn bj-bet-btn" id="mnRandomBtn" style="margin-top:8px;width:100%;" ${!playing || state.minesBusy ? "disabled" : ""}>🎲 Sélection aléatoire</button>
+
+          <div class="bj-panel-label" style="margin-top:14px;">
+            <span>Profit total (${multLabel}×)</span>
+          </div>
+          <div class="mn-readout mn-readout-green">${currentWinnings} 💎</div>
+
+          <button class="bj-btn primary bj-bet-btn" id="mnStartBtn" style="margin-top:14px;" ${playing || state.minesBusy || state.account.balance < MINES_MIN_BET_CLIENT ? "disabled" : ""}>
+            ${state.minesBusy && !playing ? "Lancement…" : finished ? "🔁 Rejouer" : "▶️ Parier"}
+          </button>
+
+          ${state.minesError ? `<p class="auth-error">${esc(state.minesError)}</p>` : ""}
+
+          <p class="bj-rules">Choisis ton nombre de mines, révèle des cases pour faire monter le multiplicateur, et encaisse quand tu veux avant de tomber sur une mine. 💎 Émeraudes fictives, 100% pour le fun.</p>
+        </div>
+
+        <div class="bj-table" style="min-height:auto;">
+          ${resultBanner}
+          <div class="mn-grid">${minesRenderTiles(g)}</div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  const betInput = document.getElementById("mnBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.minesBetAmount = e.target.value; });
+
+  const halfBtn = document.getElementById("mnHalfBtn");
+  if (halfBtn) halfBtn.addEventListener("click", () => {
+    state.minesBetAmount = clamp(Math.round((Number(state.minesBetAmount) || 0) / 2), MINES_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+  const dblBtn = document.getElementById("mnDblBetBtn");
+  if (dblBtn) dblBtn.addEventListener("click", () => {
+    state.minesBetAmount = clamp(Math.round((Number(state.minesBetAmount) || 0) * 2), MINES_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+
+  const minesSelect = document.getElementById("mnMinesSelect");
+  if (minesSelect) minesSelect.addEventListener("change", e => { state.minesCount = Number(e.target.value); render(); });
+
+  const startBtn = document.getElementById("mnStartBtn");
+  if (startBtn) startBtn.addEventListener("click", minesStart);
+  const cashoutBtn = document.getElementById("mnCashoutBtn");
+  if (cashoutBtn) cashoutBtn.addEventListener("click", minesCashout);
+  const randomBtn = document.getElementById("mnRandomBtn");
+  if (randomBtn) randomBtn.addEventListener("click", minesRandomPick);
+}
+
+/* ---------- casino : flip ---------- */
+
+const FLIP_MIN_BET_CLIENT = 10; // doit correspondre à FLIP_MIN_BET côté serveur
+const FLIP_FACE_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/1/17/Lingot_de_Paladium.png/revision/latest?cb=20210729175433&path-prefix=fr";
+const FLIP_PILE_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/9/99/Lingot_de_Paladium_Vert.png/revision/latest?cb=20210731200814&path-prefix=fr";
+
+async function openFlip() {
+  state.casinoGame = "flip";
+  state.flipError = "";
+  state.flipSpinning = false;
+  render();
+  try {
+    const s = await api("/api/casino/flip/state");
+    state.flip = s.last || null;
+    state.flipHistory = s.history || [];
+  } catch (e) { /* pas de partie précédente, on part d'un état vide */ }
+  render();
+}
+
+function flipChooseSide(side) {
+  if (state.flipBusy || state.flipSpinning) return;
+  state.flipSide = side;
+  render();
+}
+
+function flipStart() {
+  if (state.flipBusy || state.flipSpinning) return;
+  const amount = clamp(Math.round(Number(state.flipBetAmount) || 0), FLIP_MIN_BET_CLIENT, state.account.balance || FLIP_MIN_BET_CLIENT);
+  state.flipBetAmount = amount;
+  state.flipBusy = true; state.flipError = ""; render();
+
+  (async () => {
+    try {
+      const r = await api("/api/casino/flip/play", { method: "POST", body: { amount, side: state.flipSide } });
+      // La pièce tourne un court instant avant de révéler le résultat renvoyé par le serveur.
+      state.flipSpinning = true;
+      render();
+      setTimeout(() => {
+        state.account.balance = r.balance;
+        state.flip = r;
+        state.flipHistory = r.history || [r, ...state.flipHistory].slice(0, 20);
+        state.flipSpinning = false;
+        state.flipBusy = false;
+        render();
+      }, 900);
+    } catch (e) {
+      state.flipError = e.message;
+      state.flipBusy = false;
+      render();
+    }
+  })();
+}
+
+function renderFlipGame() {
+  const app = document.getElementById("app");
+  const g = state.flip;
+  const busy = state.flipBusy;
+  const spinning = state.flipSpinning;
+  const showingResult = g && !spinning && !busy;
+  const coinSide = spinning ? state.flipSide : (showingResult ? g.result : state.flipSide);
+  const multLabel = "1.98";
+  const potential = Math.round((Number(state.flipBetAmount) || 0) * 1.98);
+
+  const resultLabel = showingResult
+    ? (g.win
+        ? `<p class="cf-result-label win">🎉 ${g.result === "face" ? "Face" : "Pile"} — +${g.payout - g.bet} 💎</p>`
+        : `<p class="cf-result-label lose">💥 ${g.result === "face" ? "Face" : "Pile"} — tu perds ${g.bet} 💎</p>`)
+    : "";
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">🪙</div> Flip</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="bj-layout">
+
+        <div class="bj-panel">
+          <div class="auth-tabs">
+            <button class="auth-tab active" id="flipManualTab">Manuel</button>
+            <button class="auth-tab" id="flipAutoTab">Auto</button>
+          </div>
+
+          <div class="bj-panel-label">
+            <span>Montant du pari</span>
+            <span class="bj-panel-label-sub">💎 fictif</span>
+          </div>
+          <div class="bj-panel-input-row">
+            <input type="number" id="cfBetInput" min="${FLIP_MIN_BET_CLIENT}" max="${state.account.balance}"
+              value="${state.flipBetAmount}" ${busy || spinning ? "disabled" : ""} />
+            <button class="bj-mini-btn" id="cfHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
+            <button class="bj-mini-btn" id="cfDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
+          </div>
+
+          <div class="cf-side-row">
+            <button class="cf-side-btn amber ${state.flipSide === "face" ? "active" : ""}" id="cfFaceBtn" ${busy || spinning ? "disabled" : ""}>
+              <img class="cf-side-icon" src="${FLIP_FACE_URL}" alt="" /> Face
+            </button>
+            <button class="cf-side-btn green ${state.flipSide === "pile" ? "active" : ""}" id="cfPileBtn" ${busy || spinning ? "disabled" : ""}>
+              <img class="cf-side-icon" src="${FLIP_PILE_URL}" alt="" /> Pile
+            </button>
+          </div>
+
+          <button class="bj-btn primary bj-bet-btn" id="cfStartBtn" ${busy || spinning || state.account.balance < FLIP_MIN_BET_CLIENT ? "disabled" : ""}>
+            ${busy || spinning ? "Lancer…" : "▶️ Parier"}
+          </button>
+
+          <div class="bj-panel-label" style="margin-top:14px;">
+            <span>Profit total (${multLabel}×)</span>
+          </div>
+          <div class="mn-readout mn-readout-green">${busy || spinning ? potential : (showingResult ? g.payout : potential)} 💎</div>
+
+          ${state.flipError ? `<p class="auth-error">${esc(state.flipError)}</p>` : ""}
+
+          <p class="bj-rules">Choisis Face ou Pile et lance la pièce. Une bonne prédiction paie ${multLabel} fois ta mise. 💎 Émeraudes fictives, 100% pour le fun.</p>
+        </div>
+
+        <div class="bj-table" style="min-height:auto;">
+          <div class="cf-stage">
+            <div class="cf-coin ${coinSide === "pile" ? "pile" : ""} ${spinning ? "spinning" : ""}">
+              <div class="cf-coin-hole"><img src="${coinSide === "pile" ? FLIP_PILE_URL : FLIP_FACE_URL}" alt="${coinSide === "pile" ? "Pile" : "Face"}" /></div>
+            </div>
+          </div>
+          ${resultLabel}
+
+          <div class="cf-history-box">
+            <div class="cf-history-title">Historique</div>
+            <div class="cf-history-row">
+              ${state.flipHistory.length === 0
+                ? `<span class="cf-history-empty">Aucun lancer pour l'instant.</span>`
+                : state.flipHistory.slice(0, 20).map(h => `
+                  <div class="cf-history-chip" title="${h.result === "face" ? "Face" : "Pile"}">
+                    <img src="${h.result === "face" ? FLIP_FACE_URL : FLIP_PILE_URL}" alt="" />
+                  </div>
+                `).join("")}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  const autoTab = document.getElementById("flipAutoTab");
+  if (autoTab) autoTab.addEventListener("click", () => showToast("Le mode Auto arrive bientôt sur Flip 👀"));
+
+  const betInput = document.getElementById("cfBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.flipBetAmount = e.target.value; render(); });
+  const halfBtn = document.getElementById("cfHalfBtn");
+  if (halfBtn) halfBtn.addEventListener("click", () => {
+    state.flipBetAmount = clamp(Math.round((Number(state.flipBetAmount) || 0) / 2), FLIP_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+  const dblBtn = document.getElementById("cfDblBetBtn");
+  if (dblBtn) dblBtn.addEventListener("click", () => {
+    state.flipBetAmount = clamp(Math.round((Number(state.flipBetAmount) || 0) * 2), FLIP_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+
+  const faceBtn = document.getElementById("cfFaceBtn");
+  if (faceBtn) faceBtn.addEventListener("click", () => flipChooseSide("face"));
+  const pileBtn = document.getElementById("cfPileBtn");
+  if (pileBtn) pileBtn.addEventListener("click", () => flipChooseSide("pile"));
+
+  const startBtn = document.getElementById("cfStartBtn");
+  if (startBtn) startBtn.addEventListener("click", flipStart);
 }
 
 /* ---------- rendering: bet & deposit modal ---------- */

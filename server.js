@@ -476,6 +476,435 @@ app.get("/api/referrals", authRequired, async (req, res) => {
   });
 });
 
+/* ================= CASINO : BLACKJACK ================= */
+// Parties en cours stockées en mémoire (une seule partie active par compte à
+// la fois) — pas besoin de table en base : le solde, lui, est débité/crédité
+// en base à chaque étape qui compte (mise au lancement, gain à la
+// résolution), donc un redémarrage du serveur ne peut jamais faire perdre ou
+// gagner d'émeraudes injustement, au pire la partie en cours est à relancer.
+const blackjackGames = new Map(); // accountId -> { deck, player, dealer, bet, doubled, status, result, payout }
+
+const BJ_MIN_BET = 10;
+const BJ_RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const BJ_SUITS = ["♠", "♥", "♦", "♣"];
+
+function freshShuffledDeck() {
+  const deck = [];
+  for (const s of BJ_SUITS) for (const r of BJ_RANKS) deck.push({ r, s });
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function bjCardValue(card) {
+  if (card.r === "A") return 11;
+  if (card.r === "K" || card.r === "Q" || card.r === "J") return 10;
+  return Number(card.r);
+}
+
+function bjHandTotal(cards) {
+  let total = 0;
+  let acesAs11 = 0;
+  for (const c of cards) {
+    total += bjCardValue(c);
+    if (c.r === "A") acesAs11++;
+  }
+  while (total > 21 && acesAs11 > 0) { total -= 10; acesAs11--; }
+  return { total, soft: acesAs11 > 0 };
+}
+
+function bjIsBlackjack(cards) {
+  return cards.length === 2 && bjHandTotal(cards).total === 21;
+}
+
+function bjCardJson(card, hidden) {
+  return hidden ? { hidden: true } : { r: card.r, s: card.s };
+}
+
+function bjPublicState(game) {
+  const finished = game.status === "finished";
+  return {
+    status: game.status,
+    bet: game.bet,
+    doubled: !!game.doubled,
+    player: game.player.map(c => bjCardJson(c, false)),
+    playerTotal: bjHandTotal(game.player).total,
+    dealer: game.dealer.map((c, i) => bjCardJson(c, !finished && i === 1)),
+    dealerTotal: finished ? bjHandTotal(game.dealer).total : null,
+    result: game.result || null,
+    payout: game.payout || 0,
+  };
+}
+
+// Termine la partie : fait tirer le croupier si besoin (dealerPlays = false
+// quand le joueur a déjà perdu d'office : dépassé 21, ou blackjack naturel
+// où le croupier ne tire jamais de carte supplémentaire), compare les mains,
+// crédite le gain éventuel et journalise le résultat dans le fil d'activité.
+async function resolveBlackjack(req, game, dealerPlays) {
+  if (dealerPlays) {
+    let d = bjHandTotal(game.dealer);
+    while (d.total < 17) {
+      game.dealer.push(game.deck.pop());
+      d = bjHandTotal(game.dealer);
+    }
+  }
+
+  const p = bjHandTotal(game.player);
+  const d = bjHandTotal(game.dealer);
+
+  let result, payout;
+  if (p.total > 21) {
+    result = "lose"; payout = 0;
+  } else if (bjIsBlackjack(game.player) && !game.doubled) {
+    if (bjIsBlackjack(game.dealer)) { result = "push"; payout = game.bet; }
+    else { result = "blackjack"; payout = Math.round(game.bet * 2.5); }
+  } else if (d.total > 21 || p.total > d.total) {
+    result = "win"; payout = game.bet * 2;
+  } else if (p.total === d.total) {
+    result = "push"; payout = game.bet;
+  } else {
+    result = "lose"; payout = 0;
+  }
+
+  game.status = "finished";
+  game.result = result;
+  game.payout = payout;
+
+  if (payout > 0) {
+    await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
+  }
+
+  const net = payout - game.bet;
+  const resultLabel = { blackjack: "Blackjack ! 🂡", win: "Gagné", push: "Égalité", lose: "Perdu" }[result];
+  const netLabel = net > 0 ? `+${net} 💎` : net < 0 ? `${net} 💎` : "±0 💎";
+  await pool.query(
+    "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+    [req.user.pseudo, net > 0 ? "yes" : net < 0 ? "no" : null, `🃏 Blackjack — ${req.user.pseudo} : ${resultLabel} (${netLabel})`]
+  );
+}
+
+app.get("/api/casino/blackjack/state", authRequired, (req, res) => {
+  const game = blackjackGames.get(req.user.id);
+  if (!game) return res.json({ active: false });
+  res.json({ active: true, ...bjPublicState(game) });
+});
+
+app.post("/api/casino/blackjack/start", authRequired, async (req, res) => {
+  try {
+    const existing = blackjackGames.get(req.user.id);
+    if (existing && existing.status === "playing") {
+      return res.status(400).json({ error: "Termine ta partie de blackjack en cours." });
+    }
+
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = clamp(Math.round(Number(req.body?.amount) || 0), BJ_MIN_BET, Math.max(BJ_MIN_BET, account.balance));
+    if (bet < BJ_MIN_BET || bet > account.balance) {
+      return res.status(400).json({ error: `Mise invalide : entre ${BJ_MIN_BET} 💎 et ton solde.` });
+    }
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+
+    const deck = freshShuffledDeck();
+    const game = {
+      deck,
+      player: [deck.pop(), deck.pop()],
+      dealer: [deck.pop(), deck.pop()],
+      bet,
+      doubled: false,
+      status: "playing",
+      result: null,
+      payout: 0,
+    };
+    blackjackGames.set(req.user.id, game);
+
+    if (bjIsBlackjack(game.player)) {
+      await resolveBlackjack(req, game, false);
+    }
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du lancement de la partie." });
+  }
+});
+
+app.post("/api/casino/blackjack/hit", authRequired, async (req, res) => {
+  try {
+    const game = blackjackGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune partie en cours." });
+
+    game.player.push(game.deck.pop());
+    const p = bjHandTotal(game.player);
+    if (p.total > 21) {
+      await resolveBlackjack(req, game, false);
+    }
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+app.post("/api/casino/blackjack/stand", authRequired, async (req, res) => {
+  try {
+    const game = blackjackGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune partie en cours." });
+
+    await resolveBlackjack(req, game, true);
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+app.post("/api/casino/blackjack/double", authRequired, async (req, res) => {
+  try {
+    const game = blackjackGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune partie en cours." });
+    if (game.player.length !== 2) return res.status(400).json({ error: "Tu ne peux doubler qu'au tout premier coup." });
+
+    const [arows] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    const balance = arows[0] ? arows[0].balance : 0;
+    if (balance < game.bet) return res.status(400).json({ error: "Solde insuffisant pour doubler." });
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [game.bet, req.user.id]);
+    game.bet *= 2;
+    game.doubled = true;
+    game.player.push(game.deck.pop());
+
+    const p = bjHandTotal(game.player);
+    await resolveBlackjack(req, game, p.total <= 21);
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : MINES ================= */
+
+// Même logique que le blackjack ci-dessus : partie en mémoire (une seule à la
+// fois par compte), mise débitée au lancement, gain crédité à la résolution
+// (perte, victoire totale ou retrait). Les positions des mines ne sont
+// JAMAIS envoyées au client tant que la partie est en cours — seule la liste
+// des cases déjà révélées et le multiplicateur courant le sont.
+const minesGames = new Map(); // accountId -> { mines: Set<number>, revealed: Set<number>, bet, minesCount, status, payout }
+
+const MINES_MIN_BET = 10;
+const MINES_GRID_SIZE = 25;
+const MINES_HOUSE_EDGE = 0.97; // 3% de marge maison, comme les casinos en ligne classiques
+
+// Multiplicateur "juste" (sans marge) pour avoir révélé `revealedCount` cases
+// sûres sachant qu'il y a `minesCount` mines parmi les MINES_GRID_SIZE cases :
+// produit des probabilités inverses de tomber sur une case sûre à chaque tirage.
+function minesFairMultiplier(minesCount, revealedCount) {
+  let mult = 1;
+  for (let i = 0; i < revealedCount; i++) {
+    mult *= (MINES_GRID_SIZE - i) / (MINES_GRID_SIZE - minesCount - i);
+  }
+  return mult;
+}
+function minesMultiplier(minesCount, revealedCount) {
+  if (revealedCount <= 0) return 1;
+  return minesFairMultiplier(minesCount, revealedCount) * MINES_HOUSE_EDGE;
+}
+
+function minesPublicState(game) {
+  const finished = game.status !== "playing";
+  const revealedCount = game.revealed.size;
+  const safeTiles = MINES_GRID_SIZE - game.minesCount;
+  const nextMultiplier = revealedCount < safeTiles ? minesMultiplier(game.minesCount, revealedCount + 1) : null;
+  return {
+    status: game.status, // 'playing' | 'lost' | 'won' | 'cashed'
+    bet: game.bet,
+    minesCount: game.minesCount,
+    revealed: Array.from(game.revealed),
+    mines: finished ? Array.from(game.mines) : [],
+    multiplier: minesMultiplier(game.minesCount, revealedCount),
+    nextMultiplier,
+    payout: game.payout || 0,
+  };
+}
+
+app.get("/api/casino/mines/state", authRequired, (req, res) => {
+  const game = minesGames.get(req.user.id);
+  if (!game) return res.json({ active: false });
+  res.json({ active: true, ...minesPublicState(game) });
+});
+
+app.post("/api/casino/mines/start", authRequired, async (req, res) => {
+  try {
+    const existing = minesGames.get(req.user.id);
+    if (existing && existing.status === "playing") {
+      return res.status(400).json({ error: "Termine ta partie de Mines en cours." });
+    }
+
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = clamp(Math.round(Number(req.body?.amount) || 0), MINES_MIN_BET, Math.max(MINES_MIN_BET, account.balance));
+    if (bet < MINES_MIN_BET || bet > account.balance) {
+      return res.status(400).json({ error: `Mise invalide : entre ${MINES_MIN_BET} 💎 et ton solde.` });
+    }
+    const minesCount = clamp(Math.round(Number(req.body?.mines) || 3), 1, 24);
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+
+    // tirage aléatoire des positions des mines parmi les 25 cases
+    const positions = Array.from({ length: MINES_GRID_SIZE }, (_, i) => i);
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    const mines = new Set(positions.slice(0, minesCount));
+
+    const game = { mines, revealed: new Set(), bet, minesCount, status: "playing", payout: 0 };
+    minesGames.set(req.user.id, game);
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...minesPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du lancement de la partie." });
+  }
+});
+
+app.post("/api/casino/mines/reveal", authRequired, async (req, res) => {
+  try {
+    const game = minesGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune partie en cours." });
+
+    const tile = Math.round(Number(req.body?.tile));
+    if (!Number.isInteger(tile) || tile < 0 || tile >= MINES_GRID_SIZE) {
+      return res.status(400).json({ error: "Case invalide." });
+    }
+    if (game.revealed.has(tile)) return res.status(400).json({ error: "Case déjà révélée." });
+
+    game.revealed.add(tile);
+
+    if (game.mines.has(tile)) {
+      game.status = "lost";
+      game.payout = 0;
+      await pool.query(
+        "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+        [req.user.pseudo, "no", `💣 Mines — ${req.user.pseudo} a explosé (-${game.bet} 💎)`]
+      );
+    } else {
+      const safeTiles = MINES_GRID_SIZE - game.minesCount;
+      if (game.revealed.size === safeTiles) {
+        // toutes les gemmes ont été trouvées : victoire automatique, encaissement immédiat
+        game.status = "won";
+        game.payout = Math.round(game.bet * minesMultiplier(game.minesCount, game.revealed.size));
+        await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [game.payout, req.user.id]);
+        const net = game.payout - game.bet;
+        await pool.query(
+          "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+          [req.user.pseudo, "yes", `💎 Mines — ${req.user.pseudo} a trouvé toutes les gemmes ! (+${net} 💎)`]
+        );
+      }
+    }
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...minesPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+app.post("/api/casino/mines/cashout", authRequired, async (req, res) => {
+  try {
+    const game = minesGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune partie en cours." });
+    if (game.revealed.size === 0) return res.status(400).json({ error: "Révèle au moins une case avant d'encaisser." });
+
+    game.status = "cashed";
+    game.payout = Math.round(game.bet * minesMultiplier(game.minesCount, game.revealed.size));
+    await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [game.payout, req.user.id]);
+
+    const net = game.payout - game.bet;
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `💎 Mines — ${req.user.pseudo} a encaissé (+${net} 💎)`]
+    );
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, ...minesPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : FLIP ================= */
+
+// Jeu à pièce : contrairement au blackjack/mines, chaque partie est un seul
+// lancer résolu instantanément (pas de partie "en cours" à conserver). On
+// garde juste en mémoire, par compte, le petit historique des derniers
+// lancers pour l'affichage côté client (le plus récent en tête).
+const flipHistory = new Map(); // accountId -> [{ result, win, bet, payout, ts }, ...]
+
+const FLIP_MIN_BET = 10;
+const FLIP_MULTIPLIER = 1.98; // ~1% de marge maison sur un jeu à 50/50, comme les autres jeux du casino
+
+app.get("/api/casino/flip/state", authRequired, (req, res) => {
+  const history = flipHistory.get(req.user.id) || [];
+  res.json({ last: history[0] || null, history });
+});
+
+app.post("/api/casino/flip/play", authRequired, async (req, res) => {
+  try {
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = clamp(Math.round(Number(req.body?.amount) || 0), FLIP_MIN_BET, Math.max(FLIP_MIN_BET, account.balance));
+    if (bet < FLIP_MIN_BET || bet > account.balance) {
+      return res.status(400).json({ error: `Mise invalide : entre ${FLIP_MIN_BET} 💎 et ton solde.` });
+    }
+    const side = req.body?.side === "pile" ? "pile" : "face";
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+
+    const result = Math.random() < 0.5 ? "face" : "pile";
+    const win = result === side;
+    const payout = win ? Math.round(bet * FLIP_MULTIPLIER) : 0;
+    if (payout > 0) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
+    }
+
+    const entry = { result, win, bet, payout, ts: Date.now() };
+    const list = [entry, ...(flipHistory.get(req.user.id) || [])].slice(0, 20);
+    flipHistory.set(req.user.id, list);
+
+    const net = payout - bet;
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🪙 Flip — ${req.user.pseudo} : ${result === "face" ? "Face" : "Pile"} (${net >= 0 ? "+" : ""}${net} 💎)`]
+    );
+
+    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, result, win, bet, payout, history: list });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
 /* ================= ADMIN : JOUEURS ================= */
 
 app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => {
