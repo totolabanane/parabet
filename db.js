@@ -4,7 +4,16 @@
 
 const fs = require("fs");
 const path = require("path");
-const { Pool } = require("pg");
+const { Pool, types } = require("pg");
+
+// Le driver pg convertit par défaut TIMESTAMP/DATE en objets Date JS.
+// Le reste du code (server.js) a été écrit pour SQLite, qui renvoie des
+// dates sous forme de texte ("YYYY-MM-DD HH:MM:SS"). On force donc pg à
+// laisser ces colonnes en texte brut, pour rester compatible sans toucher
+// à server.js.
+types.setTypeParser(1082, (val) => val); // DATE
+types.setTypeParser(1114, (val) => val); // TIMESTAMP WITHOUT TIME ZONE
+types.setTypeParser(1184, (val) => val); // TIMESTAMP WITH TIME ZONE
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
