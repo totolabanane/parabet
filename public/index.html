@@ -162,6 +162,7 @@
   .mini-btn { padding: 6px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); }
   .mini-btn.green { color: var(--green); border-color: rgba(16,207,124,0.35); }
   .mini-btn.red { color: var(--red); border-color: rgba(255,77,94,0.35); }
+  .mini-btn.amber { color: var(--amber); border-color: rgba(242,183,63,0.35); }
   .mini-btn:hover { color: var(--text); }
   select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13.5px; padding: 10px 12px; outline: none; }
 
@@ -306,6 +307,7 @@ const state = {
   adminAccounts: [],     // liste des joueurs inscrits (admin)
   adminExpandedAccountId: null,
   adminAccountBets: {},  // cache: accountId -> liste de paris (admin)
+  adminResolveTime: {},  // cache: marketId -> valeur de l'input datetime-local (heure de fin choisie)
 
   filter: "all",
   query: "",
@@ -335,6 +337,24 @@ const state = {
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+// Valeur "maintenant" au format attendu par <input type="datetime-local">
+// (heure locale du navigateur, sans fuseau), ex: "2026-08-04T21:15"
+function nowLocalInputValue() {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+// Retourne l'heure de fin choisie pour un marché (pré-remplie à "maintenant"
+// si le staff n'a encore rien modifié), et la mémorise dans le state.
+function getResolveTime(marketId) {
+  if (!state.adminResolveTime[marketId]) {
+    state.adminResolveTime[marketId] = nowLocalInputValue();
+  }
+  return state.adminResolveTime[marketId];
+}
 
 function showToast(msg) {
   const el = document.getElementById("toast");
@@ -614,8 +634,9 @@ function visibleMarkets() {
     const q = state.query.trim().toLowerCase();
     list = list.filter(m => m.title.toLowerCase().includes(q));
   }
+  const statusRank = { open: 0, locked: 1, resolved: 2 };
   return [...list].sort((a, b) => {
-    if (a.status !== b.status) return a.status === "open" ? -1 : 1;
+    if (a.status !== b.status) return statusRank[a.status] - statusRank[b.status];
     return b.volume - a.volume;
   });
 }
@@ -686,14 +707,60 @@ async function adminDeleteMarket(marketId) {
   render();
 }
 
-async function adminResolveMarket(marketId, outcome) {
+async function adminResolveMarket(marketId, outcome, resolvedAtLocal) {
   state.adminBusy = true; render();
   try {
-    const r = await api(`/api/admin/markets/${marketId}/resolve`, { method: "POST", body: { outcome } });
+    // L'input datetime-local donne une heure locale sans fuseau ("2026-08-04T21:15") ;
+    // on la convertit en ISO (avec fuseau) pour que le serveur interprète la bonne heure.
+    const resolvedAt = resolvedAtLocal ? new Date(resolvedAtLocal).toISOString() : new Date().toISOString();
+    const r = await api(`/api/admin/markets/${marketId}/resolve`, { method: "POST", body: { outcome, resolvedAt } });
     const [markets, feed] = await Promise.all([api("/api/markets"), api("/api/feed")]);
     state.markets = markets;
     state.feed = feed;
-    showToast(`Marché résolu (${outcome === "yes" ? "Oui" : "Non"}) — ${r.paid} joueur(s) payé(s).`);
+    delete state.adminResolveTime[marketId];
+    const refundMsg = r.refunded ? ` · ${r.refunded} pari(s) placé(s) après coup remboursé(s)` : "";
+    showToast(`Marché résolu (${outcome === "yes" ? "Oui" : "Non"}) — ${r.paid} joueur(s) payé(s)${refundMsg}.`);
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminLockMarket(marketId) {
+  state.adminBusy = true; render();
+  try {
+    await api(`/api/admin/markets/${marketId}/lock`, { method: "POST" });
+    state.markets = await api("/api/markets");
+    showToast("Paris bloqués sur ce marché.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminUnlockMarket(marketId) {
+  state.adminBusy = true; render();
+  try {
+    await api(`/api/admin/markets/${marketId}/unlock`, { method: "POST" });
+    state.markets = await api("/api/markets");
+    showToast("Marché rouvert aux paris.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminSetPct(marketId, value) {
+  const pct = Math.round(Number(value));
+  if (!Number.isFinite(pct) || pct < 2 || pct > 98) { showToast("Entre un % entre 2 et 98."); return; }
+  state.adminBusy = true; render();
+  try {
+    await api(`/api/admin/markets/${marketId}/pct`, { method: "POST", body: { yes: pct } });
+    state.markets = await api("/api/markets");
+    showToast(`% de chance mis à jour (${pct}%).`);
   } catch (e) {
     showToast(e.message);
   }
@@ -993,6 +1060,7 @@ function renderApp() {
 function cardHtml(m) {
   const meta = CAT_META[m.category];
   const closed = m.status === "resolved";
+  const locked = m.status === "locked";
   return `
     <div class="card">
       <div class="card-head">
@@ -1009,6 +1077,8 @@ function cardHtml(m) {
       <div class="probbar"><div style="width:${m.yes}%; background:var(--green);"></div><div style="width:${100 - m.yes}%; background:var(--red);"></div></div>
       ${closed
         ? `<div class="resolved-badge ${m.resolution}">Résolu · ${m.resolution === "yes" ? "Oui" : "Non"}</div>`
+        : locked
+        ? `<div class="resolved-badge" style="background:var(--amber-bg); color:var(--amber);">🔒 Paris bloqués</div>`
         : `<div class="btn-row">
             <button class="btn-yes" data-bet="${m.id}|yes">Oui · ${m.yes}¢</button>
             <button class="btn-no" data-bet="${m.id}|no">Non · ${100 - m.yes}¢</button>
@@ -1016,7 +1086,7 @@ function cardHtml(m) {
       }
       <div class="card-foot">
         <span>${m.volume.toLocaleString("fr-FR")} 💎 de volume</span>
-        <span>${closed ? "Fermé" : `Ferme ${esc(m.closes)}`}</span>
+        <span>${closed ? "Fermé" : locked ? "Verrouillé" : `Ferme ${esc(m.closes)}`}</span>
       </div>
     </div>
   `;
@@ -1253,6 +1323,7 @@ function renderFaqModalContent(overlay, modal) {
 function renderAdmin() {
   const app = document.getElementById("app");
   const openMarkets = state.markets.filter(m => m.status === "open");
+  const lockedMarkets = state.markets.filter(m => m.status === "locked");
   const resolvedMarkets = state.markets.filter(m => m.status === "resolved");
   const pendingDeposits = [...state.deposits].filter(d => d.status === "pending").sort((a, b) => b.ts - a.ts);
   const pastDeposits = [...state.deposits].filter(d => d.status !== "pending").sort((a, b) => b.ts - a.ts);
@@ -1291,7 +1362,7 @@ function renderAdmin() {
                   <p class="feed-line">
                     <span style="color:${b.side === "yes" ? "var(--green)" : "var(--red)"}; font-weight:700;">${b.side === "yes" ? "Oui" : "Non"}</span>
                     — ${esc(b.title)} · ${b.amount} 💎 à ${b.price}% · ${new Date(b.ts).toLocaleString("fr-FR")}
-                    ${b.marketStatus === "resolved" ? (b.marketResolution === b.side ? ` · <span style="color:var(--green);">gagné</span>` : ` · <span style="color:var(--red);">perdu</span>`) : ` · en cours`}
+                    ${b.marketStatus === "resolved" ? (b.refunded ? ` · <span style="color:var(--amber);">remboursé (pari après la fin du marché)</span>` : b.marketResolution === b.side ? ` · <span style="color:var(--green);">gagné</span>` : ` · <span style="color:var(--red);">perdu</span>`) : ` · en cours`}
                   </p>
                 `).join("")}
               </div>
@@ -1330,12 +1401,45 @@ function renderAdmin() {
       <div class="admin-section">
         <h3>Marchés ouverts (${openMarkets.length})</h3>
         ${openMarkets.length === 0 ? `<p class="admin-row-meta">Aucun marché ouvert.</p>` : openMarkets.map(m => `
-          <div class="admin-row">
+          <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
             <div>
               <div class="admin-row-title">${esc(m.title)}</div>
               <div class="admin-row-meta">${CAT_META[m.category].label} · ${m.yes}% Oui · ${m.volume} 💎 de volume · ferme ${esc(m.closes)}</div>
             </div>
             <div class="admin-actions">
+              <input type="number" min="2" max="98" value="${m.yes}" data-pct-input="${m.id}" style="width:64px;" />
+              <button class="mini-btn" data-setpct="${m.id}">Changer le %</button>
+              <button class="mini-btn amber" data-lock="${m.id}">🔒 Bloquer les paris</button>
+            </div>
+            <div class="admin-actions" style="align-items:center;">
+              <label class="admin-row-meta" style="margin:0;">Marché terminé le :</label>
+              <input type="datetime-local" data-resolve-time="${m.id}" value="${getResolveTime(m.id)}" style="width:auto;" />
+              <button class="mini-btn" data-set-now="${m.id}">Maintenant</button>
+              <button class="mini-btn green" data-resolve="${m.id}|yes">Résoudre : Oui</button>
+              <button class="mini-btn red" data-resolve="${m.id}|no">Résoudre : Non</button>
+              <button class="mini-btn" data-delete="${m.id}">Supprimer</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="admin-section">
+        <h3>Marchés verrouillés (${lockedMarkets.length})</h3>
+        ${lockedMarkets.length === 0 ? `<p class="admin-row-meta">Aucun marché verrouillé.</p>` : lockedMarkets.map(m => `
+          <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+            <div>
+              <div class="admin-row-title">${esc(m.title)}</div>
+              <div class="admin-row-meta">${CAT_META[m.category].label} · ${m.yes}% Oui · ${m.volume} 💎 de volume · paris bloqués</div>
+            </div>
+            <div class="admin-actions">
+              <input type="number" min="2" max="98" value="${m.yes}" data-pct-input="${m.id}" style="width:64px;" />
+              <button class="mini-btn" data-setpct="${m.id}">Changer le %</button>
+              <button class="mini-btn" data-unlock="${m.id}">🔓 Rouvrir les paris</button>
+            </div>
+            <div class="admin-actions" style="align-items:center;">
+              <label class="admin-row-meta" style="margin:0;">Marché terminé le :</label>
+              <input type="datetime-local" data-resolve-time="${m.id}" value="${getResolveTime(m.id)}" style="width:auto;" />
+              <button class="mini-btn" data-set-now="${m.id}">Maintenant</button>
               <button class="mini-btn green" data-resolve="${m.id}|yes">Résoudre : Oui</button>
               <button class="mini-btn red" data-resolve="${m.id}|no">Résoudre : Non</button>
               <button class="mini-btn" data-delete="${m.id}">Supprimer</button>
@@ -1350,7 +1454,7 @@ function renderAdmin() {
           <div class="admin-row">
             <div>
               <div class="admin-row-title">${esc(m.title)}</div>
-              <div class="admin-row-meta">${CAT_META[m.category].label} · résultat : ${m.resolution === "yes" ? "Oui" : "Non"}</div>
+              <div class="admin-row-meta">${CAT_META[m.category].label} · résultat : ${m.resolution === "yes" ? "Oui" : "Non"}${m.resolvedAt ? ` · marché terminé le ${new Date(m.resolvedAt).toLocaleString("fr-FR")}` : ""}</div>
             </div>
             <div class="admin-actions">
               <button class="mini-btn" data-delete="${m.id}">Supprimer</button>
@@ -1395,7 +1499,7 @@ function renderAdmin() {
         `).join("")}
       </div>
 
-      <p class="disclaimer">Résoudre un marché paie automatiquement tous les joueurs qui ont misé sur le bon résultat, en émeraudes fictives, proportionnellement à la cote au moment de leur mise. Approuver un dépôt crédite immédiatement le solde du joueur : vérifie bien la capture d'écran avant de valider.</p>
+      <p class="disclaimer">Résoudre un marché paie automatiquement tous les joueurs qui ont misé sur le bon résultat avant l'heure de fin indiquée, en émeraudes fictives, proportionnellement à la cote au moment de leur mise. Les paris placés après cette heure (ex: pari passé une fois l'événement déjà terminé) sont simplement remboursés, sans gain ni perte. Approuver un dépôt crédite immédiatement le solde du joueur : vérifie bien la capture d'écran avant de valider.</p>
 
       <div class="admin-section">
         <h3>Retraits en attente (${pendingWithdrawals.length})</h3>
@@ -1439,14 +1543,31 @@ function renderAdmin() {
   document.getElementById("fYes").addEventListener("input", e => { state.adminForm.yes = e.target.value; });
   document.getElementById("fCloses").addEventListener("input", e => { state.adminForm.closes = e.target.value; });
   document.getElementById("createBtn").addEventListener("click", adminCreateMarket);
+  document.querySelectorAll("[data-resolve-time]").forEach(inp => inp.addEventListener("change", e => {
+    state.adminResolveTime[inp.dataset.resolveTime] = e.target.value;
+  }));
+  document.querySelectorAll("[data-set-now]").forEach(b => b.addEventListener("click", () => {
+    state.adminResolveTime[b.dataset.setNow] = nowLocalInputValue();
+    render();
+  }));
   document.querySelectorAll("[data-resolve]").forEach(b => b.addEventListener("click", () => {
     const [marketId, outcome] = b.dataset.resolve.split("|");
-    if (confirm(`Résoudre ce marché avec le résultat "${outcome === "yes" ? "Oui" : "Non"}" ? Cette action est définitive et paiera les gagnants.`)) {
-      adminResolveMarket(marketId, outcome);
+    const timeInput = document.querySelector(`[data-resolve-time="${marketId}"]`);
+    const resolvedAtLocal = timeInput ? timeInput.value : getResolveTime(marketId);
+    if (!resolvedAtLocal) { showToast("Indique l'heure à laquelle le marché s'est terminé."); return; }
+    const prettyTime = new Date(resolvedAtLocal).toLocaleString("fr-FR");
+    if (confirm(`Résoudre ce marché avec le résultat "${outcome === "yes" ? "Oui" : "Non"}" (marché terminé le ${prettyTime}) ? Les paris placés après cette heure seront remboursés. Cette action est définitive et paiera les gagnants.`)) {
+      adminResolveMarket(marketId, outcome, resolvedAtLocal);
     }
   }));
   document.querySelectorAll("[data-delete]").forEach(b => b.addEventListener("click", () => {
     if (confirm("Supprimer ce marché définitivement ?")) adminDeleteMarket(b.dataset.delete);
+  }));
+  document.querySelectorAll("[data-lock]").forEach(b => b.addEventListener("click", () => adminLockMarket(b.dataset.lock)));
+  document.querySelectorAll("[data-unlock]").forEach(b => b.addEventListener("click", () => adminUnlockMarket(b.dataset.unlock)));
+  document.querySelectorAll("[data-setpct]").forEach(b => b.addEventListener("click", () => {
+    const input = document.querySelector(`[data-pct-input="${b.dataset.setpct}"]`);
+    adminSetPct(b.dataset.setpct, input ? input.value : "");
   }));
   document.querySelectorAll("[data-approve-dep]").forEach(b => b.addEventListener("click", () => {
     if (confirm("Confirmer ce dépôt ? Le montant sera crédité immédiatement sur le compte du joueur.")) {

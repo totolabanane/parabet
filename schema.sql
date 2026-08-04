@@ -26,8 +26,9 @@ CREATE TABLE IF NOT EXISTS markets (
   yes_pct      INT NOT NULL DEFAULT 50,
   volume       INT NOT NULL DEFAULT 0,
   closes_label VARCHAR(60) DEFAULT 'Indéterminée',
-  status       ENUM('open','resolved') NOT NULL DEFAULT 'open',
+  status       ENUM('open','locked','resolved') NOT NULL DEFAULT 'open',
   resolution   ENUM('yes','no') DEFAULT NULL,
+  resolved_at  DATETIME DEFAULT NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS bets (
   side       ENUM('yes','no') NOT NULL,
   amount     INT NOT NULL,
   price      INT NOT NULL,
+  refunded   TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (market_id) REFERENCES markets(id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE

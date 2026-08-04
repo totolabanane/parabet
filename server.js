@@ -96,6 +96,7 @@ function marketRowToJson(m) {
     closes: m.closes_label,
     status: m.status,
     resolution: m.resolution,
+    resolvedAt: m.resolved_at ? new Date(m.resolved_at.replace(" ", "T") + "Z").getTime() : null,
   };
 }
 
@@ -314,7 +315,7 @@ app.get("/api/mybets", authRequired, async (req, res) => {
   );
   res.json(rows.map(b => ({
     marketId: b.market_id, title: b.market_title, side: b.side,
-    amount: b.amount, price: b.price, ts: new Date(b.created_at).getTime(),
+    amount: b.amount, price: b.price, refunded: !!b.refunded, ts: new Date(b.created_at).getTime(),
   })));
 });
 
@@ -330,7 +331,10 @@ app.post("/api/bets", authRequired, async (req, res) => {
     const market = mrows[0];
     if (!market || market.status !== "open") {
       await conn.rollback();
-      return res.status(400).json({ error: "Ce marché n'est plus ouvert." });
+      const msg = market && market.status === "locked"
+        ? "Les paris sont temporairement bloqués sur ce marché."
+        : "Ce marché n'est plus ouvert.";
+      return res.status(400).json({ error: msg });
     }
 
     const [arows] = await conn.query("SELECT * FROM accounts WHERE id = ? FOR UPDATE", [req.user.id]);
@@ -517,6 +521,7 @@ app.get("/api/admin/accounts/:id/bets", authRequired, adminRequired, async (req,
     side: b.side,
     amount: b.amount,
     price: b.price,
+    refunded: !!b.refunded,
     marketStatus: b.market_status,
     marketResolution: b.market_resolution,
     ts: new Date(b.created_at).getTime(),
@@ -543,9 +548,60 @@ app.delete("/api/admin/markets/:id", authRequired, adminRequired, async (req, re
   res.json({ ok: true });
 });
 
+// Verrouille un marché : plus aucune nouvelle mise n'est acceptée, mais il
+// n'est pas encore résolu (utile pour figer les paris avant l'issue d'un
+// événement, le temps de vérifier le résultat).
+app.post("/api/admin/markets/:id/lock", authRequired, adminRequired, async (req, res) => {
+  const [result] = await pool.query(
+    "UPDATE markets SET status = 'locked' WHERE id = ? AND status = 'open'",
+    [req.params.id]
+  );
+  if (!result.affectedRows) return res.status(400).json({ error: "Ce marché n'est pas ouvert." });
+  res.json({ ok: true });
+});
+
+// Rouvre un marché verrouillé (les joueurs peuvent de nouveau parier).
+app.post("/api/admin/markets/:id/unlock", authRequired, adminRequired, async (req, res) => {
+  const [result] = await pool.query(
+    "UPDATE markets SET status = 'open' WHERE id = ? AND status = 'locked'",
+    [req.params.id]
+  );
+  if (!result.affectedRows) return res.status(400).json({ error: "Ce marché n'est pas verrouillé." });
+  res.json({ ok: true });
+});
+
+// Modifie manuellement le % de chance affiché (ex: pour recaler le marché
+// après une nouvelle information, indépendamment des mises déjà placées).
+app.post("/api/admin/markets/:id/pct", authRequired, adminRequired, async (req, res) => {
+  const { yes } = req.body || {};
+  const yesPct = clamp(Math.round(Number(yes)), 2, 98);
+  if (!Number.isFinite(yesPct)) return res.status(400).json({ error: "Pourcentage invalide." });
+  const [result] = await pool.query(
+    "UPDATE markets SET yes_pct = ? WHERE id = ? AND status != 'resolved'",
+    [yesPct, req.params.id]
+  );
+  if (!result.affectedRows) return res.status(400).json({ error: "Marché introuvable ou déjà résolu." });
+  res.json({ ok: true, yes: yesPct });
+});
+
+// Convertit une date JS en chaîne "YYYY-MM-DD HH:MM:SS" (UTC), le même format
+// que celui produit par SQLite pour bets.created_at (colonnes DEFAULT
+// datetime('now')), afin de pouvoir comparer les deux par simple égalité/
+// comparaison de chaînes.
+function toSqliteUtc(date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
 app.post("/api/admin/markets/:id/resolve", authRequired, adminRequired, async (req, res) => {
-  const { outcome } = req.body || {};
+  const { outcome, resolvedAt } = req.body || {};
   if (outcome !== "yes" && outcome !== "no") return res.status(400).json({ error: "Résultat invalide." });
+
+  // Heure de fin du marché : celle envoyée par le staff (pré-remplie à
+  // "maintenant" côté interface, mais modifiable), sinon l'heure actuelle
+  // par défaut si rien n'est fourni.
+  let cutoffDate = resolvedAt ? new Date(resolvedAt) : new Date();
+  if (isNaN(cutoffDate.getTime())) cutoffDate = new Date();
+  const cutoff = toSqliteUtc(cutoffDate);
 
   const conn = await pool.getConnection();
   try {
@@ -557,20 +613,35 @@ app.post("/api/admin/markets/:id/resolve", authRequired, adminRequired, async (r
       return res.status(400).json({ error: "Marché introuvable ou déjà résolu." });
     }
 
-    const [winners] = await conn.query("SELECT * FROM bets WHERE market_id = ? AND side = ?", [req.params.id, outcome]);
-    for (const b of winners) {
-      const payout = Math.round((b.amount * 100) / Math.max(2, b.price));
-      await conn.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, b.account_id]);
+    const [allBets] = await conn.query("SELECT * FROM bets WHERE market_id = ?", [req.params.id]);
+    let paidCount = 0;
+    let refundedCount = 0;
+    for (const b of allBets) {
+      // Un pari placé après l'heure de fin réelle du marché n'a pas pu être
+      // pris en compte dans l'issue : il est simplement remboursé (mise
+      // rendue), sans gain ni perte, quel que soit le côté choisi.
+      if (b.created_at > cutoff) {
+        await conn.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [b.amount, b.account_id]);
+        await conn.query("UPDATE bets SET refunded = 1 WHERE id = ?", [b.id]);
+        refundedCount++;
+      } else if (b.side === outcome) {
+        const payout = Math.round((b.amount * 100) / Math.max(2, b.price));
+        await conn.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, b.account_id]);
+        paidCount++;
+      }
     }
 
-    await conn.query("UPDATE markets SET status = 'resolved', resolution = ? WHERE id = ?", [outcome, req.params.id]);
+    await conn.query(
+      "UPDATE markets SET status = 'resolved', resolution = ?, resolved_at = ? WHERE id = ?",
+      [outcome, cutoff, req.params.id]
+    );
     await conn.query(
       "INSERT INTO feed (pseudo, side, amount, title) VALUES ('Staff', ?, 0, ?)",
       [outcome, `🏁 Résultat — ${market.title} : ${outcome === "yes" ? "Oui" : "Non"}`]
     );
 
     await conn.commit();
-    res.json({ paid: winners.length });
+    res.json({ paid: paidCount, refunded: refundedCount });
   } catch (e) {
     await conn.rollback();
     console.error(e);

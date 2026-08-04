@@ -27,6 +27,8 @@ for (const stmt of [
   "ALTER TABLE accounts ADD COLUMN referred_by INTEGER",
   "ALTER TABLE accounts ADD COLUMN referral_earnings INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE withdrawals ADD COLUMN minecraft_pseudo TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE markets ADD COLUMN resolved_at TEXT",
+  "ALTER TABLE bets ADD COLUMN refunded INTEGER NOT NULL DEFAULT 0",
 ]) {
   try { db.exec(stmt); } catch (e) { /* colonne déjà présente, on ignore */ }
 }

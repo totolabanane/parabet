@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS markets (
   closes_label TEXT DEFAULT 'Indéterminée',
   status       TEXT NOT NULL DEFAULT 'open',
   resolution   TEXT DEFAULT NULL,
+  resolved_at  TEXT DEFAULT NULL,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS bets (
   side       TEXT NOT NULL,
   amount     INTEGER NOT NULL,
   price      INTEGER NOT NULL,
+  refunded   INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (market_id) REFERENCES markets(id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
