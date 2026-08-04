@@ -73,8 +73,21 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS casino_bets (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  game       TEXT NOT NULL,               -- 'blackjack' | 'mines' | 'flip'
+  bet        INTEGER NOT NULL,
+  payout     INTEGER NOT NULL DEFAULT 0,
+  result     TEXT NOT NULL,               -- 'win' | 'lose' | 'push' | 'cashout'
+  detail     TEXT DEFAULT NULL,           -- petit résumé lisible pour l'admin
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_bets_market ON bets(market_id);
 CREATE INDEX IF NOT EXISTS idx_bets_account ON bets(account_id);
+CREATE INDEX IF NOT EXISTS idx_casino_bets_account ON casino_bets(account_id);
 CREATE INDEX IF NOT EXISTS idx_deposits_status ON deposits(status);
 CREATE INDEX IF NOT EXISTS idx_deposits_account ON deposits(account_id);
 CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals(status);

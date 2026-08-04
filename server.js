@@ -583,6 +583,10 @@ async function resolveBlackjack(req, game, dealerPlays) {
     "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
     [req.user.pseudo, net > 0 ? "yes" : net < 0 ? "no" : null, `🃏 Blackjack — ${req.user.pseudo} : ${resultLabel} (${netLabel})`]
   );
+  await pool.query(
+    "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+    [req.user.id, "blackjack", game.bet, payout, result, `${resultLabel} · joueur ${p.total} vs croupier ${d.total}${game.doubled ? " · doublé" : ""}`]
+  );
 }
 
 app.get("/api/casino/blackjack/state", authRequired, (req, res) => {
@@ -803,6 +807,10 @@ app.post("/api/casino/mines/reveal", authRequired, async (req, res) => {
         "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
         [req.user.pseudo, "no", `💣 Mines — ${req.user.pseudo} a explosé (-${game.bet} 💎)`]
       );
+      await pool.query(
+        "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+        [req.user.id, "mines", game.bet, 0, "lose", `${game.minesCount} mines · explosé après ${game.revealed.size} case${game.revealed.size === 1 ? "" : "s"} révélée${game.revealed.size === 1 ? "" : "s"}`]
+      );
     } else {
       const safeTiles = MINES_GRID_SIZE - game.minesCount;
       if (game.revealed.size === safeTiles) {
@@ -814,6 +822,10 @@ app.post("/api/casino/mines/reveal", authRequired, async (req, res) => {
         await pool.query(
           "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
           [req.user.pseudo, "yes", `💎 Mines — ${req.user.pseudo} a trouvé toutes les gemmes ! (+${net} 💎)`]
+        );
+        await pool.query(
+          "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+          [req.user.id, "mines", game.bet, game.payout, "win", `${game.minesCount} mines · toutes les gemmes trouvées`]
         );
       }
     }
@@ -840,6 +852,10 @@ app.post("/api/casino/mines/cashout", authRequired, async (req, res) => {
     await pool.query(
       "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
       [req.user.pseudo, net >= 0 ? "yes" : "no", `💎 Mines — ${req.user.pseudo} a encaissé (+${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "mines", game.bet, game.payout, "cashout", `${game.minesCount} mines · encaissé après ${game.revealed.size} case${game.revealed.size === 1 ? "" : "s"} révélée${game.revealed.size === 1 ? "" : "s"}`]
     );
 
     const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
@@ -896,6 +912,10 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
       "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
       [req.user.pseudo, net >= 0 ? "yes" : "no", `🪙 Flip — ${req.user.pseudo} : ${result === "face" ? "Face" : "Pile"} (${net >= 0 ? "+" : ""}${net} 💎)`]
     );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "flip", bet, payout, win ? "win" : "lose", `Misé sur ${side === "pile" ? "Pile" : "Face"} · résultat ${result === "pile" ? "Pile" : "Face"}`]
+    );
 
     const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
     res.json({ balance: after[0].balance, result, win, bet, payout, history: list });
@@ -914,13 +934,20 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
       a.referral_code, a.referral_earnings,
       ref.pseudo AS referred_by_pseudo,
       COALESCE(bs.bet_count, 0) AS bet_count,
-      COALESCE(bs.total_wagered, 0) AS total_wagered
+      COALESCE(bs.total_wagered, 0) AS total_wagered,
+      COALESCE(cs.casino_bet_count, 0) AS casino_bet_count,
+      COALESCE(cs.casino_total_wagered, 0) AS casino_total_wagered,
+      COALESCE(cs.casino_net, 0) AS casino_net
     FROM accounts a
     LEFT JOIN accounts ref ON ref.id = a.referred_by
     LEFT JOIN (
       SELECT account_id, COUNT(*) AS bet_count, SUM(amount) AS total_wagered
       FROM bets GROUP BY account_id
     ) bs ON bs.account_id = a.id
+    LEFT JOIN (
+      SELECT account_id, COUNT(*) AS casino_bet_count, SUM(bet) AS casino_total_wagered, SUM(payout - bet) AS casino_net
+      FROM casino_bets GROUP BY account_id
+    ) cs ON cs.account_id = a.id
     ORDER BY a.created_at DESC
   `);
   res.json(rows.map(a => ({
@@ -934,6 +961,9 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
     referralEarnings: a.referral_earnings,
     betCount: a.bet_count,
     totalWagered: a.total_wagered,
+    casinoBetCount: a.casino_bet_count,
+    casinoTotalWagered: a.casino_total_wagered,
+    casinoNet: a.casino_net,
   })));
 });
 
@@ -954,6 +984,46 @@ app.get("/api/admin/accounts/:id/bets", authRequired, adminRequired, async (req,
     marketStatus: b.market_status,
     marketResolution: b.market_resolution,
     ts: new Date(b.created_at).getTime(),
+  })));
+});
+
+app.get("/api/admin/accounts/:id/casino-bets", authRequired, adminRequired, async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT * FROM casino_bets WHERE account_id = ? ORDER BY created_at DESC LIMIT 200`,
+    [req.params.id]
+  );
+  res.json(rows.map(c => ({
+    id: c.id,
+    game: c.game,
+    bet: c.bet,
+    payout: c.payout,
+    net: c.payout - c.bet,
+    result: c.result,
+    detail: c.detail,
+    ts: new Date(c.created_at).getTime(),
+  })));
+});
+
+// Vue d'ensemble : toutes les parties casino de tous les joueurs, les plus
+// récentes en premier (pratique pour surveiller l'activité casino sans avoir
+// à ouvrir chaque joueur un par un).
+app.get("/api/admin/casino-bets", authRequired, adminRequired, async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT c.*, a.pseudo FROM casino_bets c
+     JOIN accounts a ON a.id = c.account_id
+     ORDER BY c.created_at DESC LIMIT 300`
+  );
+  res.json(rows.map(c => ({
+    id: c.id,
+    accountId: c.account_id,
+    pseudo: c.pseudo,
+    game: c.game,
+    bet: c.bet,
+    payout: c.payout,
+    net: c.payout - c.bet,
+    result: c.result,
+    detail: c.detail,
+    ts: new Date(c.created_at).getTime(),
   })));
 });
 

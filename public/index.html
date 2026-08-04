@@ -546,6 +546,9 @@ const state = {
   adminAccounts: [],     // liste des joueurs inscrits (admin)
   adminExpandedAccountId: null,
   adminAccountBets: {},  // cache: accountId -> liste de paris (admin)
+  adminExpandedAccountCasinoId: null,
+  adminAccountCasinoBets: {}, // cache: accountId -> liste de parties casino (admin)
+  adminCasinoBets: [],   // toutes les parties casino récentes, tous joueurs (admin)
   adminResolveTime: {},  // cache: marketId -> valeur de l'input datetime-local (heure de fin choisie)
 
   filter: "all",
@@ -1122,6 +1125,34 @@ async function loadAdminAccounts() {
   state.adminAccounts = await api("/api/admin/accounts");
 }
 
+async function loadAdminCasinoBets() {
+  state.adminCasinoBets = await api("/api/admin/casino-bets");
+}
+
+const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip" };
+const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
+const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
+
+async function toggleAccountCasinoBets(id) {
+  id = Number(id);
+  if (state.adminExpandedAccountCasinoId === id) {
+    state.adminExpandedAccountCasinoId = null;
+    render();
+    return;
+  }
+  state.adminExpandedAccountCasinoId = id;
+  render();
+  if (!state.adminAccountCasinoBets[id]) {
+    try {
+      state.adminAccountCasinoBets[id] = await api(`/api/admin/accounts/${id}/casino-bets`);
+    } catch (e) {
+      showToast(e.message);
+      state.adminAccountCasinoBets[id] = [];
+    }
+    render();
+  }
+}
+
 async function toggleAccountBets(id) {
   id = Number(id);
   if (state.adminExpandedAccountId === id) {
@@ -1312,7 +1343,7 @@ function renderApp() {
   document.getElementById("referralBtn").addEventListener("click", openReferralModal);
   document.getElementById("faqBtn").addEventListener("click", openFaqModal);
   const adminBtn = document.getElementById("adminBtn");
-  if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts()]); render(); });
+  if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts(), loadAdminCasinoBets()]); render(); });
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { state.filter = b.dataset.filter; render(); }));
   document.querySelectorAll("[data-bet]").forEach(b => b.addEventListener("click", () => {
     const [marketId, side] = b.dataset.bet.split("|");
@@ -2333,16 +2364,21 @@ function renderAdmin() {
         <h3>Joueurs inscrits (${state.adminAccounts.length})</h3>
         ${state.adminAccounts.length === 0 ? `<p class="admin-row-meta">Aucun joueur inscrit pour l'instant.</p>` : state.adminAccounts.map(a => `
           <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:pointer;" data-toggle-account="${a.id}">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
               <div>
                 <div class="admin-row-title">${esc(a.pseudo)}${a.isAdmin ? ` <span class="admin-tag" style="margin-left:4px;">Staff</span>` : ""}</div>
                 <div class="admin-row-meta">
-                  ${a.balance} 💎 · ${a.betCount} pari${a.betCount === 1 ? "" : "s"} pour ${a.totalWagered} 💎 misés au total · inscrit le ${new Date(a.createdAt).toLocaleDateString("fr-FR")}
+                  ${a.balance} 💎 · ${a.betCount} pari${a.betCount === 1 ? "" : "s"} marché pour ${a.totalWagered} 💎 misés
+                  · ${a.casinoBetCount} partie${a.casinoBetCount === 1 ? "" : "s"} casino pour ${a.casinoTotalWagered} 💎 misés (<span style="color:${a.casinoNet >= 0 ? "var(--green)" : "var(--red)"};">${a.casinoNet >= 0 ? "+" : ""}${a.casinoNet} 💎</span>)
+                  · inscrit le ${new Date(a.createdAt).toLocaleDateString("fr-FR")}
                   ${a.referredByPseudo ? ` · parrainé par ${esc(a.referredByPseudo)}` : ""}
                   ${a.referralEarnings > 0 ? ` · ${a.referralEarnings} 💎 gagnés en parrainage` : ""}
                 </div>
               </div>
-              <button class="mini-btn">${state.adminExpandedAccountId === a.id ? "Masquer" : "Voir les paris"}</button>
+              <div class="admin-actions">
+                <button class="mini-btn" data-toggle-account="${a.id}">${state.adminExpandedAccountId === a.id ? "Masquer" : "Voir les paris"}</button>
+                <button class="mini-btn" data-toggle-account-casino="${a.id}">${state.adminExpandedAccountCasinoId === a.id ? "Masquer" : "Voir le casino"}</button>
+              </div>
             </div>
             ${state.adminExpandedAccountId === a.id ? `
               <div class="feed-box" style="height:auto; max-height:220px;">
@@ -2355,8 +2391,34 @@ function renderAdmin() {
                 `).join("")}
               </div>
             ` : ""}
+            ${state.adminExpandedAccountCasinoId === a.id ? `
+              <div class="feed-box" style="height:auto; max-height:220px;">
+                ${!state.adminAccountCasinoBets[a.id] ? `<p class="admin-row-meta">Chargement…</p>` : state.adminAccountCasinoBets[a.id].length === 0 ? `<p class="admin-row-meta">Ce joueur n'a encore joué à aucun jeu du casino.</p>` : state.adminAccountCasinoBets[a.id].map(c => `
+                  <p class="feed-line">
+                    <span style="font-weight:700;">${CASINO_GAME_LABEL[c.game] || c.game}</span>
+                    — ${c.bet} 💎 misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
+                    (${c.net >= 0 ? "+" : ""}${c.net} 💎) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
+                  </p>
+                `).join("")}
+              </div>
+            ` : ""}
           </div>
         `).join("")}
+      </div>
+
+      <div class="admin-section">
+        <h3>Activité casino récente (${state.adminCasinoBets.length})</h3>
+        ${state.adminCasinoBets.length === 0 ? `<p class="admin-row-meta">Aucune partie de casino jouée pour l'instant.</p>` : `
+          <div class="feed-box" style="height:auto; max-height:260px;">
+            ${state.adminCasinoBets.map(c => `
+              <p class="feed-line">
+                <strong>${esc(c.pseudo)}</strong> — <span style="font-weight:700;">${CASINO_GAME_LABEL[c.game] || c.game}</span>
+                · ${c.bet} 💎 misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
+                (${c.net >= 0 ? "+" : ""}${c.net} 💎) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
+              </p>
+            `).join("")}
+          </div>
+        `}
       </div>
 
       <div class="admin-section">
@@ -2587,6 +2649,9 @@ function renderAdmin() {
   }));
   document.querySelectorAll("[data-toggle-account]").forEach(el => el.addEventListener("click", () => {
     toggleAccountBets(el.dataset.toggleAccount);
+  }));
+  document.querySelectorAll("[data-toggle-account-casino]").forEach(el => el.addEventListener("click", () => {
+    toggleAccountCasinoBets(el.dataset.toggleAccountCasino);
   }));
 }
 

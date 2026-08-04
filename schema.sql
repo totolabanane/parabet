@@ -76,9 +76,22 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS casino_bets (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  account_id INT NOT NULL,
+  game       VARCHAR(20) NOT NULL,
+  bet        INT NOT NULL,
+  payout     INT NOT NULL DEFAULT 0,
+  result     VARCHAR(10) NOT NULL,
+  detail     VARCHAR(255) DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- Index utiles
 CREATE INDEX idx_bets_market ON bets(market_id);
 CREATE INDEX idx_bets_account ON bets(account_id);
+CREATE INDEX idx_casino_bets_account ON casino_bets(account_id);
 CREATE INDEX idx_deposits_status ON deposits(status);
 CREATE INDEX idx_deposits_account ON deposits(account_id);
 CREATE INDEX idx_withdrawals_status ON withdrawals(status);
