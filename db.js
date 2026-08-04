@@ -1,82 +1,112 @@
-// db.js — base de données SQLite toute simple (1 fichier, zéro serveur à installer)
-// Utilise le module natif node:sqlite (intégré à Node.js 22+, aucune compilation,
-// aucune dépendance npm à installer). Expose la même API minimale (query / getConnection)
-// que l'ancien pool mysql2, donc le reste de server.js n'a presque rien à changer.
+// db.js — Postgres (Neon) via le module "pg"
+// Expose la même API minimale (query / getConnection) qu'avant (SQLite / mysql2),
+// donc server.js n'a besoin d'aucune modification.
 
-const path = require("path");
 const fs = require("fs");
-const { DatabaseSync } = require("node:sqlite");
+const path = require("path");
+const { Pool } = require("pg");
 
-const DB_FILE = process.env.DB_FILE || path.join(__dirname, "parabet.db");
-
-const db = new DatabaseSync(DB_FILE);
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA foreign_keys = ON;");
-
-// Crée les tables si elles n'existent pas encore (premier lancement)
-const schema = fs.readFileSync(path.join(__dirname, "schema.sqlite.sql"), "utf8");
-db.exec(schema);
-
-// Migration douce : si la base existait déjà avant l'ajout du parrainage,
-// les nouvelles colonnes ne sont pas créées par le schema ci-dessus
-// (CREATE TABLE IF NOT EXISTS ne modifie pas une table existante), donc on
-// les ajoute ici à la main. Chaque ALTER TABLE est ignoré s'il a déjà été
-// appliqué (SQLite renvoie une erreur "duplicate column name" qu'on avale).
-for (const stmt of [
-  "ALTER TABLE accounts ADD COLUMN referral_code TEXT",
-  "ALTER TABLE accounts ADD COLUMN referred_by INTEGER",
-  "ALTER TABLE accounts ADD COLUMN referral_earnings INTEGER NOT NULL DEFAULT 0",
-  "ALTER TABLE withdrawals ADD COLUMN minecraft_pseudo TEXT NOT NULL DEFAULT ''",
-  "ALTER TABLE markets ADD COLUMN resolved_at TEXT",
-  "ALTER TABLE bets ADD COLUMN refunded INTEGER NOT NULL DEFAULT 0",
-]) {
-  try { db.exec(stmt); } catch (e) { /* colonne déjà présente, on ignore */ }
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error("ERREUR: DATABASE_URL manquant (URL de connexion Neon).");
+  process.exit(1);
 }
-try {
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_referral_code ON accounts(referral_code)");
-} catch (e) { /* ignore */ }
-try {
-  db.exec("CREATE INDEX IF NOT EXISTS idx_accounts_referred_by ON accounts(referred_by)");
-} catch (e) { /* ignore */ }
 
-/* ---------- petites adaptations de syntaxe MySQL -> SQLite ---------- */
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  // Neon exige TLS. rejectUnauthorized:false évite les soucis de chaîne de
+  // certificats sur certains environnements (Render inclus).
+  ssl: { rejectUnauthorized: false },
+});
+
+// Crée les tables si elles n'existent pas encore (premier lancement),
+// puis applique les migrations douces (nouvelles colonnes ajoutées au fil du temps).
+async function init() {
+  const schema = fs.readFileSync(path.join(__dirname, "schema.postgres.sql"), "utf8");
+  await pool.query(schema);
+
+  for (const stmt of [
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_code TEXT",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referred_by INTEGER",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_earnings INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS minecraft_pseudo TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP",
+    "ALTER TABLE bets ADD COLUMN IF NOT EXISTS refunded INTEGER NOT NULL DEFAULT 0",
+  ]) {
+    await pool.query(stmt);
+  }
+
+  await pool.query(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_referral_code ON accounts(referral_code)"
+  );
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_accounts_referred_by ON accounts(referred_by)"
+  );
+}
+
+const ready = init().catch((err) => {
+  console.error("Erreur d'initialisation de la base Postgres :", err);
+  process.exit(1);
+});
+
+/* ---------- petites adaptations de syntaxe MySQL/SQLite -> Postgres ---------- */
 
 function translate(sql) {
-  return sql
-    .replace(/\bNOW\(\)/gi, "datetime('now')")
-    .replace(/\bCURDATE\(\)/gi, "date('now')")
-    .replace(/\s+FOR UPDATE\b/gi, "");
+  // CURDATE() (MySQL) -> CURRENT_DATE (Postgres). NOW() est déjà valide en Postgres.
+  return sql.replace(/\bCURDATE\(\)/gi, "CURRENT_DATE");
 }
 
 function isSelect(sql) {
   return /^\s*SELECT/i.test(sql);
 }
 
+function isInsert(sql) {
+  return /^\s*INSERT\s+INTO/i.test(sql);
+}
+
+// Convertit les placeholders "?" (style mysql2/sqlite) en "$1, $2, ..." (style pg)
+function toPgPlaceholders(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
 /* ---------- API compatible avec mysql2/promise (sous-ensemble utilisé) ---------- */
 
-async function query(sql, params = []) {
-  const translated = translate(sql);
-  const stmt = db.prepare(translated);
+async function runQuery(exec, sql, params = []) {
+  let translated = translate(sql);
+  const wantsId = isInsert(translated) && !/RETURNING/i.test(translated);
+  if (wantsId) translated += " RETURNING id";
+
+  const pgSql = toPgPlaceholders(translated);
+  const result = await exec(pgSql, params);
+
   if (isSelect(translated)) {
-    return [stmt.all(...params)];
+    return [result.rows];
   }
-  const info = stmt.run(...params);
-  return [{ insertId: info.lastInsertRowid, affectedRows: info.changes }];
+  const insertId = result.rows && result.rows[0] ? result.rows[0].id : undefined;
+  return [{ insertId, affectedRows: result.rowCount }];
+}
+
+async function query(sql, params = []) {
+  await ready;
+  return runQuery((s, p) => pool.query(s, p), sql, params);
 }
 
 async function getConnection() {
+  await ready;
+  const client = await pool.connect();
   return {
-    query,
-    beginTransaction: async () => db.exec("BEGIN"),
-    commit: async () => db.exec("COMMIT"),
+    query: (sql, params = []) => runQuery((s, p) => client.query(s, p), sql, params),
+    beginTransaction: () => client.query("BEGIN"),
+    commit: () => client.query("COMMIT"),
     rollback: async () => {
       try {
-        db.exec("ROLLBACK");
+        await client.query("ROLLBACK");
       } catch (e) {
         // pas de transaction en cours, on ignore
       }
     },
-    release: () => {},
+    release: () => client.release(),
   };
 }
 

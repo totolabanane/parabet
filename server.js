@@ -34,7 +34,7 @@ const REF_BONUS_REFERRER = Number(REFERRAL_BONUS_REFERRER);
 const REF_BONUS_REFEREE = Number(REFERRAL_BONUS_REFEREE);
 
 /* ---------- base de données ---------- */
-// La connexion et la création des tables sont gérées dans db.js (SQLite, fichier local).
+// La connexion et la création des tables sont gérées dans db.js (Postgres / Neon).
 
 /* ---------- dossier des captures d'écran ---------- */
 
