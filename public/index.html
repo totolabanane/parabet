@@ -2441,11 +2441,7 @@ function renderWithdrawModalContent(overlay, modal) {
     <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
       ${state.withdrawBusy ? "Envoi…" : "Envoyer la demande de retrait"}
     </button>
-<<<<<<< HEAD
-    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo de ton compte ParaBet doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
-=======
     <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo indiqué doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
->>>>>>> 47b1618 (ta capter)
     ${balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
   `;
 
