@@ -648,7 +648,7 @@ const state = {
   depositBusy: false,
 
   withdrawModalOpen: false,
-  withdrawForm: { amount: 100 },
+  withdrawForm: { amount: 100, minecraftPseudo: "" },
   withdrawBusy: false,
 
   referral: { code: "", bonusReferrer: 0, bonusReferee: 0, totalEarned: 0, count: 0, referred: [] },
@@ -946,7 +946,7 @@ async function submitDeposit() {
 
 function openWithdrawModal() {
   state.withdrawModalOpen = true;
-  state.withdrawForm = { amount: Math.max(WITHDRAW_MIN_AMOUNT, Math.min(state.account.balance, 100)) };
+  state.withdrawForm = { amount: Math.max(WITHDRAW_MIN_AMOUNT, Math.min(state.account.balance, 100)), minecraftPseudo: state.account.pseudo || "" };
   renderModal();
 }
 function closeWithdrawModal() {
@@ -959,10 +959,15 @@ async function submitWithdraw() {
   const balance = state.account.balance;
   const amount = clamp(Math.round(Number(state.withdrawForm.amount) || 0), WITHDRAW_MIN_AMOUNT, Math.max(WITHDRAW_MIN_AMOUNT, balance));
   if (amount > balance) { showToast("Solde insuffisant pour ce retrait."); return; }
+  const minecraftPseudo = String(state.withdrawForm.minecraftPseudo || "").trim();
+  if (minecraftPseudo.length < 3 || minecraftPseudo.length > 20 || !/^[a-zA-Z0-9_]+$/.test(minecraftPseudo)) {
+    showToast("Indique ton pseudo Paladium (Minecraft) valide.");
+    return;
+  }
 
   state.withdrawBusy = true; renderModal();
   try {
-    const r = await api("/api/withdrawals", { method: "POST", body: { amount } });
+    const r = await api("/api/withdrawals", { method: "POST", body: { amount, minecraftPseudo } });
     state.account.balance = r.balance;
     state.withdrawals = await api("/api/mywithdrawals");
     state.withdrawModalOpen = false;
@@ -1133,6 +1138,24 @@ async function adminSetPct(marketId, value) {
     await api(`/api/admin/markets/${marketId}/pct`, { method: "POST", body: { yes: pct } });
     state.markets = await api("/api/markets");
     showToast(`% de chance mis à jour (${pct}%).`);
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminSetBalance(accountId, mode, value) {
+  const num = Math.round(Number(value));
+  if (!Number.isFinite(num) || String(value).trim() === "") { showToast("Entre un montant valide."); return; }
+  const body = mode === "delta" ? { delta: num } : { balance: num };
+  state.adminBusy = true; render();
+  try {
+    const r = await api(`/api/admin/accounts/${accountId}/balance`, { method: "POST", body });
+    const acc = state.adminAccounts.find(a => a.id === Number(accountId));
+    if (acc) acc.balance = r.balance;
+    if (state.account && state.account.id === Number(accountId)) state.account.balance = r.balance;
+    showToast(`Solde mis à jour : ${r.balance} 💎`);
   } catch (e) {
     showToast(e.message);
   }
@@ -2413,10 +2436,16 @@ function renderWithdrawModalContent(overlay, modal) {
     <div class="quick-row">
       ${[WITHDRAW_MIN_AMOUNT, Math.round(balance / 2), balance].filter((v, i, arr) => v >= WITHDRAW_MIN_AMOUNT && arr.indexOf(v) === i).map(q => `<button class="quick-btn" data-wdquick="${q}">${q === balance ? "Max" : q}</button>`).join("")}
     </div>
+    <label class="modal-label" style="margin-top:12px;">Pseudo Paladium (Minecraft)</label>
+    <input type="text" id="wdPseudoInput" maxlength="20" placeholder="TonPseudoEnJeu" value="${esc(f.minecraftPseudo || "")}" autocomplete="off" />
     <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
       ${state.withdrawBusy ? "Envoi…" : "Envoyer la demande de retrait"}
     </button>
+<<<<<<< HEAD
     <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo de ton compte ParaBet doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
+=======
+    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo indiqué doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
+>>>>>>> 47b1618 (ta capter)
     ${balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
   `;
 
@@ -2425,6 +2454,9 @@ function renderWithdrawModalContent(overlay, modal) {
   document.getElementById("wdModalClose").addEventListener("click", closeWithdrawModal);
   document.getElementById("wdAmountInput").addEventListener("input", e => {
     state.withdrawForm.amount = clamp(Math.round(Number(e.target.value) || WITHDRAW_MIN_AMOUNT), WITHDRAW_MIN_AMOUNT, maxAmount);
+  });
+  document.getElementById("wdPseudoInput").addEventListener("input", e => {
+    state.withdrawForm.minecraftPseudo = e.target.value;
   });
   document.querySelectorAll("[data-wdquick]").forEach(b => b.addEventListener("click", () => {
     state.withdrawForm.amount = clamp(Number(b.dataset.wdquick), WITHDRAW_MIN_AMOUNT, maxAmount);
@@ -2556,6 +2588,12 @@ function renderAdmin() {
                 <button class="mini-btn" data-toggle-account="${a.id}">${state.adminExpandedAccountId === a.id ? "Masquer" : "Voir les paris"}</button>
                 <button class="mini-btn" data-toggle-account-casino="${a.id}">${state.adminExpandedAccountCasinoId === a.id ? "Masquer" : "Voir le casino"}</button>
               </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <input type="number" data-balance-input="${a.id}" placeholder="Nouveau solde" style="width:120px;" />
+              <button class="mini-btn" data-set-balance="${a.id}" ${state.adminBusy ? "disabled" : ""}>Définir</button>
+              <input type="number" data-delta-input="${a.id}" placeholder="+ / -" style="width:90px;" />
+              <button class="mini-btn" data-adjust-balance="${a.id}" ${state.adminBusy ? "disabled" : ""}>Ajuster</button>
             </div>
             ${state.adminExpandedAccountId === a.id ? `
               <div class="feed-box" style="height:auto; max-height:220px;">
@@ -2734,6 +2772,7 @@ function renderAdmin() {
           <div class="admin-row">
             <div>
               <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} 💎</div>
+              <div class="admin-row-meta">Pseudo Paladium à payer : <strong>${esc(w.minecraftPseudo || "—")}</strong></div>
               <div class="admin-row-meta">Demandé le ${new Date(w.ts).toLocaleString("fr-FR")}</div>
             </div>
             <div class="admin-actions">
@@ -2750,6 +2789,7 @@ function renderAdmin() {
           <div class="admin-row">
             <div>
               <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} 💎</div>
+              <div class="admin-row-meta">Pseudo Paladium : ${esc(w.minecraftPseudo || "—")}</div>
               <div class="admin-row-meta">${w.status === "approved" ? "Payé" : "Refusé"} · ${new Date(w.ts).toLocaleString("fr-FR")}</div>
             </div>
             <div class="admin-actions">
@@ -2823,6 +2863,19 @@ function renderAdmin() {
   document.querySelectorAll("[data-viewshot]").forEach(el => el.addEventListener("click", () => {
     const dep = state.deposits.find(d => d.id === Number(el.dataset.viewshot) || d.id === el.dataset.viewshot);
     if (dep) viewScreenshotFull(dep.screenshot);
+  }));
+  document.querySelectorAll("[data-set-balance]").forEach(b => b.addEventListener("click", () => {
+    const id = b.dataset.setBalance;
+    const input = document.querySelector(`[data-balance-input="${id}"]`);
+    const value = input ? input.value : "";
+    if (!confirm(`Fixer le solde de ce joueur à ${value} 💎 ?`)) return;
+    adminSetBalance(id, "balance", value);
+  }));
+  document.querySelectorAll("[data-adjust-balance]").forEach(b => b.addEventListener("click", () => {
+    const id = b.dataset.adjustBalance;
+    const input = document.querySelector(`[data-delta-input="${id}"]`);
+    const value = input ? input.value : "";
+    adminSetBalance(id, "delta", value);
   }));
   document.querySelectorAll("[data-toggle-account]").forEach(el => el.addEventListener("click", () => {
     toggleAccountBets(el.dataset.toggleAccount);

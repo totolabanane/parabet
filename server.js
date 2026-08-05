@@ -967,6 +967,41 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
   })));
 });
 
+// Permet au staff de modifier directement le solde d'un joueur : soit en
+// fixant un nouveau montant absolu ("balance"), soit en appliquant un
+// ajustement relatif ("delta", positif ou négatif).
+app.post("/api/admin/accounts/:id/balance", authRequired, adminRequired, async (req, res) => {
+  const accountId = Number(req.params.id);
+  const { balance, delta, reason } = req.body || {};
+
+  const [rows] = await pool.query("SELECT id, pseudo, balance FROM accounts WHERE id = ?", [accountId]);
+  const account = rows[0];
+  if (!account) return res.status(404).json({ error: "Joueur introuvable." });
+
+  let newBalance;
+  if (balance !== undefined && balance !== null && String(balance).trim() !== "") {
+    newBalance = Math.round(Number(balance));
+  } else if (delta !== undefined && delta !== null && String(delta).trim() !== "") {
+    newBalance = account.balance + Math.round(Number(delta));
+  } else {
+    return res.status(400).json({ error: "Indique un nouveau solde (balance) ou un ajustement (delta)." });
+  }
+
+  if (!Number.isFinite(newBalance) || newBalance < 0) {
+    return res.status(400).json({ error: "Le solde doit être un nombre positif ou nul." });
+  }
+
+  await pool.query("UPDATE accounts SET balance = ? WHERE id = ?", [newBalance, accountId]);
+
+  const diff = newBalance - account.balance;
+  await pool.query(
+    "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+    [account.pseudo, diff >= 0 ? "yes" : "no", `🛠️ Ajustement staff — ${account.pseudo} : ${diff >= 0 ? "+" : ""}${diff} 💎${reason ? ` (${String(reason).trim().slice(0, 120)})` : ""}`]
+  );
+
+  res.json({ ok: true, id: accountId, balance: newBalance });
+});
+
 app.get("/api/admin/accounts/:id/bets", authRequired, adminRequired, async (req, res) => {
   const [rows] = await pool.query(
     `SELECT b.*, m.title AS market_title, m.status AS market_status, m.resolution AS market_resolution
