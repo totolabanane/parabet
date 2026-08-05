@@ -446,6 +446,38 @@
   }
   .cf-history-chip img { width: 16px; height: 16px; object-fit: contain; }
   .cf-history-empty { font-size: 12px; color: var(--text-faint); }
+
+  /* dépôt : dropzone + récap */
+  .dep-drop {
+    position: relative;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    background: var(--surface-2);
+  }
+  .dep-drop:hover, .dep-drop.dragover { border-color: var(--green); background: var(--green-bg); }
+  .dep-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .dep-drop-icon { font-size: 22px; margin-bottom: 6px; }
+  .dep-drop-text { font-size: 12.5px; color: var(--text-dim); }
+  .dep-drop-text b { color: var(--text); }
+  .dep-drop-hint { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+
+  .dep-preview-wrap { position: relative; margin-top: 12px; }
+  .dep-preview-wrap img { width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
+  .dep-preview-remove {
+    position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(10,11,15,0.75); border: 1px solid var(--border); color: var(--text);
+    font-size: 13px; display: flex; align-items: center; justify-content: center;
+  }
+  .dep-preview-name { font-size: 11px; color: var(--text-faint); margin-top: 6px; word-break: break-all; }
+
+  .dep-usd { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); margin-top: -6px; margin-bottom: 12px; }
+  .dep-inline-error { font-size: 11.5px; color: var(--red); margin-top: -6px; margin-bottom: 12px; }
+  .dep-recap { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 14px; font-size: 12px; color: var(--text-dim); }
+  .dep-recap b { color: var(--text); }
 </style>
 </head>
 <body>
@@ -474,6 +506,7 @@ const CAT_META = {
 
 const DEPOSIT_MIN_AMOUNT = 10000; // doit correspondre à DEPOSIT_MIN_AMOUNT côté serveur (.env)
 const WITHDRAW_MIN_AMOUNT = 15000; // doit correspondre à WITHDRAW_MIN_AMOUNT côté serveur (.env)
+const EMERALD_USD_RATE = 0.80; // doit correspondre au taux affiché dans la FAQ
 
 // Contenu de la FAQ — à ajuster librement, ce n'est que du texte affiché.
 const FAQ_ITEMS = [
@@ -611,7 +644,7 @@ const state = {
   busy: false,
 
   depositModalOpen: false,
-  depositForm: { amount: 100, dataUrl: null, blob: null, fileName: "" },
+  depositForm: { amount: DEPOSIT_MIN_AMOUNT, dataUrl: null, blob: null, fileName: "" },
   depositBusy: false,
 
   withdrawModalOpen: false,
@@ -859,19 +892,39 @@ async function claimBonus() {
 
 function openDepositModal() {
   state.depositModalOpen = true;
-  state.depositForm = { amount: 100, dataUrl: null, blob: null, fileName: "" };
+  state.depositForm = { amount: DEPOSIT_MIN_AMOUNT, dataUrl: null, blob: null, fileName: "" };
   renderModal();
 }
 function closeDepositModal() {
   state.depositModalOpen = false;
   renderModal();
 }
+function removeDepositScreenshot() {
+  state.depositForm.dataUrl = null;
+  state.depositForm.blob = null;
+  state.depositForm.fileName = "";
+  renderModal();
+}
+async function handleDepositFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) { showToast("Choisis une image (capture d'écran)."); return; }
+  try {
+    const { dataUrl, blob } = await compressImageFile(file);
+    state.depositForm.dataUrl = dataUrl;
+    state.depositForm.blob = blob;
+    state.depositForm.fileName = file.name;
+    renderModal();
+  } catch (err) {
+    showToast("Impossible de lire cette image.");
+  }
+}
 
 async function submitDeposit() {
   if (state.depositBusy) return;
   const f = state.depositForm;
   if (!f.blob) { showToast("Ajoute une capture d'écran prouvant le dépôt en jeu."); return; }
-  const amount = clamp(Math.round(Number(f.amount) || 0), DEPOSIT_MIN_AMOUNT, 1000000);
+  const amount = Math.round(Number(f.amount) || 0);
+  if (amount < DEPOSIT_MIN_AMOUNT) { showToast(`Le montant minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎.`); return; }
 
   state.depositBusy = true; renderModal();
   try {
@@ -1291,7 +1344,6 @@ function renderAuth() {
         </p>
         <button class="text-btn" id="authFaqBtn" style="margin-top:10px; width:100%; text-align:center;">❓ Questions fréquentes</button>
         <button class="text-btn" id="authLegalBtn" style="margin-top:8px; width:100%; text-align:center;">📜 Mentions légales & CGU</button>
-        <a href="https://discord.gg/Me8UjM7Uug" target="_blank" rel="noopener noreferrer" class="text-btn" style="margin-top:8px; width:100%; text-align:center; text-decoration:none; display:block;">💬 Rejoindre le Discord</a>
       </div>
     </div>
   `;
@@ -2256,48 +2308,88 @@ function renderModal() {
 
 function renderDepositModalContent(overlay, modal) {
   const f = state.depositForm;
+  const amountNum = Number(f.amount) || 0;
+  const belowMin = amountNum > 0 && amountNum < DEPOSIT_MIN_AMOUNT;
+  const usdValue = (amountNum * EMERALD_USD_RATE).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const quicks = [DEPOSIT_MIN_AMOUNT, 5000 + DEPOSIT_MIN_AMOUNT, 10000 + DEPOSIT_MIN_AMOUNT, 25000 + DEPOSIT_MIN_AMOUNT].filter((v, i, arr) => arr.indexOf(v) === i);
+  const canSubmit = !state.depositBusy && !!f.blob && amountNum >= DEPOSIT_MIN_AMOUNT;
 
   modal.innerHTML = `
     <div class="modal-head">
       <span class="modal-kicker" style="color:var(--green);">Déposer des émeraudes Paladium</span>
       <button class="modal-close" id="depModalClose">✕</button>
     </div>
-    <p class="modal-title">Transfère tes émeraudes au staff en jeu,/pay totolabanane indique le montant ci-dessous et joins une capture d'écran comme preuve. Ton solde ParaBet sera crédité après vérification manuelle par le staff.</p>
+    <p class="modal-title">Effectuez un /pay totolabanane <montant> en jeu, indiquez le montant ci-dessous et joignez une capture d'écran du paiement comme preuve.</p>
+
     <label class="modal-label">Montant déposé (émeraudes en jeu)</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">💎</span>
       <input type="number" id="depAmountInput" min="${DEPOSIT_MIN_AMOUNT}" value="${f.amount}" />
     </div>
-    <label class="modal-label">Capture d'écran de la preuve (transaction / coffre / chat)</label>
-    <div class="field" style="margin-top:8px; margin-bottom:0;">
-      <input type="file" id="depFileInput" accept="image/*" />
+    <p class="dep-usd">≈ ${usdValue} $ · taux : 1 💎 = ${EMERALD_USD_RATE.toFixed(2)} $</p>
+    ${belowMin ? `<p class="dep-inline-error">Le minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎.</p>` : ""}
+    <div class="quick-row">
+      ${quicks.map(q => `<button class="quick-btn" data-depquick="${q}">${q.toLocaleString("fr-FR")}</button>`).join("")}
     </div>
-    ${f.dataUrl ? `<img src="${f.dataUrl}" style="width:100%; border-radius:8px; margin-top:12px; border:1px solid var(--border); display:block;" />` : ""}
-    <button class="confirm-btn btn-yes" id="depConfirmBtn" style="margin-top:16px;" ${state.depositBusy || !f.blob ? "disabled style='opacity:0.55;'" : ""}>
+
+    <label class="modal-label">Capture d'écran de la preuve (transaction / coffre / chat)</label>
+    ${!f.dataUrl ? `
+      <div class="dep-drop" id="depDrop">
+        <div class="dep-drop-icon">📎</div>
+        <div class="dep-drop-text"><b>Clique</b> ou glisse une image ici</div>
+        <div class="dep-drop-hint">PNG, JPG… — compressée automatiquement</div>
+        <input type="file" id="depFileInput" accept="image/*" />
+      </div>
+    ` : `
+      <div class="dep-preview-wrap">
+        <img src="${f.dataUrl}" />
+        <button class="dep-preview-remove" id="depRemoveShot" title="Retirer l'image">✕</button>
+      </div>
+      <p class="dep-preview-name">📎 ${esc(f.fileName)}</p>
+    `}
+
+    ${amountNum >= DEPOSIT_MIN_AMOUNT && f.blob ? `
+      <div class="dep-recap">
+        Récap : demande de dépôt de <b>${amountNum.toLocaleString("fr-FR")} 💎</b> (≈ ${usdValue} $), avec preuve jointe.
+        Le staff valide généralement en moins de 12h.
+      </div>
+    ` : ""}
+
+    <button class="confirm-btn btn-yes" id="depConfirmBtn" style="margin-top:16px;" ${canSubmit ? "" : "disabled style='opacity:0.55;'"}>
       ${state.depositBusy ? "Envoi…" : "Envoyer la demande de dépôt"}
     </button>
-    <p class="price-note">Montant minimum : ${DEPOSIT_MIN_AMOUNT} 💎. Le crédit n'est pas automatique : un membre du staff doit valider la preuve.</p>
+    <p class="price-note">Montant minimum : ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎. Le crédit n'est pas automatique : un membre du staff doit valider la preuve.</p>
   `;
 
   overlay.classList.add("open");
   overlay.onclick = (e) => { if (e.target === overlay) closeDepositModal(); };
   document.getElementById("depModalClose").addEventListener("click", closeDepositModal);
+
   document.getElementById("depAmountInput").addEventListener("input", e => {
-    state.depositForm.amount = clamp(Math.round(Number(e.target.value) || DEPOSIT_MIN_AMOUNT), DEPOSIT_MIN_AMOUNT, 1000000);
+    state.depositForm.amount = e.target.value;
+    renderModal();
   });
-  document.getElementById("depFileInput").addEventListener("change", async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const { dataUrl, blob } = await compressImageFile(file);
-      state.depositForm.dataUrl = dataUrl;
-      state.depositForm.blob = blob;
-      state.depositForm.fileName = file.name;
-      renderModal();
-    } catch (err) {
-      showToast("Impossible de lire cette image.");
-    }
-  });
+  document.querySelectorAll("[data-depquick]").forEach(b => b.addEventListener("click", () => {
+    state.depositForm.amount = Number(b.dataset.depquick);
+    renderModal();
+  }));
+
+  const removeBtn = document.getElementById("depRemoveShot");
+  if (removeBtn) removeBtn.addEventListener("click", removeDepositScreenshot);
+
+  const dropZone = document.getElementById("depDrop");
+  if (dropZone) {
+    const fileInput = document.getElementById("depFileInput");
+    fileInput.addEventListener("change", e => handleDepositFile(e.target.files[0]));
+    dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      handleDepositFile(e.dataTransfer.files[0]);
+    });
+  }
+
   const confirmBtn = document.getElementById("depConfirmBtn");
   if (confirmBtn) confirmBtn.addEventListener("click", submitDeposit);
 }
