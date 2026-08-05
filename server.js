@@ -69,6 +69,30 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+// Exigence de mise ("wagering requirement") : chaque dépôt approuvé ajoute son
+// montant à wagering_required (voir /api/admin/deposits/:id/approve). Chaque
+// mise placée (marché de prédiction ou jeu de casino) fait progresser
+// wagering_progress d'autant, plafonné à wagering_required — impossible de
+// "dépasser" l'objectif. Le retrait est bloqué tant que
+// wagering_progress < wagering_required (voir /api/withdrawals).
+// `q` est soit `pool`, soit une connexion de transaction (`conn`).
+async function addWageringProgress(q, accountId, stakeAmount) {
+  if (!stakeAmount) return;
+  await q.query(
+    "UPDATE accounts SET wagering_progress = LEAST(wagering_progress + ?, wagering_required) WHERE id = ?",
+    [stakeAmount, accountId]
+  );
+}
+
+// Renvoie { wageringRequired, wageringProgress } à jour pour un compte —
+// à inclure dans les réponses après une mise, pour que le front puisse
+// mettre à jour la barre de progression sans requête supplémentaire.
+async function getWageringFields(q, accountId) {
+  const [rows] = await q.query("SELECT wagering_required, wagering_progress FROM accounts WHERE id = ?", [accountId]);
+  const a = rows[0] || { wagering_required: 0, wagering_progress: 0 };
+  return { wageringRequired: a.wagering_required, wageringProgress: a.wagering_progress };
+}
+
 function signToken(account) {
   return jwt.sign(
     { id: account.id, pseudo: account.pseudo, isAdmin: !!account.is_admin },
@@ -224,7 +248,7 @@ app.post("/api/register", async (req, res) => {
 
     const account = { id: result.insertId, pseudo, is_admin: isAdmin };
     setAuthCookie(res, signToken(account));
-    res.json({ pseudo, balance: startBalance, isAdmin: !!isAdmin, lastBonusDate: null, referralCode });
+    res.json({ pseudo, balance: startBalance, isAdmin: !!isAdmin, lastBonusDate: null, referralCode, wageringRequired: 0, wageringProgress: 0 });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur lors de l'inscription." });
@@ -253,6 +277,8 @@ app.post("/api/login", async (req, res) => {
       isAdmin: !!account.is_admin,
       lastBonusDate: account.last_bonus_date,
       referralCode,
+      wageringRequired: account.wagering_required,
+      wageringProgress: account.wagering_progress,
     });
   } catch (e) {
     console.error(e);
@@ -276,6 +302,8 @@ app.get("/api/me", authRequired, async (req, res) => {
     isAdmin: !!account.is_admin,
     lastBonusDate: account.last_bonus_date,
     referralCode,
+    wageringRequired: account.wagering_required,
+    wageringProgress: account.wagering_progress,
   });
 });
 
@@ -361,9 +389,11 @@ app.post("/api/bets", authRequired, async (req, res) => {
       "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, ?, ?)",
       [req.user.pseudo, side, stake, market.title]
     );
+    await addWageringProgress(conn, req.user.id, stake);
 
     await conn.commit();
-    res.json({ balance: account.balance - stake, stake });
+    const wagering = await getWageringFields(pool, req.user.id);
+    res.json({ balance: account.balance - stake, stake, ...wagering });
   } catch (e) {
     await conn.rollback();
     console.error(e);
@@ -426,6 +456,16 @@ app.post("/api/withdrawals", authRequired, async (req, res) => {
     if (!account || amount > account.balance) {
       await conn.rollback();
       return res.status(400).json({ error: "Solde insuffisant pour ce retrait." });
+    }
+
+    if (account.wagering_progress < account.wagering_required) {
+      await conn.rollback();
+      const remaining = account.wagering_required - account.wagering_progress;
+      return res.status(400).json({
+        error: `Tu dois encore miser ${remaining} 💎 avant de pouvoir retirer (${account.wagering_progress}/${account.wagering_required} misés).`,
+        wageringRequired: account.wagering_required,
+        wageringProgress: account.wagering_progress,
+      });
     }
 
     await conn.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [amount, account.id]);
@@ -612,6 +652,7 @@ app.post("/api/casino/blackjack/start", authRequired, async (req, res) => {
     }
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
 
     const deck = freshShuffledDeck();
     const game = {
@@ -630,8 +671,8 @@ app.post("/api/casino/blackjack/start", authRequired, async (req, res) => {
       await resolveBlackjack(req, game, false);
     }
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...bjPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur lors du lancement de la partie." });
@@ -649,8 +690,8 @@ app.post("/api/casino/blackjack/hit", authRequired, async (req, res) => {
       await resolveBlackjack(req, game, false);
     }
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...bjPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
@@ -664,8 +705,8 @@ app.post("/api/casino/blackjack/stand", authRequired, async (req, res) => {
 
     await resolveBlackjack(req, game, true);
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...bjPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
@@ -683,6 +724,7 @@ app.post("/api/casino/blackjack/double", authRequired, async (req, res) => {
     if (balance < game.bet) return res.status(400).json({ error: "Solde insuffisant pour doubler." });
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [game.bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, game.bet);
     game.bet *= 2;
     game.doubled = true;
     game.player.push(game.deck.pop());
@@ -690,8 +732,8 @@ app.post("/api/casino/blackjack/double", authRequired, async (req, res) => {
     const p = bjHandTotal(game.player);
     await resolveBlackjack(req, game, p.total <= 21);
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...bjPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...bjPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
@@ -767,6 +809,7 @@ app.post("/api/casino/mines/start", authRequired, async (req, res) => {
     const minesCount = clamp(Math.round(Number(req.body?.mines) || 3), 1, 24);
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
 
     // tirage aléatoire des positions des mines parmi les 25 cases
     const positions = Array.from({ length: MINES_GRID_SIZE }, (_, i) => i);
@@ -779,8 +822,8 @@ app.post("/api/casino/mines/start", authRequired, async (req, res) => {
     const game = { mines, revealed: new Set(), bet, minesCount, status: "playing", payout: 0 };
     minesGames.set(req.user.id, game);
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...minesPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...minesPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur lors du lancement de la partie." });
@@ -830,8 +873,8 @@ app.post("/api/casino/mines/reveal", authRequired, async (req, res) => {
       }
     }
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...minesPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...minesPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
@@ -858,8 +901,8 @@ app.post("/api/casino/mines/cashout", authRequired, async (req, res) => {
       [req.user.id, "mines", game.bet, game.payout, "cashout", `${game.minesCount} mines · encaissé après ${game.revealed.size} case${game.revealed.size === 1 ? "" : "s"} révélée${game.revealed.size === 1 ? "" : "s"}`]
     );
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, ...minesPublicState(game) });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...minesPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
@@ -895,6 +938,7 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
     const side = req.body?.side === "pile" ? "pile" : "face";
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
 
     const result = Math.random() < 0.5 ? "face" : "pile";
     const win = result === side;
@@ -917,8 +961,13 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
       [req.user.id, "flip", bet, payout, win ? "win" : "lose", `Misé sur ${side === "pile" ? "Pile" : "Face"} · résultat ${result === "pile" ? "Pile" : "Face"}`]
     );
 
-    const [after] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
-    res.json({ balance: after[0].balance, result, win, bet, payout, history: list });
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      result, win, bet, payout, history: list,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
@@ -932,6 +981,7 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
     SELECT
       a.id, a.pseudo, a.balance, a.is_admin, a.created_at,
       a.referral_code, a.referral_earnings,
+      a.wagering_required, a.wagering_progress,
       ref.pseudo AS referred_by_pseudo,
       COALESCE(bs.bet_count, 0) AS bet_count,
       COALESCE(bs.total_wagered, 0) AS total_wagered,
@@ -959,6 +1009,8 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
     referralCode: a.referral_code,
     referredByPseudo: a.referred_by_pseudo || null,
     referralEarnings: a.referral_earnings,
+    wageringRequired: a.wagering_required,
+    wageringProgress: a.wagering_progress,
     betCount: a.bet_count,
     totalWagered: a.total_wagered,
     casinoBetCount: a.casino_bet_count,
@@ -1205,7 +1257,10 @@ app.post("/api/admin/deposits/:id/approve", authRequired, adminRequired, async (
       return res.status(400).json({ error: "Ce dépôt n'est plus en attente." });
     }
 
-    await conn.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [dep.amount, dep.account_id]);
+    await conn.query(
+      "UPDATE accounts SET balance = balance + ?, wagering_required = wagering_required + ? WHERE id = ?",
+      [dep.amount, dep.amount, dep.account_id]
+    );
     await conn.query("UPDATE deposits SET status = 'approved', reviewed_at = NOW() WHERE id = ?", [dep.id]);
 
     const [arows] = await conn.query("SELECT pseudo FROM accounts WHERE id = ?", [dep.account_id]);

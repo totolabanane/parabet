@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   referral_code     VARCHAR(12) UNIQUE,
   referred_by       INT DEFAULT NULL,
   referral_earnings INT NOT NULL DEFAULT 0,
+  wagering_required INT NOT NULL DEFAULT 0,
+  wagering_progress INT NOT NULL DEFAULT 0,
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (referred_by) REFERENCES accounts(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

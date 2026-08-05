@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   referral_code     VARCHAR(12) UNIQUE,
   referred_by       INTEGER DEFAULT NULL,
   referral_earnings INTEGER NOT NULL DEFAULT 0,
+  wagering_required INTEGER NOT NULL DEFAULT 0,
+  wagering_progress INTEGER NOT NULL DEFAULT 0,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (referred_by) REFERENCES accounts(id) ON DELETE SET NULL
 );

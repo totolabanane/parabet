@@ -41,6 +41,12 @@ async function init() {
     "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS minecraft_pseudo TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP",
     "ALTER TABLE bets ADD COLUMN IF NOT EXISTS refunded INTEGER NOT NULL DEFAULT 0",
+    // Exigence de mise ("wagering requirement") : à chaque dépôt approuvé, le
+    // montant s'ajoute à wagering_required. Chaque mise (marché ou casino)
+    // fait progresser wagering_progress (plafonné à wagering_required). Le
+    // retrait n'est autorisé que quand wagering_progress >= wagering_required.
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS wagering_required INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS wagering_progress INTEGER NOT NULL DEFAULT 0",
   ]) {
     await pool.query(stmt);
   }

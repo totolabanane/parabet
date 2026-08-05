@@ -103,6 +103,16 @@
   .probbar { width: 100%; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; display: flex; }
   .probbar > div { transition: width 0.5s cubic-bezier(0.22,1,0.36,1); }
 
+  .wager-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 4px 0 14px; }
+  .wager-box.done { border-color: rgba(16,207,124,0.35); }
+  .wager-head { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--text-dim); margin-bottom: 8px; }
+  .wager-head strong { color: var(--text); font-family: var(--font-mono); }
+  .wager-bar { width: 100%; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+  .wager-bar > div { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.5s cubic-bezier(0.22,1,0.36,1); }
+  .wager-bar.done > div { background: var(--green); }
+  .wager-note { font-size: 11px; color: var(--text-faint); margin-top: 7px; line-height: 1.4; }
+  .wager-note.done { color: var(--green); }
+
   .btn-row { display: flex; gap: 8px; margin-top: 2px; }
   .btn-yes, .btn-no {
     flex: 1; padding: 8px 0; border-radius: 8px; font-size: 12.5px; font-weight: 700;
@@ -699,6 +709,33 @@ const state = {
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+// Barre de progression de l'exigence de mise ("wagering requirement") : tant
+// qu'un joueur n'a pas remisé l'équivalent de ses dépôts approuvés, il ne
+// peut pas retirer. required = 0 signifie "pas de dépôt en attente de mise",
+// donc rien à afficher.
+function wageringBarHtml(account) {
+  const required = Number(account && account.wageringRequired) || 0;
+  const progress = Math.min(Number(account && account.wageringProgress) || 0, required);
+  if (required <= 0) return "";
+  const pct = Math.round((progress / required) * 100);
+  const done = progress >= required;
+  const remaining = required - progress;
+  return `
+    <div class="wager-box ${done ? "done" : ""}">
+      <div class="wager-head">
+        <span>🎯 Objectif de mise avant retrait</span>
+        <strong>${progress.toLocaleString("fr-FR")} / ${required.toLocaleString("fr-FR")} 💎</strong>
+      </div>
+      <div class="wager-bar ${done ? "done" : ""}"><div style="width:${pct}%;"></div></div>
+      <p class="wager-note ${done ? "done" : ""}">
+        ${done
+          ? "✅ Objectif atteint, tu peux retirer."
+          : `Il te reste à miser ${remaining.toLocaleString("fr-FR")} 💎 (sur des marchés ou au casino) avant de pouvoir retirer — un dépôt validé doit être remisé en totalité.`}
+      </p>
+    </div>
+  `;
+}
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 // Valeur "maintenant" au format attendu par <input type="datetime-local">
@@ -1051,6 +1088,8 @@ async function placeBet() {
   try {
     const r = await api("/api/bets", { method: "POST", body: { marketId, side, amount: stake } });
     state.account.balance = r.balance;
+    state.account.wageringRequired = r.wageringRequired;
+    state.account.wageringProgress = r.wageringProgress;
     const [markets, feed, mybets] = await Promise.all([api("/api/markets"), api("/api/feed"), api("/api/mybets")]);
     state.markets = markets;
     state.feed = feed;
@@ -1453,6 +1492,8 @@ function renderApp() {
         : `<div class="grid">${markets.map(cardHtml).join("")}</div>`
       }
 
+      ${wageringBarHtml(state.account)}
+
       ${myDeposits.length > 0 ? `
       <h2 class="section-title">Mes dépôts</h2>
       <div class="feed-box" style="height:auto; max-height:180px;">
@@ -1740,6 +1781,8 @@ async function bjAction(path, body) {
   try {
     const r = await api(`/api/casino/blackjack/${path}`, { method: "POST", body });
     state.account.balance = r.balance;
+    state.account.wageringRequired = r.wageringRequired;
+    state.account.wageringProgress = r.wageringProgress;
     state.blackjack = r;
     state.bjJustResolved = prevStatus !== "finished" && r.status === "finished";
   } catch (e) {
@@ -1934,6 +1977,8 @@ async function minesAction(path, body) {
   try {
     const r = await api(`/api/casino/mines/${path}`, { method: "POST", body });
     state.account.balance = r.balance;
+    state.account.wageringRequired = r.wageringRequired;
+    state.account.wageringProgress = r.wageringProgress;
     state.mines = r;
   } catch (e) {
     state.minesError = e.message;
@@ -2139,6 +2184,8 @@ function flipStart() {
       render();
       setTimeout(() => {
         state.account.balance = r.balance;
+        state.account.wageringRequired = r.wageringRequired;
+        state.account.wageringProgress = r.wageringProgress;
         state.flip = r;
         state.flipHistory = r.history || [r, ...state.flipHistory].slice(0, 20);
         state.flipSpinning = false;
@@ -2432,6 +2479,9 @@ function renderWithdrawModalContent(overlay, modal) {
   const balance = state.account.balance;
   const f = state.withdrawForm;
   const maxAmount = Math.max(WITHDRAW_MIN_AMOUNT, balance);
+  const required = Number(state.account.wageringRequired) || 0;
+  const progress = Math.min(Number(state.account.wageringProgress) || 0, required);
+  const wageringBlocked = required > 0 && progress < required;
 
   modal.innerHTML = `
     <div class="modal-head">
@@ -2439,21 +2489,22 @@ function renderWithdrawModalContent(overlay, modal) {
       <button class="modal-close" id="wdModalClose">✕</button>
     </div>
     <p class="modal-title">Indique le montant à retirer. Ton solde ParaBet est débité tout de suite ; le staff te remet les émeraudes en jeu après vérification, puis valide la demande.</p>
+    ${wageringBarHtml(state.account)}
     <label class="modal-label">Montant à retirer · ${balance} 💎 disponibles</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">💎</span>
-      <input type="number" id="wdAmountInput" min="${WITHDRAW_MIN_AMOUNT}" max="${maxAmount}" value="${f.amount}" />
+      <input type="number" id="wdAmountInput" min="${WITHDRAW_MIN_AMOUNT}" max="${maxAmount}" value="${f.amount}" ${wageringBlocked ? "disabled" : ""} />
     </div>
     <div class="quick-row">
-      ${[WITHDRAW_MIN_AMOUNT, Math.round(balance / 2), balance].filter((v, i, arr) => v >= WITHDRAW_MIN_AMOUNT && arr.indexOf(v) === i).map(q => `<button class="quick-btn" data-wdquick="${q}">${q === balance ? "Max" : q}</button>`).join("")}
+      ${[WITHDRAW_MIN_AMOUNT, Math.round(balance / 2), balance].filter((v, i, arr) => v >= WITHDRAW_MIN_AMOUNT && arr.indexOf(v) === i).map(q => `<button class="quick-btn" data-wdquick="${q}" ${wageringBlocked ? "disabled" : ""}>${q === balance ? "Max" : q}</button>`).join("")}
     </div>
     <label class="modal-label" style="margin-top:12px;">Pseudo Paladium (Minecraft)</label>
-    <input type="text" id="wdPseudoInput" class="modal-text-input" maxlength="20" placeholder="TonPseudoEnJeu" value="${esc(f.minecraftPseudo || "")}" autocomplete="off" />
-    <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
-      ${state.withdrawBusy ? "Envoi…" : "Envoyer la demande de retrait"}
+    <input type="text" id="wdPseudoInput" class="modal-text-input" maxlength="20" placeholder="TonPseudoEnJeu" value="${esc(f.minecraftPseudo || "")}" autocomplete="off" ${wageringBlocked ? "disabled" : ""} />
+    <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || wageringBlocked || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
+      ${state.withdrawBusy ? "Envoi…" : wageringBlocked ? "Objectif de mise non atteint" : "Envoyer la demande de retrait"}
     </button>
     <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo indiqué doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
-    ${balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
+    ${!wageringBlocked && balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
   `;
 
   overlay.classList.add("open");
