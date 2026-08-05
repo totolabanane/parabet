@@ -528,6 +528,59 @@ function closeFaqModal() {
   renderModal();
 }
 
+// Mentions légales & Conditions Générales d'Utilisation — à ajuster librement, ce n'est que du texte affiché.
+const LEGAL_SECTIONS = [
+  {
+    q: "Objet et nature du service",
+    a: "ParaBet est un service communautaire non officiel lié au serveur Minecraft Paladium. Il permet aux joueurs de parier des émeraudes fictives (💎) sur l'issue d'événements liés au serveur. ParaBet n'est ni édité, ni géré, ni garanti par Mojang/Microsoft, et n'a aucune valeur monétaire réelle : les 💎 ne sont pas une monnaie, un actif financier ou un moyen de paiement.",
+  },
+  {
+    q: "Un seul compte par joueur",
+    a: "Chaque joueur ne peut posséder qu'un seul compte ParaBet, associé à un seul pseudo Paladium. La création de plusieurs comptes (multi-compte) pour cumuler le bonus quotidien, abuser du programme de parrainage, manipuler les cotes d'un marché ou contourner une sanction est strictement interdite. Toute violation constatée peut entraîner, sans préavis : le gel ou la suppression des comptes concernés, l'annulation des gains associés, et un bannissement du service ainsi que, le cas échéant, une transmission de l'information au staff du serveur Paladium.",
+  },
+  {
+    q: "Dépôts",
+    a: "Un dépôt correspond à un transfert d'émeraudes en jeu vers le staff, accompagné d'une preuve (capture d'écran). Le crédit du solde ParaBet n'est jamais automatique : il est soumis à une vérification manuelle par le staff, qui peut refuser un dépôt en cas de preuve insuffisante, incohérente, modifiée ou frauduleuse.",
+  },
+  {
+    q: "Retraits — le pseudo doit correspondre",
+    a: "Une demande de retrait ne peut être effectuée que par le titulaire du compte, vers son propre pseudo en jeu sur Paladium : le pseudo du compte ParaBet doit impérativement correspondre au pseudo qui reçoit les émeraudes en jeu. Toute demande de retrait vers un pseudo différent du titulaire du compte pourra être refusée. Le montant demandé est débité du solde dès l'envoi de la demande ; il est reversé en jeu par le staff après vérification, puis la demande est marquée comme payée.",
+  },
+  {
+    q: "Annulation d'un retrait en cas de doute",
+    a: "Le staff se réserve le droit d'annuler, de suspendre ou de refuser toute demande de retrait en cas de doute raisonnable : suspicion de multi-compte, de triche, de manipulation des cotes, d'erreur, de fraude, ou toute anomalie détectée avant le paiement effectif en jeu. En cas d'annulation ou de refus, le montant retiré est automatiquement recrédité sur le solde ParaBet du joueur. Une demande déjà marquée comme payée ne peut en revanche plus être annulée.",
+  },
+  {
+    q: "Résolution des marchés",
+    a: "Chaque marché est résolu manuellement par le staff sur la base du résultat réel de l'événement concerné. Les mises placées avant l'heure de fin indiquée sont payées ou perdues selon le résultat ; les mises placées après cette heure sont simplement remboursées, sans gain ni perte. Les décisions de résolution prises par le staff sont définitives.",
+  },
+  {
+    q: "Monnaie fictive et absence de valeur réelle",
+    a: "Les émeraudes 💎 utilisées sur ParaBet sont une monnaie fictive interne au service, sans valeur légale, sans possibilité de revente à un tiers en dehors du serveur Paladium, et sans garantie de conversion. ParaBet ne constitue ni un jeu d'argent réel, ni un service financier réglementé.",
+  },
+  {
+    q: "Comportement et modération",
+    a: "Toute tentative de triche, d'exploitation d'un bug, de manipulation des cotes, de fraude sur les preuves de dépôt, d'usurpation de pseudo, ou tout comportement abusif envers le staff ou les autres joueurs peut entraîner un avertissement, une suspension ou un bannissement définitif, avec perte du solde et des gains en cours.",
+  },
+  {
+    q: "Responsabilité",
+    a: "ParaBet est fourni « en l'état », à titre communautaire et sans garantie de disponibilité continue. Le staff ne saurait être tenu responsable d'une perte de solde liée à une erreur du joueur (pseudo incorrect, montant erroné, preuve illisible) ou à un événement extérieur au service (panne du serveur Paladium, litige en jeu, etc.).",
+  },
+  {
+    q: "Modification des présentes conditions",
+    a: "Ces mentions légales et conditions d'utilisation peuvent être modifiées à tout moment par le staff. La version en vigueur est celle affichée sur cette page au moment de l'utilisation du service.",
+  },
+];
+
+function openLegalModal() {
+  state.legalModalOpen = true;
+  renderModal();
+}
+function closeLegalModal() {
+  state.legalModalOpen = false;
+  renderModal();
+}
+
 /* ---------- state ---------- */
 
 const state = {
@@ -568,6 +621,7 @@ const state = {
   referral: { code: "", bonusReferrer: 0, bonusReferee: 0, totalEarned: 0, count: 0, referred: [] },
   referralModalOpen: false,
   faqModalOpen: false,
+  legalModalOpen: false,
   referralCodeInput: "",  // code de parrainage saisi/pré-rempli sur le formulaire d'inscription
 
   adminForm: { title: "", category: "guerre", yes: 50, closes: "" },
@@ -1236,12 +1290,14 @@ function renderAuth() {
           Compte propre à ParaBet, séparé de ton compte Minecraft. 💎 sont des émeraudes fictives sans valeur réelle : solde de départ, bonus quotidien, ou dépôt de tes émeraudes Paladium (validé manuellement par le staff).
         </p>
         <button class="text-btn" id="authFaqBtn" style="margin-top:10px; width:100%; text-align:center;">❓ Questions fréquentes</button>
+        <button class="text-btn" id="authLegalBtn" style="margin-top:8px; width:100%; text-align:center;">📜 Mentions légales & CGU</button>
       </div>
     </div>
   `;
   document.getElementById("tabLogin").addEventListener("click", () => { state.authMode = "login"; state.authError = ""; render(); });
   document.getElementById("tabRegister").addEventListener("click", () => { state.authMode = "register"; state.authError = ""; render(); });
   document.getElementById("authFaqBtn").addEventListener("click", openFaqModal);
+  document.getElementById("authLegalBtn").addEventListener("click", openLegalModal);
   document.getElementById("authSubmit").addEventListener("click", () => {
     const pseudo = document.getElementById("fPseudo").value;
     const password = document.getElementById("fPassword").value;
@@ -1288,6 +1344,7 @@ function renderApp() {
           <button class="text-btn" id="withdrawBtn">🏧 Retirer</button>
           <button class="text-btn" id="referralBtn">🤝 Parrainage</button>
           <button class="text-btn" id="faqBtn">❓ FAQ</button>
+          <button class="text-btn" id="legalBtn">📜 CGU</button>
           ${state.account.isAdmin ? `<button class="text-btn amber" id="adminBtn">Admin</button>` : ""}
           <button class="text-btn" id="logoutBtn">Déconnexion</button>
         </div>
@@ -1327,7 +1384,7 @@ function renderApp() {
           : state.feed.map(feedLineHtml).join("")}
       </div>
 
-      <p class="disclaimer">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. Le solde vient du départ, du bonus quotidien, d'un dépôt d'émeraudes du serveur Paladium (bouton "Déposer") ou d'un parrainage. Les dépôts et retraits sont crédités/débités après vérification manuelle du staff.</p>
+      <p class="disclaimer">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. Le solde vient du départ, du bonus quotidien, d'un dépôt d'émeraudes du serveur Paladium (bouton "Déposer") ou d'un parrainage. Les dépôts et retraits sont crédités/débités après vérification manuelle du staff. Un seul compte par joueur. Le pseudo du compte doit correspondre au pseudo qui reçoit le retrait en jeu. Le staff peut annuler un retrait en cas de doute. Voir les <a href="#" id="legalFooterLink" style="color:var(--text-dim); text-decoration:underline;">mentions légales & CGU</a>.</p>
     </div>
   `;
 
@@ -1342,6 +1399,9 @@ function renderApp() {
   document.getElementById("withdrawBtn").addEventListener("click", openWithdrawModal);
   document.getElementById("referralBtn").addEventListener("click", openReferralModal);
   document.getElementById("faqBtn").addEventListener("click", openFaqModal);
+  document.getElementById("legalBtn").addEventListener("click", openLegalModal);
+  const legalFooterLink = document.getElementById("legalFooterLink");
+  if (legalFooterLink) legalFooterLink.addEventListener("click", e => { e.preventDefault(); openLegalModal(); });
   const adminBtn = document.getElementById("adminBtn");
   if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts(), loadAdminCasinoBets()]); render(); });
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { state.filter = b.dataset.filter; render(); }));
@@ -2144,6 +2204,7 @@ function renderModal() {
   if (state.withdrawModalOpen) { renderWithdrawModalContent(overlay, modal); return; }
   if (state.referralModalOpen) { renderReferralModalContent(overlay, modal); return; }
   if (state.faqModalOpen) { renderFaqModalContent(overlay, modal); return; }
+  if (state.legalModalOpen) { renderLegalModalContent(overlay, modal); return; }
   if (!state.openBet) { overlay.classList.remove("open"); return; }
 
   const market = state.markets.find(m => m.id === state.openBet.marketId);
@@ -2261,7 +2322,7 @@ function renderWithdrawModalContent(overlay, modal) {
     <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
       ${state.withdrawBusy ? "Envoi…" : "Envoyer la demande de retrait"}
     </button>
-    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Si le staff refuse la demande, le solde retiré t'est automatiquement recrédité.</p>
+    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo de ton compte ParaBet doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
     ${balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
   `;
 
@@ -2335,6 +2396,28 @@ function renderFaqModalContent(overlay, modal) {
   overlay.classList.add("open");
   overlay.onclick = (e) => { if (e.target === overlay) closeFaqModal(); };
   document.getElementById("faqModalClose").addEventListener("click", closeFaqModal);
+}
+
+function renderLegalModalContent(overlay, modal) {
+  modal.innerHTML = `
+    <div class="modal-head">
+      <span class="modal-kicker" style="color:var(--amber);">Mentions légales & CGU</span>
+      <button class="modal-close" id="legalModalClose">✕</button>
+    </div>
+    <p class="modal-title">Conditions d'utilisation de ParaBet. En utilisant le service, tu acceptes les règles ci-dessous.</p>
+    <div class="faq-list">
+      ${LEGAL_SECTIONS.map((item, i) => `
+        <details class="faq-item" ${i === 0 ? "open" : ""}>
+          <summary class="faq-question">${esc(item.q)}</summary>
+          <p class="faq-answer">${esc(item.a)}</p>
+        </details>
+      `).join("")}
+    </div>
+  `;
+
+  overlay.classList.add("open");
+  overlay.onclick = (e) => { if (e.target === overlay) closeLegalModal(); };
+  document.getElementById("legalModalClose").addEventListener("click", closeLegalModal);
 }
 
 /* ---------- rendering: admin panel ---------- */
