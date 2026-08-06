@@ -767,7 +767,8 @@ const minesGames = new Map(); // accountId -> { mines: Set<number>, revealed: Se
 
 const MINES_MIN_BET = 10;
 const MINES_GRID_SIZE = 25;
-const MINES_HOUSE_EDGE = 0.97; // 3% de marge maison, comme les casinos en ligne classiques
+const MINES_HOUSE_EDGE = 0.92; // 8% de marge maison
+const minesLocks = new Set(); // accountId en cours de traitement, anti double-reveal en parallèle
 
 // Multiplicateur "juste" (sans marge) pour avoir révélé `revealedCount` cases
 // sûres sachant qu'il y a `minesCount` mines parmi les MINES_GRID_SIZE cases :
@@ -850,6 +851,14 @@ app.post("/api/casino/mines/start", authRequired, async (req, res) => {
 });
 
 app.post("/api/casino/mines/reveal", authRequired, async (req, res) => {
+  // Anti-course : si une requête reveal est déjà en train d'être traitée pour
+  // ce compte (ex: plusieurs clics/requêtes envoyés en parallèle), on rejette
+  // les suivantes plutôt que de laisser plusieurs cases se révéler "gratuitement"
+  // avant que le statut "lost" n'ait eu le temps d'être posé.
+  if (minesLocks.has(req.user.id)) {
+    return res.status(429).json({ error: "Une case est déjà en cours de révélation." });
+  }
+  minesLocks.add(req.user.id);
   try {
     const game = minesGames.get(req.user.id);
     if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune partie en cours." });
@@ -897,6 +906,8 @@ app.post("/api/casino/mines/reveal", authRequired, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
+  } finally {
+    minesLocks.delete(req.user.id);
   }
 });
 
