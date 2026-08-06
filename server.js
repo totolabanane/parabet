@@ -740,6 +740,22 @@ app.post("/api/casino/blackjack/double", authRequired, async (req, res) => {
   }
 });
 
+/* ================= CASINO : STATUT / MAINTENANCE ================= */
+
+// Active/désactive temporairement un jeu du casino sans rien déployer :
+// passer un flag à `true` bloque les nouvelles mises (start / play) avec un
+// message clair, sans toucher aux parties déjà en cours ni aux autres jeux.
+const CASINO_MAINTENANCE = {
+  blackjack: false,
+  mines: true,
+  flip: false,
+  roulette: false,
+};
+
+app.get("/api/casino/status", authRequired, (req, res) => {
+  res.json({ maintenance: CASINO_MAINTENANCE });
+});
+
 /* ================= CASINO : MINES ================= */
 
 // Même logique que le blackjack ci-dessus : partie en mémoire (une seule à la
@@ -793,6 +809,9 @@ app.get("/api/casino/mines/state", authRequired, (req, res) => {
 
 app.post("/api/casino/mines/start", authRequired, async (req, res) => {
   try {
+    if (CASINO_MAINTENANCE.mines) {
+      return res.status(503).json({ error: "Mines est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
     const existing = minesGames.get(req.user.id);
     if (existing && existing.status === "playing") {
       return res.status(400).json({ error: "Termine ta partie de Mines en cours." });
@@ -967,6 +986,157 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
       wageringRequired: after[0].wagering_required,
       wageringProgress: after[0].wagering_progress,
       result, win, bet, payout, history: list,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : ROULETTE ================= */
+
+// Roulette européenne classique (37 cases, 0 unique). Comme Flip, chaque
+// partie est un seul lancer résolu instantanément côté serveur — mais on
+// accepte ici plusieurs mises simultanées (numéro plein, rouge/noir,
+// pair/impair, manque/passe, douzaines, colonnes), comme sur une vraie
+// table. Les gains suivent les cotes réelles de la roulette (aucune marge
+// supplémentaire n'est appliquée : la présence du 0 suffit à donner
+// l'avantage à la maison, exactement comme dans un vrai casino).
+const rouletteHistory = new Map(); // accountId -> [{ pocket, color, ts, net }, ...]
+
+const ROULETTE_MIN_BET = 10;
+const ROULETTE_MAX_BETS = 12; // nombre max de mises différentes sur un même lancer
+const ROULETTE_RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+
+function rouletteColor(pocket) {
+  if (pocket === 0) return "green";
+  return ROULETTE_RED.has(pocket) ? "red" : "black";
+}
+
+// Multiplicateur total (mise comprise) selon le type de pari.
+const ROULETTE_PAYOUTS = {
+  straight: 36, // numéro plein, paie 35 pour 1
+  red: 2, black: 2, even: 2, odd: 2, low: 2, high: 2, // chances simples, paient 1 pour 1
+  dozen: 3, column: 3, // douzaines/colonnes, paient 2 pour 1
+};
+
+function rouletteBetWins(bet, pocket) {
+  switch (bet.type) {
+    case "straight": return pocket === bet.value;
+    case "red": return pocket !== 0 && ROULETTE_RED.has(pocket);
+    case "black": return pocket !== 0 && !ROULETTE_RED.has(pocket);
+    case "even": return pocket !== 0 && pocket % 2 === 0;
+    case "odd": return pocket !== 0 && pocket % 2 === 1;
+    case "low": return pocket >= 1 && pocket <= 18;
+    case "high": return pocket >= 19 && pocket <= 36;
+    case "dozen": return pocket !== 0 && Math.ceil(pocket / 12) === bet.value;
+    case "column": return pocket !== 0 && (((pocket - 1) % 3) + 1) === bet.value;
+    default: return false;
+  }
+}
+
+function rouletteBetLabel(bet) {
+  switch (bet.type) {
+    case "straight": return `Numéro plein ${bet.value}`;
+    case "red": return "Rouge";
+    case "black": return "Noir";
+    case "even": return "Pair";
+    case "odd": return "Impair";
+    case "low": return "Manque (1-18)";
+    case "high": return "Passe (19-36)";
+    case "dozen": return bet.value === 1 ? "1ère douzaine (1-12)" : bet.value === 2 ? "2ème douzaine (13-24)" : "3ème douzaine (25-36)";
+    case "column": return `Colonne ${bet.value}`;
+    default: return "Pari";
+  }
+}
+
+// Valide et normalise la liste de mises envoyée par le client. Renvoie
+// `null` si un pari est invalide (type/valeur incohérents ou montant hors
+// bornes) pour que l'appelant rejette toute la requête d'un bloc.
+function rouletteValidateBets(rawBets, balance) {
+  if (!Array.isArray(rawBets) || rawBets.length === 0 || rawBets.length > ROULETTE_MAX_BETS) return null;
+  const bets = [];
+  let total = 0;
+  for (const raw of rawBets) {
+    const type = raw?.type;
+    const amount = Math.round(Number(raw?.amount) || 0);
+    if (amount < ROULETTE_MIN_BET) return null;
+    let value = null;
+    if (type === "straight") {
+      value = Math.round(Number(raw?.value));
+      if (!Number.isInteger(value) || value < 0 || value > 36) return null;
+    } else if (type === "dozen" || type === "column") {
+      value = Math.round(Number(raw?.value));
+      if (![1, 2, 3].includes(value)) return null;
+    } else if (!["red", "black", "even", "odd", "low", "high"].includes(type)) {
+      return null;
+    }
+    total += amount;
+    bets.push({ type, value, amount });
+  }
+  if (total > balance) return null;
+  return { bets, total };
+}
+
+app.get("/api/casino/roulette/state", authRequired, (req, res) => {
+  res.json({ history: rouletteHistory.get(req.user.id) || [] });
+});
+
+app.post("/api/casino/roulette/play", authRequired, async (req, res) => {
+  try {
+    if (CASINO_MAINTENANCE.roulette) {
+      return res.status(503).json({ error: "Roulette est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
+
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const validated = rouletteValidateBets(req.body?.bets, account.balance);
+    if (!validated) {
+      return res.status(400).json({ error: `Mises invalides : chaque mise doit être d'au moins ${ROULETTE_MIN_BET} 💎 et le total ne peut pas dépasser ton solde.` });
+    }
+    const { bets, total } = validated;
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [total, req.user.id]);
+    await addWageringProgress(pool, req.user.id, total);
+
+    const pocket = Math.floor(Math.random() * 37); // 0 à 36
+    const color = rouletteColor(pocket);
+
+    let totalPayout = 0;
+    const resolvedBets = bets.map(bet => {
+      const win = rouletteBetWins(bet, pocket);
+      const payout = win ? bet.amount * ROULETTE_PAYOUTS[bet.type] : 0;
+      totalPayout += payout;
+      return { ...bet, win, payout, label: rouletteBetLabel(bet) };
+    });
+
+    if (totalPayout > 0) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [totalPayout, req.user.id]);
+    }
+
+    const net = totalPayout - total;
+    const entry = { pocket, color, net, ts: Date.now() };
+    const list = [entry, ...(rouletteHistory.get(req.user.id) || [])].slice(0, 30);
+    rouletteHistory.set(req.user.id, list);
+
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🎡 Roulette — ${req.user.pseudo} : ${pocket} ${color === "red" ? "🔴" : color === "black" ? "⚫" : "🟢"} (${net >= 0 ? "+" : ""}${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "roulette", total, totalPayout, net >= 0 ? "win" : "lose", `Bille sur ${pocket} (${color}) · ${bets.length} mise${bets.length === 1 ? "" : "s"}`]
+    );
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      pocket, color, bets: resolvedBets, totalBet: total, totalPayout, net,
+      history: list,
     });
   } catch (e) {
     console.error(e);

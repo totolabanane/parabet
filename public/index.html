@@ -376,6 +376,7 @@
   .lobby-card-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); padding: 9px 12px; }
   .lobby-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; box-shadow: 0 0 6px var(--green); }
   .lobby-dot.off { background: var(--text-faint); box-shadow: none; }
+  .lobby-dot.maintenance { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
   .lobby-card-icon-img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.35)); }
   .logo-badge-img { padding: 0; overflow: hidden; }
   .logo-badge-img img { width: 100%; height: 100%; object-fit: cover; }
@@ -467,6 +468,128 @@
   }
   .cf-history-chip img { width: 16px; height: 16px; object-fit: contain; }
   .cf-history-empty { font-size: 12px; color: var(--text-faint); }
+
+  /* slots */
+  .sl-stage { display: flex; flex-direction: column; align-items: center; padding: 30px 10px 6px; }
+  .sl-reels { display: flex; gap: 12px; }
+  .sl-reel {
+    width: 74px; height: 74px; border-radius: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; overflow: hidden;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .sl-reel.spinning { animation: slShake 0.18s linear infinite; }
+  .sl-reel.reveal { animation: slReveal 0.5s cubic-bezier(.2,.8,.3,1.2) both; animation-delay: var(--sl-delay, 0ms); }
+  @keyframes slShake {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes slReveal {
+    0% { transform: scale(0.4) rotate(-8deg); opacity: 0.3; }
+    60% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .sl-payline { width: 240px; height: 2px; margin-top: 8px; background: linear-gradient(90deg, transparent, var(--amber), transparent); opacity: 0.6; }
+  .cf-history-chip { font-size: 13px; letter-spacing: -1px; }
+
+  /* roulette */
+  .rl-stage { display: flex; align-items: center; justify-content: center; padding: 20px 10px 10px; }
+  .rl-wheel-outer { position: relative; width: 240px; height: 240px; }
+  .rl-wheel-bezel {
+    position: absolute; inset: 0; border-radius: 50%; background: #0c0d12; padding: 8px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.05);
+  }
+  .rl-wheel-ring {
+    position: absolute; inset: 8px; border-radius: 50%; overflow: hidden;
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.4);
+  }
+  .rl-wheel-num-lbl {
+    position: absolute; top: 50%; left: 50%; width: 22px; height: 16px; margin: -8px 0 0 -11px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 800; font-size: 9.5px; color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5); pointer-events: none;
+  }
+  .rl-wheel-hub {
+    position: absolute; inset: 62px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #24262f, #0a0b0f 75%);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.06), inset 0 4px 10px rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rl-wheel-cross { position: relative; width: 68%; height: 68%; }
+  .rl-wheel-cross::before, .rl-wheel-cross::after {
+    content: ""; position: absolute; top: 50%; left: 50%; background: linear-gradient(90deg, #a3690f, #ffd875 45%, #f2c14e 55%, #a3690f);
+    box-shadow: 0 0 6px rgba(242,193,78,0.5);
+  }
+  .rl-wheel-cross::before { width: 100%; height: 3px; transform: translate(-50%, -50%); }
+  .rl-wheel-cross::after { width: 3px; height: 100%; transform: translate(-50%, -50%); }
+  .rl-wheel-dot {
+    position: absolute; width: 12px; height: 12px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffe9a8, #f2c14e 60%, #a3690f); box-shadow: 0 0 8px rgba(242,193,78,0.6);
+  }
+  .rl-wheel-pointer {
+    position: absolute; top: -2px; left: 50%; transform: translateX(-50%); z-index: 3;
+    width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent;
+    border-top: 11px solid var(--amber); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  }
+  .rl-result-label { text-align: center; margin: 14px 0 0; font-size: 13.5px; font-weight: 700; }
+  .rl-result-label.win { color: var(--green); }
+  .rl-result-label.lose { color: var(--red); }
+
+  .rl-history-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rl-history-chip {
+    min-width: 24px; height: 24px; padding: 0 5px; border-radius: 7px; font-family: var(--font-mono);
+    font-size: 11px; font-weight: 800; color: #fff; display: flex; align-items: center; justify-content: center;
+  }
+  .rl-history-chip.red { background: #a4172c; }
+  .rl-history-chip.black { background: #23252f; border: 1px solid rgba(255,255,255,0.15); }
+  .rl-history-chip.green { background: #0a6b40; }
+
+  /* table de mise "vraie roulette" : 0 sur 3 lignes + grille 3x12 + colonnes 2:1 + douzaines + chances simples */
+  .rl-table {
+    display: grid; grid-template-columns: 40px repeat(12, 1fr) 44px; grid-template-rows: repeat(3, 1fr) 38px 38px;
+    gap: 4px; margin-bottom: 4px; font-family: var(--font-mono); font-weight: 800;
+  }
+  .rl-cell {
+    display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font-size: 12px; position: relative; text-align: center;
+    padding: 2px; line-height: 1.15; transition: transform 0.1s ease, border-color 0.15s ease;
+  }
+  .rl-cell:hover:not(:disabled) { transform: translateY(-1px); border-color: #6b7290; }
+  .rl-cell:disabled { cursor: not-allowed; opacity: 0.55; }
+  .rl-cell.zero { background: rgba(10,107,64,0.55); font-size: 15px; }
+  .rl-cell.red { background: rgba(164,23,44,0.6); }
+  .rl-cell.black { background: rgba(20,21,27,0.9); }
+  .rl-cell.colbet { font-size: 10.5px; font-weight: 700; color: var(--text-dim); }
+  .rl-cell.outside { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .rl-cell.outside.red-fill { background: rgba(164,23,44,0.6); }
+  .rl-cell.outside.black-fill { background: rgba(20,21,27,0.9); }
+  .rl-cell .rl-chip-badge {
+    position: absolute; bottom: -6px; right: -6px; background: var(--amber); color: #241a00; font-size: 9px;
+    font-weight: 800; border-radius: 999px; padding: 2px 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.35); z-index: 2;
+  }
+
+  .rl-actions-row { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 18px; }
+  .rl-text-btn {
+    display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-dim);
+    padding: 6px 4px;
+  }
+  .rl-text-btn:hover:not(:disabled) { color: var(--text); }
+  .rl-text-btn:disabled { cursor: not-allowed; opacity: 0.45; }
+
+  .rl-chip-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .rl-chip-btn {
+    flex: 1; min-width: 46px; padding: 8px 0; border-radius: 999px; font-family: var(--font-mono); font-weight: 800;
+    font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .rl-chip-btn.active { background: var(--amber-bg); color: var(--amber); border-color: rgba(242,183,63,0.5); }
+
+  .rl-bets-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .rl-bets-empty { font-size: 12px; color: var(--text-faint); }
+  .rl-bet-line { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+  .rl-bet-line span:first-child { color: var(--text-dim); }
+  .rl-bet-line span:last-child { font-family: var(--font-mono); font-weight: 700; }
+  .rl-bets-total { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 800; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
   /* dépôt : dropzone + récap */
   .dep-drop {
@@ -696,6 +819,16 @@ const state = {
   minesError: "",
   minesAnim: new Set(),  // cases déjà affichées comme révélées lors du dernier rendu (pour l'animation "mn-fresh")
 
+  casinoMaintenance: {}, // { mines: true, ... } — statut renvoyé par /api/casino/status
+
+  roulette: null,        // dernier résultat de Roulette renvoyé par le serveur (ou null)
+  rouletteHistory: [],
+  rouletteBets: [],       // mises placées avant le lancer : [{ type, value, amount, label }]
+  rouletteChip: 50,       // valeur du jeton actuellement sélectionné
+  rouletteBusy: false,
+  rouletteSpinning: false,
+  rouletteError: "",
+
   flip: null,            // dernier résultat de Flip renvoyé par le serveur (ou null)
   flipBetAmount: 100,
   flipSide: "face",       // "face" ou "pile", choisi par le joueur avant de lancer
@@ -703,6 +836,13 @@ const state = {
   flipSpinning: false,   // vrai pendant l'animation de la pièce, pour retarder l'affichage du résultat
   flipError: "",
   flipHistory: [],        // historique des derniers résultats (les plus récents en tête)
+
+  slots: null,            // dernier résultat de Slots renvoyé par le serveur (ou null)
+  slotsBetAmount: 100,
+  slotsBusy: false,
+  slotsSpinning: false,   // vrai pendant l'animation des rouleaux, pour retarder l'affichage du résultat
+  slotsError: "",
+  slotsHistory: [],        // historique des derniers tirages (les plus récents en tête)
 };
 
 /* ---------- helpers ---------- */
@@ -1309,7 +1449,7 @@ async function loadAdminCasinoBets() {
   state.adminCasinoBets = await api("/api/admin/casino-bets");
 }
 
-const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip" };
+const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots" };
 const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
 const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
 
@@ -1609,11 +1749,28 @@ const CASINO_GAMES = [
   { id: "mines",     title: "Mines",     poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
   { id: "hilo",      title: "Hilo",      poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
   { id: "flip",      title: "Flip",      poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
+  { id: "roulette",  title: "Roulette",  icon: "🎡", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
+  { id: "slots",     title: "Slots",     icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
 ];
 
-function openCasino() {
+// Statut effectif d'un jeu pour le lobby : combine le flag `enabled` (jeu pas
+// encore développé) avec le statut de maintenance renvoyé par le serveur
+// (jeu développé mais temporairement coupé). Les deux affichent un cadenas
+// mais avec un libellé et un point de couleur différents.
+function casinoGameStatus(g) {
+  if (!g.enabled) return { clickable: false, label: "Bientôt disponible", dotClass: "off" };
+  if (state.casinoMaintenance[g.id]) return { clickable: false, label: "En maintenance", dotClass: "maintenance" };
+  return { clickable: true, label: "Disponible", dotClass: "" };
+}
+
+async function openCasino() {
   state.view = "casino";
   state.casinoGame = null;
+  render();
+  try {
+    const s = await api("/api/casino/status");
+    state.casinoMaintenance = s.maintenance || {};
+  } catch (e) { /* si le statut ne charge pas, on part sans maintenance connue */ }
   render();
 }
 
@@ -1623,15 +1780,16 @@ function backToCasinoLobby() {
 }
 
 function lobbyCardHtml(g) {
+  const status = casinoGameStatus(g);
   if (g.poster) {
     return `
-      <div class="lobby-card ${g.enabled ? "" : "disabled"}" data-lobby="${g.id}">
+      <div class="lobby-card ${status.clickable ? "" : "disabled"}" data-lobby="${g.id}">
         <div class="lobby-card-art lobby-card-art-poster" style="background-image:url('${g.poster}');">
-          ${!g.enabled ? `<span class="lobby-lock">🔒</span>` : ""}
+          ${!status.clickable ? `<span class="lobby-lock">🔒</span>` : ""}
         </div>
         <div class="lobby-card-status">
-          <span class="lobby-dot ${g.enabled ? "" : "off"}"></span>
-          ${g.enabled ? "Disponible" : "Bientôt disponible"}
+          <span class="lobby-dot ${status.dotClass}"></span>
+          ${status.label}
         </div>
       </div>
     `;
@@ -1641,16 +1799,16 @@ function lobbyCardHtml(g) {
     ? `<img class="lobby-card-icon lobby-card-icon-img" src="${g.icon.slice(4)}" alt="${esc(g.title)}" />`
     : `<div class="lobby-card-icon">${g.icon}</div>`;
   return `
-    <div class="lobby-card ${g.enabled ? "" : "disabled"}" data-lobby="${g.id}">
+    <div class="lobby-card ${status.clickable ? "" : "disabled"}" data-lobby="${g.id}">
       <div class="lobby-card-art" style="background:${g.gradient};">
-        ${!g.enabled ? `<span class="lobby-lock">🔒</span>` : ""}
+        ${!status.clickable ? `<span class="lobby-lock">🔒</span>` : ""}
         ${iconHtml}
         <div class="lobby-card-kicker">ParaBet Originals</div>
         <div class="lobby-card-title">${g.title}</div>
       </div>
       <div class="lobby-card-status">
-        <span class="lobby-dot ${g.enabled ? "" : "off"}"></span>
-        ${g.enabled ? "Disponible" : "Bientôt disponible"}
+        <span class="lobby-dot ${status.dotClass}"></span>
+        ${status.label}
       </div>
     </div>
   `;
@@ -1685,10 +1843,16 @@ function renderCasinoLobby() {
   document.getElementById("casinoBackBtn").addEventListener("click", async () => { state.view = "app"; await loadEverything(); render(); });
   document.querySelectorAll("[data-lobby]").forEach(el => el.addEventListener("click", () => {
     const g = CASINO_GAMES.find(x => x.id === el.dataset.lobby);
-    if (!g.enabled) { showToast(`${g.title} arrive bientôt sur ParaBet 👀`); return; }
+    const status = casinoGameStatus(g);
+    if (!status.clickable) {
+      showToast(!g.enabled ? `${g.title} arrive bientôt sur ParaBet 👀` : `${g.title} est en maintenance, reviens plus tard 🔧`);
+      return;
+    }
     if (g.id === "blackjack") openBlackjack();
     else if (g.id === "mines") openMines();
     else if (g.id === "flip") openFlip();
+    else if (g.id === "roulette") openRoulette();
+    else if (g.id === "slots") openSlots();
   }));
 }
 
@@ -1806,6 +1970,8 @@ function renderCasino() {
   if (state.casinoGame === "blackjack") { renderBlackjackGame(); return; }
   if (state.casinoGame === "mines") { renderMinesGame(); return; }
   if (state.casinoGame === "flip") { renderFlipGame(); return; }
+  if (state.casinoGame === "roulette") { renderRouletteGame(); return; }
+  if (state.casinoGame === "slots") { renderSlotsGame(); return; }
   renderCasinoLobby();
 }
 
@@ -2328,6 +2494,547 @@ function renderFlipGame() {
 
   const startBtn = document.getElementById("cfStartBtn");
   if (startBtn) startBtn.addEventListener("click", flipStart);
+}
+
+/* ---------- casino : slots ---------- */
+
+const SLOTS_MIN_BET_CLIENT = 10; // doit correspondre à SLOTS_MIN_BET côté serveur
+const SLOTS_SYMBOL_EMOJI = { cherry: "🍒", lemon: "🍋", grape: "🍇", bell: "🔔", star: "⭐", diamond: "💎", seven: "7️⃣" };
+const SLOTS_SPIN_SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "⭐", "💎", "7️⃣"]; // pour l'animation de défilement
+const SLOTS_MULT_LABEL = { triple: "triple", pair: "paire" };
+
+async function openSlots() {
+  state.casinoGame = "slots";
+  state.slotsError = "";
+  state.slotsSpinning = false;
+  render();
+  try {
+    const s = await api("/api/casino/slots/state");
+    state.slots = s.last || null;
+    state.slotsHistory = s.history || [];
+  } catch (e) { /* pas grave si l'historique ne charge pas */ }
+  render();
+}
+
+function slotsStart() {
+  if (state.slotsBusy || state.slotsSpinning) return;
+  const amount = clamp(Math.round(Number(state.slotsBetAmount) || 0), SLOTS_MIN_BET_CLIENT, state.account.balance || SLOTS_MIN_BET_CLIENT);
+  state.slotsBetAmount = amount;
+  state.slotsBusy = true; state.slotsError = ""; render();
+
+  (async () => {
+    try {
+      const r = await api("/api/casino/slots/play", { method: "POST", body: { amount } });
+      state.account.balance = r.balance;
+      state.account.wageringRequired = r.wageringRequired;
+      state.account.wageringProgress = r.wageringProgress;
+      state.slotsSpinning = true;
+      render();
+      setTimeout(() => {
+        state.slots = r;
+        state.slotsHistory = r.history || [r, ...state.slotsHistory].slice(0, 20);
+        state.slotsSpinning = false;
+        state.slotsBusy = false;
+        render();
+      }, 900);
+    } catch (e) {
+      state.slotsError = e.message;
+      state.slotsBusy = false;
+      render();
+    }
+  })();
+}
+
+function renderSlotsGame() {
+  const app = document.getElementById("app");
+  const g = state.slots;
+  const busy = state.slotsBusy;
+  const spinning = state.slotsSpinning;
+  const showingResult = g && !spinning && !busy;
+  const reels = showingResult ? g.reels : null;
+
+  const resultLabel = showingResult
+    ? (g.win
+        ? `<p class="cf-result-label win">🎉 ${SLOTS_MULT_LABEL[g.kind] || g.kind} — +${g.payout - g.bet} 💎 (×${g.multiplier})</p>`
+        : `<p class="cf-result-label lose">💥 Aucune combinaison — tu perds ${g.bet} 💎</p>`)
+    : "";
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">🎰</div> Slots</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="bj-layout">
+
+        <div class="bj-panel">
+          <div class="bj-panel-label">
+            <span>Montant du pari</span>
+            <span class="bj-panel-label-sub">💎 fictif</span>
+          </div>
+          <div class="bj-panel-input-row">
+            <input type="number" id="slBetInput" min="${SLOTS_MIN_BET_CLIENT}" max="${state.account.balance}"
+              value="${state.slotsBetAmount}" ${busy || spinning ? "disabled" : ""} />
+            <button class="bj-mini-btn" id="slHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
+            <button class="bj-mini-btn" id="slDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
+          </div>
+
+          <button class="bj-btn primary bj-bet-btn" id="slSpinBtn" ${busy || spinning || state.account.balance < SLOTS_MIN_BET_CLIENT ? "disabled" : ""}>
+            ${busy || spinning ? "Ça tourne…" : "🎰 Lancer"}
+          </button>
+
+          <div class="bj-panel-label" style="margin-top:14px;">
+            <span>Gains potentiels</span>
+          </div>
+          <div class="mn-readout mn-readout-green">${showingResult ? g.payout : "?"} 💎</div>
+
+          ${state.slotsError ? `<p class="auth-error">${esc(state.slotsError)}</p>` : ""}
+
+          <p class="bj-rules">
+            3 symboles identiques paient le gros lot, 2 symboles identiques (fruits) paient un petit bonus.
+            🍒 ×3 · 🍋 ×5 · 🍇 ×9 · 🔔 ×17 · ⭐ ×33 · 💎 ×68 · 7️⃣ ×225.
+            💎 Émeraudes fictives, 100% pour le fun.
+          </p>
+        </div>
+
+        <div class="bj-table" style="min-height:auto;">
+          <div class="sl-stage">
+            <div class="sl-reels">
+              ${[0, 1, 2].map(i => `
+                <div class="sl-reel ${spinning ? "spinning" : ""} ${showingResult ? "reveal" : ""}" style="--sl-delay:${i * 90}ms;">
+                  <span class="sl-symbol">${spinning ? SLOTS_SPIN_SYMBOLS[(Date.now() + i * 7) % SLOTS_SPIN_SYMBOLS.length] : (reels ? SLOTS_SYMBOL_EMOJI[reels[i]] : "❔")}</span>
+                </div>
+              `).join("")}
+            </div>
+            <div class="sl-payline"></div>
+          </div>
+          ${resultLabel}
+
+          <div class="cf-history-box">
+            <div class="cf-history-title">Historique</div>
+            <div class="cf-history-row">
+              ${state.slotsHistory.length === 0
+                ? `<span class="cf-history-empty">Aucun tirage pour l'instant.</span>`
+                : state.slotsHistory.slice(0, 20).map(h => `
+                  <div class="cf-history-chip" title="${h.reels.map(r => r).join(', ')} · ${h.win ? "gain" : "perte"}">
+                    ${h.reels.map(r => SLOTS_SYMBOL_EMOJI[r]).join("")}
+                  </div>
+                `).join("")}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  const betInput = document.getElementById("slBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.slotsBetAmount = e.target.value; render(); });
+  const halfBtn = document.getElementById("slHalfBtn");
+  if (halfBtn) halfBtn.addEventListener("click", () => {
+    state.slotsBetAmount = clamp(Math.round((Number(state.slotsBetAmount) || 0) / 2), SLOTS_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+  const dblBtn = document.getElementById("slDblBetBtn");
+  if (dblBtn) dblBtn.addEventListener("click", () => {
+    state.slotsBetAmount = clamp(Math.round((Number(state.slotsBetAmount) || 0) * 2), SLOTS_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+
+  const spinBtn = document.getElementById("slSpinBtn");
+  if (spinBtn) spinBtn.addEventListener("click", slotsStart);
+
+  // Pendant l'animation, on fait défiler des symboles aléatoires dans chaque
+  // rouleau à intervalle rapide pour donner l'illusion d'un vrai tirage,
+  // jusqu'à ce que le résultat final (déjà connu du serveur) soit révélé.
+  if (spinning) {
+    const reelEls = document.querySelectorAll(".sl-reel .sl-symbol");
+    let n = 0;
+    const iv = setInterval(() => {
+      if (!state.slotsSpinning) { clearInterval(iv); return; }
+      n++;
+      reelEls.forEach((el, i) => {
+        el.textContent = SLOTS_SPIN_SYMBOLS[(n + i * 2) % SLOTS_SPIN_SYMBOLS.length];
+      });
+    }, 80);
+  }
+}
+
+/* ---------- casino : roulette ---------- */
+
+const ROULETTE_MIN_BET_CLIENT = 10; // doit correspondre à ROULETTE_MIN_BET côté serveur
+const ROULETTE_RED_CLIENT = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const ROULETTE_CHIPS = [10, 50, 100, 500, 1000];
+
+// Ordre réel des cases sur une roue européenne (37 cases, un seul 0). Sert à
+// positionner les numéros autour de la roue ET à calculer l'angle exact vers
+// lequel elle doit tourner pour s'arrêter sur le numéro tiré par le serveur.
+const ROULETTE_WHEEL_ORDER = [
+  0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5,
+  24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26,
+];
+const ROULETTE_WHEEL_SEG = 360 / ROULETTE_WHEEL_ORDER.length;
+
+function rouletteNumColor(n) {
+  if (n === 0) return "green";
+  return ROULETTE_RED_CLIENT.has(n) ? "red" : "black";
+}
+
+// Dégradé conique représentant les 37 cases colorées de la roue, dans l'ordre
+// réel de la roue (pas l'ordre numérique). `conic-gradient` démarre à midi et
+// tourne dans le sens horaire par défaut — exactement ce qu'il faut pour que
+// nos calculs d'angle (rouletteTargetAngle) restent cohérents avec le rendu.
+function rouletteWheelGradient() {
+  const seg = 100 / ROULETTE_WHEEL_ORDER.length;
+  const stops = ROULETTE_WHEEL_ORDER.map((n, i) => {
+    const color = n === 0 ? "#0a8a52" : (ROULETTE_RED_CLIENT.has(n) ? "#c81e3a" : "#181920");
+    return `${color} ${(i * seg).toFixed(4)}% ${((i + 1) * seg).toFixed(4)}%`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
+function rouletteWheelNumbersHtml() {
+  return ROULETTE_WHEEL_ORDER.map((n, i) => {
+    const angle = (i + 0.5) * ROULETTE_WHEEL_SEG;
+    return `<div class="rl-wheel-num-lbl" style="transform: rotate(${angle}deg) translateY(-85px);">${n}</div>`;
+  }).join("");
+}
+
+// Angle (en degrés) auquel il faut amener la roue pour que le numéro tiré se
+// retrouve exactement sous le repère fixe en haut (le pointeur doré).
+function rouletteTargetAngleForPocket(pocket) {
+  const idx = ROULETTE_WHEEL_ORDER.indexOf(pocket);
+  const wedgeCenter = (idx + 0.5) * ROULETTE_WHEEL_SEG;
+  return (360 - wedgeCenter) % 360;
+}
+
+async function openRoulette() {
+  state.casinoGame = "roulette";
+  state.rouletteError = "";
+  state.rouletteSpinning = false;
+  state.rouletteSpinAnim = null;
+  state.rouletteBets = [];
+  render();
+  try {
+    const s = await api("/api/casino/roulette/state");
+    state.rouletteHistory = s.history || [];
+  } catch (e) { /* pas d'historique, on part d'un état vide */ }
+  render();
+}
+
+function rouletteTotalBets() {
+  return state.rouletteBets.reduce((sum, b) => sum + b.amount, 0);
+}
+
+// Ajoute une mise sur une case (numéro plein ou chance/douzaine/colonne) avec
+// le jeton actuellement sélectionné. Si une mise existe déjà sur cette même
+// case, on empile le jeton dessus (comme sur une vraie table).
+function rouletteAddBet(type, value, label) {
+  if (state.rouletteBusy || state.rouletteSpinning) return;
+  const chip = state.rouletteChip;
+  const available = (state.account.balance || 0) - rouletteTotalBets();
+  if (chip > available) { showToast("Solde insuffisant pour ce jeton."); return; }
+
+  const existing = state.rouletteBets.find(b => b.type === type && b.value === value);
+  if (existing) existing.amount += chip;
+  else state.rouletteBets.push({ type, value, amount: chip, label });
+  render();
+}
+
+function rouletteUndoBet() {
+  if (state.rouletteBusy || state.rouletteSpinning) return;
+  state.rouletteBets.pop();
+  render();
+}
+
+function rouletteClearBets() {
+  if (state.rouletteBusy || state.rouletteSpinning) return;
+  state.rouletteBets = [];
+  render();
+}
+
+const ROULETTE_SPIN_MS = 2600;
+
+function rouletteSpin() {
+  if (state.rouletteBusy || state.rouletteSpinning || state.rouletteBets.length === 0) return;
+  state.rouletteBusy = true; state.rouletteError = ""; render();
+
+  (async () => {
+    try {
+      const bets = state.rouletteBets.map(b => ({ type: b.type, value: b.value, amount: b.amount }));
+      const r = await api("/api/casino/roulette/play", { method: "POST", body: { bets } });
+
+      // Calcule la rotation à appliquer : on part de la position actuelle de
+      // la roue, on ajoute plusieurs tours complets pour l'effet, et on
+      // termine pile sur le numéro renvoyé par le serveur.
+      const from = state.rouletteWheelRotation || 0;
+      const desiredMod = rouletteTargetAngleForPocket(r.pocket);
+      let to = from - (from % 360) + 360 * 5 + desiredMod;
+      if (to <= from) to += 360;
+      state.rouletteSpinAnim = { from, to };
+      state.rouletteSpinning = true;
+      render();
+
+      setTimeout(() => {
+        state.account.balance = r.balance;
+        state.account.wageringRequired = r.wageringRequired;
+        state.account.wageringProgress = r.wageringProgress;
+        state.roulette = r;
+        state.rouletteHistory = r.history || [];
+        state.rouletteBets = [];
+        state.rouletteWheelRotation = state.rouletteSpinAnim.to;
+        state.rouletteSpinAnim = null;
+        state.rouletteSpinning = false;
+        state.rouletteBusy = false;
+        render();
+      }, ROULETTE_SPIN_MS);
+    } catch (e) {
+      state.rouletteError = e.message;
+      state.rouletteBusy = false;
+      render();
+    }
+  })();
+}
+
+function rouletteCellHtml(cls, dataAttrs, content, disabled, betMatch) {
+  const b = betMatch ? state.rouletteBets.find(x => x.type === betMatch.type && x.value === betMatch.value) : null;
+  return `
+    <button class="rl-cell ${cls}" ${dataAttrs} ${disabled ? "disabled" : ""}>
+      ${content}
+      ${b ? `<span class="rl-chip-badge">${b.amount}</span>` : ""}
+    </button>
+  `;
+}
+
+// Reconstruit la vraie grille d'une table de roulette : 0 sur 3 lignes à
+// gauche, les 36 numéros répartis en 3 lignes × 12 colonnes (colonne c =
+// numéros 3c-2 / 3c-1 / 3c), les mises "colonne" (2:1) au bout de chaque
+// ligne, puis les douzaines et les chances simples en dessous.
+function rouletteTableHtml(disabled) {
+  const cells = [];
+
+  cells.push(`<button class="rl-cell zero" style="grid-row:1/4; grid-column:1;" data-rl-straight="0" ${disabled ? "disabled" : ""}>0${(() => {
+    const b = state.rouletteBets.find(x => x.type === "straight" && x.value === 0);
+    return b ? `<span class="rl-chip-badge">${b.amount}</span>` : "";
+  })()}</button>`);
+
+  for (let c = 1; c <= 12; c++) {
+    const top = 3 * c, mid = 3 * c - 1, bot = 3 * c - 2;
+    [[top, 1], [mid, 2], [bot, 3]].forEach(([n, row]) => {
+      const b = state.rouletteBets.find(x => x.type === "straight" && x.value === n);
+      cells.push(`
+        <button class="rl-cell ${rouletteNumColor(n)}" style="grid-row:${row}; grid-column:${c + 1};" data-rl-straight="${n}" ${disabled ? "disabled" : ""}>
+          ${n}${b ? `<span class="rl-chip-badge">${b.amount}</span>` : ""}
+        </button>
+      `);
+    });
+  }
+
+  // colonnes 2:1 — la ligne du haut correspond à la colonne 3 (3,6,9…36), celle
+  // du milieu à la colonne 2, celle du bas à la colonne 1 (1,4,7…34).
+  [[1, 3], [2, 2], [3, 1]].forEach(([row, colValue]) => {
+    const b = state.rouletteBets.find(x => x.type === "column" && x.value === colValue);
+    cells.push(`
+      <button class="rl-cell colbet" style="grid-row:${row}; grid-column:14;" data-rl-outside="column" data-rl-value="${colValue}" ${disabled ? "disabled" : ""}>
+        2:1${b ? `<span class="rl-chip-badge">${b.amount}</span>` : ""}
+      </button>
+    `);
+  });
+
+  const dozens = [[1, "2 / span 4", "1 à 12"], [2, "6 / span 4", "13 à 24"], [3, "10 / span 4", "25 à 36"]];
+  dozens.forEach(([value, colSpan]) => {
+    const b = state.rouletteBets.find(x => x.type === "dozen" && x.value === value);
+    cells.push(`
+      <button class="rl-cell colbet" style="grid-row:4; grid-column:${colSpan};" data-rl-outside="dozen" data-rl-value="${value}" ${disabled ? "disabled" : ""}>
+        ${["1ère", "2ème", "3ème"][value - 1]} douzaine (${["1-12", "13-24", "25-36"][value - 1]})${b ? `<span class="rl-chip-badge">${b.amount}</span>` : ""}
+      </button>
+    `);
+  });
+
+  const outside = [
+    ["low", null, "2 / span 2", "1 à 18", ""],
+    ["even", null, "4 / span 2", "Pair", ""],
+    ["red", null, "6 / span 2", "Rouge", "red-fill"],
+    ["black", null, "8 / span 2", "Noir", "black-fill"],
+    ["odd", null, "10 / span 2", "Impair", ""],
+    ["high", null, "12 / span 2", "19 à 36", ""],
+  ];
+  outside.forEach(([type, value, colSpan, label, extra]) => {
+    const b = state.rouletteBets.find(x => x.type === type && x.value === value);
+    cells.push(`
+      <button class="rl-cell outside ${extra}" style="grid-row:5; grid-column:${colSpan};" data-rl-outside="${type}" data-rl-value="" ${disabled ? "disabled" : ""}>
+        ${label}${b ? `<span class="rl-chip-badge">${b.amount}</span>` : ""}
+      </button>
+    `);
+  });
+
+  return cells.join("");
+}
+
+function renderRouletteGame() {
+  const app = document.getElementById("app");
+  const g = state.roulette;
+  const busy = state.rouletteBusy;
+  const spinning = state.rouletteSpinning;
+  const showingResult = g && !spinning && !busy;
+  const disabled = busy || spinning;
+
+  const resultLabel = showingResult
+    ? (g.net >= 0
+        ? `<p class="rl-result-label win">🎉 Bille sur ${g.pocket} ${g.color === "red" ? "🔴" : g.color === "black" ? "⚫" : "🟢"} — +${g.net} 💎</p>`
+        : `<p class="rl-result-label lose">💥 Bille sur ${g.pocket} ${g.color === "red" ? "🔴" : g.color === "black" ? "⚫" : "🟢"} — tu perds ${Math.abs(g.net)} 💎</p>`)
+    : "";
+
+  const total = rouletteTotalBets();
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">🎡</div> Roulette</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="bj-layout">
+
+        <div class="bj-panel">
+          <div class="bj-panel-label">
+            <span>Jeton</span>
+            <span class="bj-panel-label-sub">💎 fictif</span>
+          </div>
+          <div class="rl-chip-row">
+            ${ROULETTE_CHIPS.map(c => `<button class="rl-chip-btn ${state.rouletteChip === c ? "active" : ""}" data-rl-chip="${c}" ${disabled ? "disabled" : ""}>${c}</button>`).join("")}
+          </div>
+
+          <div class="rl-bets-box">
+            ${state.rouletteBets.length === 0
+              ? `<span class="rl-bets-empty">Clique sur la table pour placer une mise.</span>`
+              : state.rouletteBets.map(b => `<div class="rl-bet-line"><span>${esc(b.label)}</span><span>${b.amount} 💎</span></div>`).join("")}
+            ${state.rouletteBets.length > 0 ? `<div class="rl-bets-total"><span>Total misé</span><span>${total} 💎</span></div>` : ""}
+          </div>
+
+          <button class="bj-btn primary bj-bet-btn" id="rlSpinBtn" ${disabled || state.rouletteBets.length === 0 ? "disabled" : ""}>
+            ${busy || spinning ? "La bille tourne…" : "▶️ Lancer la bille"}
+          </button>
+
+          ${state.rouletteError ? `<p class="auth-error">${esc(state.rouletteError)}</p>` : ""}
+
+          <p class="bj-rules">Numéro plein (36×), rouge/noir, pair/impair, manque/passe (2×), douzaine/colonne (3×). 💎 Émeraudes fictives, 100% pour le fun.</p>
+        </div>
+
+        <div class="bj-table" style="min-height:auto;">
+          <div class="rl-stage">
+            <div class="rl-wheel-outer">
+              <div class="rl-wheel-bezel"></div>
+              <div class="rl-wheel-ring" id="rlWheelRing" style="background:${rouletteWheelGradient()};">
+                ${rouletteWheelNumbersHtml()}
+              </div>
+              <div class="rl-wheel-hub">
+                <div class="rl-wheel-cross"></div>
+                <div class="rl-wheel-dot"></div>
+              </div>
+              <div class="rl-wheel-pointer"></div>
+            </div>
+          </div>
+          ${resultLabel}
+
+          <div class="rl-table">${rouletteTableHtml(disabled)}</div>
+
+          <div class="rl-actions-row">
+            <button class="rl-text-btn" id="rlUndoBtn" ${disabled || state.rouletteBets.length === 0 ? "disabled" : ""}>↺ Annuler</button>
+            <button class="rl-text-btn" id="rlClearBtn" ${disabled || state.rouletteBets.length === 0 ? "disabled" : ""}>Effacer 🔄</button>
+          </div>
+
+          <div class="cf-history-box">
+            <div class="cf-history-title">Historique</div>
+            <div class="rl-history-row">
+              ${state.rouletteHistory.length === 0
+                ? `<span class="cf-history-empty">Aucun lancer pour l'instant.</span>`
+                : state.rouletteHistory.slice(0, 30).map(h => `<div class="rl-history-chip ${h.color}">${h.pocket}</div>`).join("")}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  // Anime la roue via la Web Animations API plutôt que des classes CSS : le
+  // DOM étant reconstruit à chaque render(), une simple classe + keyframes
+  // fixes ne permettrait pas de viser un angle différent à chaque lancer.
+  const ringEl = document.getElementById("rlWheelRing");
+  if (ringEl) {
+    if (spinning && state.rouletteSpinAnim) {
+      ringEl.style.transform = `rotate(${state.rouletteSpinAnim.from}deg)`;
+      ringEl.animate(
+        [{ transform: `rotate(${state.rouletteSpinAnim.from}deg)` }, { transform: `rotate(${state.rouletteSpinAnim.to}deg)` }],
+        { duration: ROULETTE_SPIN_MS, easing: "cubic-bezier(.15,.65,.3,1)", fill: "forwards" }
+      );
+    } else {
+      ringEl.style.transform = `rotate(${state.rouletteWheelRotation || 0}deg)`;
+    }
+  }
+
+  document.querySelectorAll("[data-rl-chip]").forEach(el => el.addEventListener("click", () => {
+    state.rouletteChip = Number(el.dataset.rlChip);
+    render();
+  }));
+
+  document.querySelectorAll("[data-rl-straight]").forEach(el => el.addEventListener("click", () => {
+    const n = Number(el.dataset.rlStraight);
+    rouletteAddBet("straight", n, `Numéro plein ${n}`);
+  }));
+
+  const outsideLabels = {
+    low: "Manque (1-18)", high: "Passe (19-36)", even: "Pair", odd: "Impair", red: "Rouge", black: "Noir",
+  };
+  document.querySelectorAll("[data-rl-outside]").forEach(el => el.addEventListener("click", () => {
+    const type = el.dataset.rlOutside;
+    if (type === "dozen" || type === "column") {
+      const value = Number(el.dataset.rlValue);
+      const label = type === "dozen"
+        ? (value === 1 ? "1ère douzaine (1-12)" : value === 2 ? "2ème douzaine (13-24)" : "3ème douzaine (25-36)")
+        : `Colonne ${value}`;
+      rouletteAddBet(type, value, label);
+    } else {
+      rouletteAddBet(type, null, outsideLabels[type]);
+    }
+  }));
+
+  const undoBtn = document.getElementById("rlUndoBtn");
+  if (undoBtn) undoBtn.addEventListener("click", rouletteUndoBet);
+  const clearBtn = document.getElementById("rlClearBtn");
+  if (clearBtn) clearBtn.addEventListener("click", rouletteClearBets);
+  const spinBtn = document.getElementById("rlSpinBtn");
+  if (spinBtn) spinBtn.addEventListener("click", rouletteSpin);
 }
 
 /* ---------- rendering: bet & deposit modal ---------- */
