@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ParaBet — le marché à pronostics de Paladium</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Press+Start+2P&family=VT323&display=swap');
 
   :root {
     --bg: #0a0b0f;
@@ -416,6 +416,186 @@
     100% { transform: scale(1) rotate(0); }
   }
 
+  /* chicken road — habillage "Minecraft" (pixel-art, blocs, police pixel) */
+  .ckr-mc {
+    --mc-font: 'Press Start 2P', var(--font-mono);
+    --mc-stone: #8b8b8b; --mc-stone-dk: #565656; --mc-stone-lt: #c6c6c6;
+    --mc-dirt: #6a4a2f; --mc-dirt-lt: #8a6440; --mc-path: #9c7a4e; --mc-path-lt: #b6935f;
+    --mc-grass: #5a9c3e; --mc-grass-dk: #3f7028; --mc-grass-lt: #79c455;
+    --mc-emerald: #17c964; --mc-emerald-dk: #0d7a3c;
+    --mc-gold: #f9c440; --mc-gold-dk: #b3860f;
+    --mc-redstone: #d3271f; --mc-redstone-dk: #7a0f0b;
+    --mc-oak: #a1682a; --mc-oak-dk: #6b4419; --mc-oak-panel: #b98a49;
+    font-family: var(--mc-font);
+    image-rendering: pixelated;
+  }
+  .ckr-mc, .ckr-mc input, .ckr-mc button { font-family: var(--mc-font); }
+  .ckr-mc * { letter-spacing: 0; }
+
+  .ckr-stage-card {
+    background: var(--mc-stone); border: 4px solid #000; border-radius: 0; overflow: hidden; margin-bottom: 18px;
+    box-shadow: inset 3px 3px 0 var(--mc-stone-lt), inset -3px -3px 0 var(--mc-stone-dk), 0 6px 0 rgba(0,0,0,0.5);
+    image-rendering: pixelated;
+  }
+  .ckr-stage { display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .ckr-stage::-webkit-scrollbar { display: none; height: 0; }
+  .ckr-sidewalk {
+    flex: 0 0 96px; height: 260px; position: relative; display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 20px;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0 4px, transparent 4px 8px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.10) 0 4px, transparent 4px 8px),
+      linear-gradient(var(--mc-grass), var(--mc-grass-dk));
+    border-right: 4px solid #2b2b2b;
+    box-shadow: inset 0 6px 0 var(--mc-grass-lt);
+  }
+  .ckr-sidewalk-tree {
+    position: absolute; top: 2px; left: 14px; width: 32px; height: 48px;
+    filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.35));
+  }
+  .ckr-sidewalk-tree svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; }
+  .ckr-sidewalk-lamp {
+    position: absolute; top: 30px; right: 20px; width: 8px; height: 54px; background: var(--mc-oak-dk);
+    box-shadow: -2px 0 0 rgba(0,0,0,0.3);
+  }
+  .ckr-sidewalk-lamp::before {
+    content: ""; position: absolute; top: -14px; left: -6px; width: 20px; height: 14px; background: #ffb238;
+    box-shadow: 0 0 0 2px #402400, 0 0 10px 2px rgba(255,178,56,0.85);
+  }
+  .ckr-lanes {
+    display: flex; align-items: stretch; min-width: max-content;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.08) 0 4px, transparent 4px 8px),
+      linear-gradient(var(--mc-path-lt), var(--mc-path) 55%, var(--mc-dirt) 100%);
+  }
+  .ckr-lane {
+    flex: 0 0 118px; height: 260px; position: relative; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start; padding-top: 14px;
+    border-right: 4px dashed #2b2b2b; background: transparent;
+    box-shadow: inset -12px 0 12px -12px rgba(0,0,0,0.35);
+    transition: background 0.25s ease;
+  }
+  .ckr-lane::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(0,0,0,0.14) 2px, transparent 2px);
+    background-size: 14px 14px; background-position: 3px 5px; pointer-events: none; opacity: 0.6;
+  }
+  .ckr-lane:last-child { border-right: none; }
+  .ckr-lane.ckr-lane-passed { background: linear-gradient(rgba(23,201,100,0.16), rgba(23,201,100,0.05)); }
+  .ckr-lane.ckr-lane-hit { background: linear-gradient(rgba(211,39,31,0.35), rgba(211,39,31,0.12)); }
+  .ckr-vehicle { width: 46px; height: 46px; position: relative; z-index: 1; filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.45)); transition: opacity 0.2s ease, filter 0.2s ease; image-rendering: pixelated; }
+  .ckr-vehicle.ckr-vehicle-lg { width: 56px; height: 56px; }
+  .ckr-vehicle svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; }
+  .ckr-lane-passed .ckr-vehicle { opacity: 0.4; filter: grayscale(0.5) drop-shadow(2px 3px 0 rgba(0,0,0,0.3)); }
+  .ckr-lane-hit .ckr-vehicle { opacity: 0; }
+  .ckr-boom {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 52px; height: 52px;
+    z-index: 2; animation: ckrBoom 0.4s steps(2) both;
+  }
+  .ckr-boom svg { width: 100%; height: 100%; shape-rendering: crispEdges; }
+  @keyframes ckrBoom { 0% { transform: translateX(-50%) scale(0.4); opacity: 0; } 55% { transform: translateX(-50%) scale(1.3); opacity: 1; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+  .ckr-lane-grate-wrap { margin-top: auto; margin-bottom: 16px; display: flex; justify-content: center; }
+  .ckr-grate {
+    width: 56px; height: 56px; border-radius: 0; display: flex; align-items: center; justify-content: center;
+    position: relative; border: 3px solid #1c1c1c;
+    background: var(--mc-stone);
+    box-shadow: inset 3px 3px 0 var(--mc-stone-lt), inset -3px -3px 0 var(--mc-stone-dk), 3px 3px 0 rgba(0,0,0,0.4);
+    transition: all 0.25s ease;
+  }
+  .ckr-grate span { position: relative; z-index: 1; font-family: var(--mc-font); font-weight: 400; font-size: 10px; color: #f4f4f4; text-shadow: 1px 1px 0 rgba(0,0,0,0.7); }
+  .ckr-grate.ckr-grate-passed {
+    background: var(--mc-emerald);
+    box-shadow: inset 3px 3px 0 #6bffb0, inset -3px -3px 0 var(--mc-emerald-dk), 3px 3px 0 rgba(0,0,0,0.4);
+  }
+  .ckr-grate.ckr-grate-passed span { color: #06331a; text-shadow: none; }
+  .ckr-grate.ckr-grate-next {
+    background: var(--mc-gold);
+    box-shadow: inset 3px 3px 0 #ffe38a, inset -3px -3px 0 var(--mc-gold-dk), 3px 3px 0 rgba(0,0,0,0.4);
+    animation: ckPulse 1s steps(2) infinite;
+  }
+  .ckr-grate.ckr-grate-next span { color: #4a3300; text-shadow: none; }
+  .ckr-grate.ckr-grate-hit {
+    background: var(--mc-redstone);
+    box-shadow: inset 3px 3px 0 #ff8a83, inset -3px -3px 0 var(--mc-redstone-dk), 3px 3px 0 rgba(0,0,0,0.4);
+  }
+  @keyframes ckPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+  .ckr-chicken-slot { flex: 0 0 74px; height: 260px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 44px; position: relative; z-index: 2; }
+  .ckr-chicken-slot svg { width: 52px; height: 52px; shape-rendering: crispEdges; filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.45)); animation: ckBob 0.5s steps(2) infinite alternate; }
+  .ckr-chicken-slot.ckr-chicken-hit svg { animation: none; opacity: 0.6; transform: rotate(80deg) translateY(6px); }
+  @keyframes ckBob { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+
+  .ckr-banner { text-align: center; padding: 12px 16px 16px; font-family: var(--mc-font); font-size: 11px; line-height: 1.8; }
+
+  .ckr-controls { display: grid; grid-template-columns: 1.1fr 1fr auto; gap: 14px; align-items: stretch; }
+  @media (max-width: 760px) { .ckr-controls { grid-template-columns: 1fr; } }
+  .ckr-box {
+    background: var(--mc-oak-panel); border: 3px solid #000; border-radius: 0; padding: 14px;
+    box-shadow: inset 3px 3px 0 rgba(255,255,255,0.25), inset -3px -3px 0 rgba(0,0,0,0.3);
+  }
+  .ckr-box-label { font-family: var(--mc-font); font-size: 9px; font-weight: 400; color: #2c1c07; text-transform: uppercase; margin-bottom: 10px; text-shadow: 1px 1px 0 rgba(255,255,255,0.2); }
+  .ckr-bet-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .ckr-bet-row input {
+    flex: 1; min-width: 0; background: #1c1c1c; border: 3px solid #000; border-radius: 0;
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6), inset -1px -1px 0 rgba(255,255,255,0.08);
+    color: #baf7c9; padding: 10px 8px; font-family: var(--mc-font); font-weight: 400; font-size: 13px; outline: none;
+  }
+  .ckr-minmax-btn {
+    background: var(--mc-stone); border: 3px solid #000; border-radius: 0; padding: 0 12px;
+    box-shadow: inset 2px 2px 0 var(--mc-stone-lt), inset -2px -2px 0 var(--mc-stone-dk);
+    font-family: var(--mc-font); font-weight: 400; font-size: 9px; color: #1c1c1c;
+  }
+  .ckr-minmax-btn:active:not(:disabled) { box-shadow: inset 2px 2px 0 var(--mc-stone-dk), inset -2px -2px 0 var(--mc-stone-lt); }
+  .ckr-minmax-btn:disabled, .ckr-bet-row input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ckr-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ckr-mc .rl-chip-btn {
+    background: var(--mc-emerald); border: 3px solid #000; border-radius: 0; color: #06331a;
+    box-shadow: inset 2px 2px 0 #6bffb0, inset -2px -2px 0 var(--mc-emerald-dk);
+    font-family: var(--mc-font); font-size: 10px; padding: 7px 9px;
+  }
+  .ckr-mc .rl-chip-btn:active:not(:disabled) { box-shadow: inset 2px 2px 0 var(--mc-emerald-dk), inset -2px -2px 0 #6bffb0; }
+  .ckr-risk-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .ckr-risk-value { font-family: var(--mc-font); font-weight: 400; font-size: 11px; color: #7a2e00; }
+  .ck-diff-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ck-diff-btn {
+    flex: 1; min-width: 64px; background: var(--mc-stone); border: 3px solid #000; border-radius: 0;
+    box-shadow: inset 2px 2px 0 var(--mc-stone-lt), inset -2px -2px 0 var(--mc-stone-dk);
+    padding: 9px 4px; color: #1c1c1c; font-family: var(--mc-font); font-weight: 400; font-size: 9px; cursor: pointer;
+    transition: filter 0.1s ease;
+  }
+  .ck-diff-btn.active {
+    background: var(--mc-gold);
+    box-shadow: inset 2px 2px 0 #ffe38a, inset -2px -2px 0 var(--mc-gold-dk);
+    color: #4a3300;
+  }
+  .ck-diff-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ckr-action-col { display: flex; flex-direction: column; gap: 10px; justify-content: center; min-width: 200px; }
+  .ckr-play-btn {
+    background: var(--mc-grass); color: #0e2a06; border: 3px solid #000; border-radius: 0; padding: 18px 20px;
+    box-shadow: inset 3px 3px 0 var(--mc-grass-lt), inset -3px -3px 0 var(--mc-grass-dk), 3px 3px 0 rgba(0,0,0,0.4);
+    font-family: var(--mc-font); font-weight: 400; font-size: 12px; cursor: pointer; transition: transform 0.06s ease;
+  }
+  .ckr-play-btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .ckr-play-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: inset 3px 3px 0 var(--mc-grass-dk), inset -3px -3px 0 var(--mc-grass-lt); }
+  .ckr-play-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ckr-cashout-btn {
+    background: var(--mc-gold); color: #4a3300; border: 3px solid #000; border-radius: 0;
+    box-shadow: inset 3px 3px 0 #ffe38a, inset -3px -3px 0 var(--mc-gold-dk), 3px 3px 0 rgba(0,0,0,0.4);
+    padding: 13px 16px; font-family: var(--mc-font); font-weight: 400; font-size: 10.5px; cursor: pointer;
+  }
+  .ckr-cashout-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: inset 3px 3px 0 var(--mc-gold-dk), inset -3px -3px 0 #ffe38a; }
+  .ckr-cashout-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ckr-howto-btn {
+    display: flex; align-items: center; gap: 6px; background: var(--mc-stone); border: 3px solid #000; border-radius: 0;
+    box-shadow: inset 2px 2px 0 var(--mc-stone-lt), inset -2px -2px 0 var(--mc-stone-dk);
+    padding: 9px 12px; font-family: var(--mc-font); font-size: 9px; font-weight: 400; color: #1c1c1c;
+  }
+  .ckr-howto-btn:hover { filter: brightness(1.08); }
+  .ckr-howto-panel {
+    background: #2b2b2b; border: 3px solid #000; color: #d8d8d8;
+    box-shadow: inset 3px 3px 0 rgba(255,255,255,0.08), inset -3px -3px 0 rgba(0,0,0,0.5);
+    padding: 14px 16px; font-family: var(--mc-font); font-size: 10px; line-height: 2; margin-bottom: 14px;
+  }
+
   /* flip */
   .cf-side-row { display: flex; gap: 8px; margin-bottom: 10px; }
   .cf-side-btn {
@@ -818,6 +998,14 @@ const state = {
   minesBusy: false,
   minesError: "",
   minesAnim: new Set(),  // cases déjà affichées comme révélées lors du dernier rendu (pour l'animation "mn-fresh")
+
+  chicken: null,         // état de la partie de Chicken Road en cours renvoyé par le serveur (ou null)
+  chickenBetAmount: 100,
+  chickenDifficulty: "moyen",
+  chickenBusy: false,
+  chickenError: "",
+  chickenAnim: 0,        // dernier "step" affiché lors du rendu précédent (pour savoir si le poulet vient d'avancer)
+  chickenHowto: false,   // affichage du panneau "Comment jouer ?"
 
   casinoMaintenance: {}, // { mines: true, ... } — statut renvoyé par /api/casino/status
 
@@ -1449,7 +1637,7 @@ async function loadAdminCasinoBets() {
   state.adminCasinoBets = await api("/api/admin/casino-bets");
 }
 
-const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots" };
+const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road" };
 const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
 const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
 
@@ -1749,8 +1937,9 @@ const CASINO_GAMES = [
   { id: "mines",     title: "Mines",     poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
   { id: "hilo",      title: "Hilo",      poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
   { id: "flip",      title: "Flip",      poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
-  { id: "roulette",  title: "Roulette",  icon: "🎡", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
+  { id: "roulette",  title: "Roulette",  poster: "/casino/roulette-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
   { id: "slots",     title: "Slots",     icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
+  { id: "chicken",   title: "Chicken Road", poster: "/casino/chicken-poster.png", gradient: "linear-gradient(165deg,#8fe07a,#1f6b2e)", enabled: true },
 ];
 
 // Statut effectif d'un jeu pour le lobby : combine le flag `enabled` (jeu pas
@@ -1853,6 +2042,7 @@ function renderCasinoLobby() {
     else if (g.id === "flip") openFlip();
     else if (g.id === "roulette") openRoulette();
     else if (g.id === "slots") openSlots();
+    else if (g.id === "chicken") openChicken();
   }));
 }
 
@@ -1972,6 +2162,7 @@ function renderCasino() {
   if (state.casinoGame === "flip") { renderFlipGame(); return; }
   if (state.casinoGame === "roulette") { renderRouletteGame(); return; }
   if (state.casinoGame === "slots") { renderSlotsGame(); return; }
+  if (state.casinoGame === "chicken") { renderChickenGame(); return; }
   renderCasinoLobby();
 }
 
@@ -2309,6 +2500,375 @@ function renderMinesGame() {
   if (cashoutBtn) cashoutBtn.addEventListener("click", minesCashout);
   const randomBtn = document.getElementById("mnRandomBtn");
   if (randomBtn) randomBtn.addEventListener("click", minesRandomPick);
+}
+
+/* ---------- casino : chicken road (habillage "Minecraft" pixel-art) ---------- */
+
+// Poulet pixel-art dessiné à la main (SVG maison, 100% original — pas d'image
+// externe pour ce jeu-ci), sur une grille 16×16 façon sprite Minecraft.
+const CHICKEN_SVG = `
+<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+  <rect x="3" y="7" width="9" height="7" fill="#fbfbfb"/>
+  <rect x="2" y="9" width="2" height="4" fill="#e9e9e9"/>
+  <rect x="9" y="2" width="5" height="6" fill="#fbfbfb"/>
+  <rect x="10" y="0" width="2" height="2" fill="#d4302a"/>
+  <rect x="12" y="1" width="2" height="2" fill="#d4302a"/>
+  <rect x="14" y="4" width="2" height="2" fill="#f2a428"/>
+  <rect x="10" y="4" width="1" height="1" fill="#161616"/>
+  <rect x="4" y="14" width="2" height="2" fill="#f2a428"/>
+  <rect x="8" y="14" width="2" height="2" fill="#f2a428"/>
+</svg>`;
+
+// Petite explosion pixel-art (remplace l'ancien 💥) pour la ligne où le poulet se fait toucher.
+const CHICKEN_BOOM_SVG = `
+<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+  <rect x="7" y="0" width="2" height="4" fill="#ffcc33"/>
+  <rect x="7" y="12" width="2" height="4" fill="#ffcc33"/>
+  <rect x="0" y="7" width="4" height="2" fill="#ffcc33"/>
+  <rect x="12" y="7" width="4" height="2" fill="#ffcc33"/>
+  <rect x="2" y="2" width="3" height="3" fill="#ff6a00"/>
+  <rect x="11" y="2" width="3" height="3" fill="#ff6a00"/>
+  <rect x="2" y="11" width="3" height="3" fill="#ff6a00"/>
+  <rect x="11" y="11" width="3" height="3" fill="#ff6a00"/>
+  <rect x="5" y="5" width="6" height="6" fill="#fff2b0"/>
+</svg>`;
+
+// Petit arbre pixel-art pour le trottoir de départ (remplace l'ancien 🌳).
+const CHICKEN_TREE_SVG = `
+<svg viewBox="0 0 16 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+  <rect x="1" y="0" width="14" height="14" fill="#3f7028"/>
+  <rect x="3" y="2" width="2" height="2" fill="#5a9c3e"/>
+  <rect x="9" y="4" width="2" height="2" fill="#5a9c3e"/>
+  <rect x="5" y="8" width="2" height="2" fill="#295016"/>
+  <rect x="10" y="9" width="2" height="2" fill="#295016"/>
+  <rect x="6" y="14" width="4" height="10" fill="#6b4419"/>
+  <rect x="6" y="14" width="2" height="10" fill="#8a6440"/>
+</svg>`;
+
+const CHICKEN_MIN_BET_CLIENT = 10; // doit correspondre à CHICKEN_MIN_BET côté serveur
+// base / croissance du risque par ligne, doit correspondre à CHICKEN_DIFFICULTIES côté serveur
+// (dupliqué ici uniquement pour l'affichage informatif "chance de se faire renverser")
+const CHICKEN_DIFFICULTIES_CLIENT = [
+  { id: "facile", label: "Facile", base: 0.05 },
+  { id: "moyen", label: "Moyen", base: 0.10 },
+  { id: "difficile", label: "Difficile", base: 0.16 },
+  { id: "hardcore", label: "Hardcore", base: 0.25 },
+];
+const CHICKEN_BET_CHIPS = [10, 50, 100, 500, 1000];
+
+// petit décor de "danger" par ligne (purement visuel, aucune incidence sur le
+// résultat : le mob affiché tourne simplement en fonction de l'index de la ligne).
+// Sprites pixel-art maison, sur grille 16×16, façon mobs de Minecraft.
+const CHICKEN_MOB_PALETTE = [
+  { lg: false, svg: `
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+      <rect width="16" height="16" fill="#3fa93f"/>
+      <rect x="3" y="3" width="3" height="3" fill="#1b3b1b"/>
+      <rect x="10" y="3" width="3" height="3" fill="#1b3b1b"/>
+      <rect x="6" y="6" width="4" height="3" fill="#1b3b1b"/>
+      <rect x="4" y="9" width="8" height="2" fill="#1b3b1b"/>
+      <rect x="6" y="11" width="4" height="2" fill="#1b3b1b"/>
+    </svg>` },
+  { lg: true, svg: `
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+      <rect width="16" height="10" fill="#4c8a52"/>
+      <rect x="0" y="10" width="16" height="6" fill="#3a5fa0"/>
+      <rect x="3" y="4" width="3" height="3" fill="#17301a"/>
+      <rect x="10" y="4" width="3" height="3" fill="#17301a"/>
+      <rect x="6" y="7" width="4" height="1" fill="#17301a"/>
+    </svg>` },
+  { lg: false, svg: `
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+      <rect width="16" height="16" fill="#d9d9d2"/>
+      <rect x="3" y="4" width="3" height="4" fill="#1c1c1c"/>
+      <rect x="10" y="4" width="3" height="4" fill="#1c1c1c"/>
+      <rect x="6" y="9" width="4" height="2" fill="#8f8f86"/>
+    </svg>` },
+  { lg: true, svg: `
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+      <rect x="2" y="4" width="12" height="9" fill="#151515"/>
+      <rect x="0" y="6" width="2" height="1" fill="#151515"/>
+      <rect x="0" y="9" width="2" height="1" fill="#151515"/>
+      <rect x="14" y="6" width="2" height="1" fill="#151515"/>
+      <rect x="14" y="9" width="2" height="1" fill="#151515"/>
+      <rect x="4" y="7" width="2" height="2" fill="#d3271f"/>
+      <rect x="10" y="7" width="2" height="2" fill="#d3271f"/>
+    </svg>` },
+  { lg: false, svg: `
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+      <rect width="16" height="16" fill="#0d0d10"/>
+      <rect x="3" y="6" width="4" height="2" fill="#b877f5"/>
+      <rect x="9" y="6" width="4" height="2" fill="#b877f5"/>
+    </svg>` },
+  { lg: false, svg: `
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+      <rect x="4" y="4" width="8" height="8" fill="#f2a428"/>
+      <rect x="6" y="6" width="1" height="2" fill="#151515"/>
+      <rect x="9" y="6" width="1" height="2" fill="#151515"/>
+      <rect x="1" y="0" width="2" height="6" fill="#ffd75e"/>
+      <rect x="13" y="0" width="2" height="6" fill="#ffd75e"/>
+      <rect x="1" y="10" width="2" height="6" fill="#ffd75e"/>
+      <rect x="13" y="10" width="2" height="6" fill="#ffd75e"/>
+    </svg>` },
+];
+
+async function openChicken() {
+  state.casinoGame = "chicken";
+  state.chickenError = "";
+  state.chickenHowto = false;
+  render();
+  try {
+    const s = await api("/api/casino/chicken/state");
+    state.chicken = s.active ? s : null;
+    state.chickenAnim = -1; // force le recentrage initial même si le step n'a pas "changé"
+    if (s.active) state.chickenDifficulty = s.difficulty;
+  } catch (e) { /* ignore */ }
+  render();
+}
+
+async function chickenAction(path, body) {
+  if (state.chickenBusy) return;
+  state.chickenBusy = true; state.chickenError = ""; render();
+  try {
+    const r = await api(`/api/casino/chicken/${path}`, { method: "POST", body });
+    state.account.balance = r.balance;
+    state.account.wageringRequired = r.wageringRequired;
+    state.account.wageringProgress = r.wageringProgress;
+    state.chicken = r;
+  } catch (e) {
+    state.chickenError = e.message;
+  }
+  state.chickenBusy = false;
+  render();
+}
+
+function chickenStart() {
+  const amount = clamp(Math.round(Number(state.chickenBetAmount) || 0), CHICKEN_MIN_BET_CLIENT, state.account.balance || CHICKEN_MIN_BET_CLIENT);
+  state.chickenAnim = 0;
+  chickenAction("start", { amount, difficulty: state.chickenDifficulty });
+}
+function chickenStep() { chickenAction("step"); }
+function chickenCashout() { chickenAction("cashout"); }
+
+// Construit la scène : trottoir de départ, puis une ligne de route par palier
+// (véhicule décoratif en haut, plaque d'égout affichant le multiplicateur en
+// bas), avec le poulet inséré juste avant la prochaine ligne à tenter (ou
+// juste avant la ligne fatale s'il vient de se faire renverser).
+function chickenRenderScene(g) {
+  const maxSteps = g ? g.maxSteps : 15;
+  const lanes = g ? g.lanes : Array.from({ length: maxSteps }, (_, i) => (1 + i * 0.1).toFixed(2));
+  const step = g ? g.step : 0; // nb de lignes franchies avec succès (inchangé si renversé sur la suivante)
+  const finished = g && g.status !== "playing";
+  const hitLane = g && g.status === "lost" ? step : -1; // ligne (0-indexée) où le poulet s'est fait renversé
+
+  const chickenSlot = (hit) => `<div class="ckr-chicken-slot${hit ? " ckr-chicken-hit" : ""}">${CHICKEN_SVG}</div>`;
+
+  const laneHtml = (i) => {
+    const passed = g && i < step;
+    const isHit = i === hitLane;
+    const isNext = g && !finished && i === step;
+    const v = CHICKEN_MOB_PALETTE[i % CHICKEN_MOB_PALETTE.length];
+
+    let laneCls = "ckr-lane";
+    if (passed) laneCls += " ckr-lane-passed";
+    if (isHit) laneCls += " ckr-lane-hit";
+
+    let grateCls = "ckr-grate";
+    if (passed) grateCls += " ckr-grate-passed";
+    if (isNext) grateCls += " ckr-grate-next";
+    if (isHit) grateCls += " ckr-grate-hit";
+
+    const vehicleHtml = isHit
+      ? `<div class="ckr-vehicle${v.lg ? " ckr-vehicle-lg" : ""}">${v.svg}</div><div class="ckr-boom">${CHICKEN_BOOM_SVG}</div>`
+      : `<div class="ckr-vehicle${v.lg ? " ckr-vehicle-lg" : ""}">${v.svg}</div>`;
+
+    return `
+      <div class="${laneCls}" data-lane="${i}">
+        ${vehicleHtml}
+        <div class="ckr-lane-grate-wrap"><div class="${grateCls}"><span>${Number(lanes[i]).toFixed(2)}×</span></div></div>
+      </div>
+    `;
+  };
+
+  const chickenPos = step; // le poulet se tient juste avant la ligne "step" (0..maxSteps)
+  const parts = [];
+  for (let i = 0; i < maxSteps; i++) {
+    if (i === chickenPos) parts.push(chickenSlot(hitLane === i));
+    parts.push(laneHtml(i));
+  }
+  if (chickenPos >= maxSteps) parts.push(chickenSlot(false));
+
+  return `
+    <div class="ckr-sidewalk">
+      <div class="ckr-sidewalk-tree">${CHICKEN_TREE_SVG}</div>
+      <div class="ckr-sidewalk-lamp"></div>
+    </div>
+    <div class="ckr-lanes">${parts.join("")}</div>
+  `;
+}
+
+function renderChickenGame() {
+  const app = document.getElementById("app");
+  // on capture la position de scroll actuelle AVANT de reconstruire toute la scène : comme le rendu
+  // remplace #ckrStage en entier à chaque appel, un nouvel élément repart toujours à scrollLeft=0 —
+  // sans ça, on voit un flash vers le début à chaque re-rendu (mise, chip, avancer, etc.).
+  const prevStageEl = document.getElementById("ckrStage");
+  const savedScrollLeft = prevStageEl ? prevStageEl.scrollLeft : 0;
+  const g = state.chicken;
+  const playing = !!g && g.status === "playing";
+  const finished = !!g && g.status !== "playing";
+  const betLocked = playing;
+  const step = g ? g.step : 0;
+  const multLabel = (g ? g.multiplier : 1).toFixed(2);
+  const currentWinnings = playing ? Math.round(g.bet * g.multiplier) : (finished ? g.payout : 0);
+  const nextMultLabel = g && g.nextMultiplier ? g.nextMultiplier.toFixed(2) : null;
+  const activeDiff = CHICKEN_DIFFICULTIES_CLIENT.find(d => d.id === state.chickenDifficulty) || CHICKEN_DIFFICULTIES_CLIENT[1];
+  const riskLabel = `${Math.round(activeDiff.base * 100)}%`;
+
+  const resultBanner = finished
+    ? (g.status === "lost"
+        ? `<p class="auth-error ckr-banner" style="margin:0;">💥 Renversé ! Tu perds ${g.bet} 💎</p>`
+        : `<p class="ckr-banner" style="color:var(--green);font-weight:700;margin:0;">🎉 ${g.status === "won" ? "Route entière traversée ! " : ""}+${g.payout - g.bet} 💎</p>`)
+    : "";
+
+  app.innerHTML = `
+    <div class="ckr-mc">
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo" style="font-family:var(--mc-font);font-size:12px;gap:10px;"><div class="logo-badge" style="border-radius:0;border:3px solid #000;box-shadow:inset 2px 2px 0 var(--mc-grass-lt), inset -2px -2px 0 var(--mc-grass-dk);background:var(--mc-grass);">🐔</div> Chicken Road</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <button class="ckr-howto-btn" id="ckHowtoBtn">ⓘ Comment jouer ?</button>
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+
+      ${state.chickenHowto ? `
+        <div class="ckr-howto-panel">
+          🐔 Choisis ta mise et ta difficulté, puis lance la partie. À chaque bloc de chemin franchi, le
+          multiplicateur augmente — mais le risque de croiser un mob hostile aussi. Encaisse à tout moment
+          avant ça, ou tente de traverser toute la route pour le gain maximum. 💎 Émeraudes fictives liées au
+          serveur Minecraft, 100% pour le fun, aucun argent réel.
+        </div>
+      ` : ""}
+
+      <div class="ckr-stage-card">
+        <div class="ckr-stage" id="ckrStage">${chickenRenderScene(g)}</div>
+        ${resultBanner}
+      </div>
+
+      <div class="ckr-controls">
+        <div class="ckr-box">
+          <div class="ckr-box-label">Montant du pari · 💎 fictif</div>
+          <div class="ckr-bet-row">
+            <button class="ckr-minmax-btn" id="ckMinBtn" ${betLocked ? "disabled" : ""}>MIN</button>
+            <input type="number" id="ckBetInput" min="${CHICKEN_MIN_BET_CLIENT}" max="${state.account.balance}"
+              value="${state.chickenBetAmount}" ${betLocked ? "disabled" : ""} />
+            <button class="ckr-minmax-btn" id="ckMaxBtn" ${betLocked ? "disabled" : ""}>MAX</button>
+          </div>
+          <div class="ckr-chip-row">
+            ${CHICKEN_BET_CHIPS.map(c => `<button class="rl-chip-btn" data-chip="${c}" ${betLocked ? "disabled" : ""}>${c}</button>`).join("")}
+          </div>
+        </div>
+
+        <div class="ckr-box">
+          <div class="ckr-risk-row">
+            <div class="ckr-box-label" style="margin-bottom:0;">Difficulté</div>
+            <span>Chance de croiser un mob (L1) <span class="ckr-risk-value">${riskLabel}</span></span>
+          </div>
+          <div class="ck-diff-row">
+            ${CHICKEN_DIFFICULTIES_CLIENT.map(d => `
+              <button class="ck-diff-btn ${state.chickenDifficulty === d.id ? "active" : ""}" data-diff="${d.id}" ${betLocked ? "disabled" : ""}>${d.label}</button>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="ckr-action-col">
+          ${!playing ? `
+            <button class="ckr-play-btn" id="ckStartBtn" ${state.chickenBusy || state.account.balance < CHICKEN_MIN_BET_CLIENT ? "disabled" : ""}>
+              ${state.chickenBusy ? "Lancement…" : finished ? "🔁 Rejouer" : "▶️ Jouer"}
+            </button>
+          ` : `
+            <button class="ckr-play-btn" id="ckStepBtn" ${state.chickenBusy ? "disabled" : ""}>
+              ${state.chickenBusy ? "Traversée…" : `🐔 Avancer${nextMultLabel ? ` (${nextMultLabel}×)` : ""}`}
+            </button>
+            <button class="ckr-cashout-btn" id="ckCashoutBtn" ${state.chickenBusy || step === 0 ? "disabled" : ""}>
+              💰 Encaisser${step > 0 ? ` — ${currentWinnings} 💎 (${multLabel}×)` : ""}
+            </button>
+          `}
+          ${state.chickenError ? `<p class="auth-error" style="margin:0;">${esc(state.chickenError)}</p>` : ""}
+        </div>
+      </div>
+
+    </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  const howtoBtn = document.getElementById("ckHowtoBtn");
+  if (howtoBtn) howtoBtn.addEventListener("click", () => { state.chickenHowto = !state.chickenHowto; render(); });
+
+  const betInput = document.getElementById("ckBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.chickenBetAmount = e.target.value; });
+
+  const minBtn = document.getElementById("ckMinBtn");
+  if (minBtn) minBtn.addEventListener("click", () => { state.chickenBetAmount = CHICKEN_MIN_BET_CLIENT; render(); });
+  const maxBtn = document.getElementById("ckMaxBtn");
+  if (maxBtn) maxBtn.addEventListener("click", () => { state.chickenBetAmount = Math.max(CHICKEN_MIN_BET_CLIENT, state.account.balance); render(); });
+
+  document.querySelectorAll("[data-chip]").forEach(btn => btn.addEventListener("click", () => {
+    state.chickenBetAmount = clamp(Number(btn.dataset.chip), CHICKEN_MIN_BET_CLIENT, state.account.balance || CHICKEN_MIN_BET_CLIENT);
+    render();
+  }));
+
+  document.querySelectorAll("[data-diff]").forEach(btn => btn.addEventListener("click", () => {
+    if (betLocked) return;
+    state.chickenDifficulty = btn.dataset.diff;
+    render();
+  }));
+
+  const startBtn = document.getElementById("ckStartBtn");
+  if (startBtn) startBtn.addEventListener("click", chickenStart);
+  const cashoutBtn = document.getElementById("ckCashoutBtn");
+  if (cashoutBtn) cashoutBtn.addEventListener("click", chickenCashout);
+  const stepBtn = document.getElementById("ckStepBtn");
+  if (stepBtn) stepBtn.addEventListener("click", chickenStep);
+
+  // fait défiler automatiquement la scène pour garder le poulet visible uniquement quand il vient
+  // de bouger (changement de step) — sinon on ne touche pas à la position de scroll de l'utilisateur.
+  // Étape 1 (synchrone, avant tout repaint) : on restaure la position qu'avait l'ancienne scène,
+  // pour ne jamais laisser le navigateur peindre un retour au début.
+  // Étape 2 (si le step a changé) : on anime en douceur depuis cette position restaurée vers la
+  // nouvelle position du poulet — via getBoundingClientRect (fiable quel que soit le scroll en cours).
+  const stage = document.getElementById("ckrStage");
+  if (stage) {
+    stage.scrollLeft = savedScrollLeft;
+    const currentStep = g ? g.step : 0;
+    if (currentStep !== state.chickenAnim) {
+      state.chickenAnim = currentStep;
+      requestAnimationFrame(() => {
+        const liveStage = document.getElementById("ckrStage");
+        const chickenEl = liveStage && liveStage.querySelector(".ckr-chicken-slot");
+        if (liveStage && chickenEl) {
+          const stageRect = liveStage.getBoundingClientRect();
+          const chickenRect = chickenEl.getBoundingClientRect();
+          const target = liveStage.scrollLeft + (chickenRect.left - stageRect.left) - stageRect.width / 2 + chickenRect.width / 2;
+          liveStage.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+        }
+      });
+    }
+  }
 }
 
 /* ---------- casino : flip ---------- */

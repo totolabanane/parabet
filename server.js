@@ -750,6 +750,7 @@ const CASINO_MAINTENANCE = {
   mines: true,
   flip: false,
   roulette: false,
+  chicken: false,
 };
 
 app.get("/api/casino/status", authRequired, (req, res) => {
@@ -933,6 +934,188 @@ app.post("/api/casino/mines/cashout", authRequired, async (req, res) => {
 
     const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
     res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...minesPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : CHICKEN ROAD ================= */
+
+// Le poulet avance ligne par ligne sur la route ; chaque ligne franchie fait
+// monter le multiplicateur, mais comporte un risque croissant de se faire
+// renverser. Même logique en mémoire qu'aux Mines : une seule partie à la
+// fois par compte, mise débitée au lancement, gain crédité à la résolution
+// (percuté, toutes les lignes franchies, ou retrait manuel).
+const chickenGames = new Map(); // accountId -> { bet, difficulty, step, status, payout }
+
+const CHICKEN_MIN_BET = 10;
+const CHICKEN_HOUSE_EDGE = 0.97; // 3% de marge maison
+
+// Chaque palier de difficulté définit : la probabilité de se faire renverser
+// à la 1ère ligne (base), l'augmentation de cette probabilité à chaque ligne
+// suivante (growth, la route devient plus dangereuse au fur et à mesure), et
+// le nombre de lignes total avant la traversée complète (maxSteps).
+const CHICKEN_DIFFICULTIES = {
+  facile:    { base: 0.05, growth: 0.004, maxSteps: 24 },
+  moyen:     { base: 0.10, growth: 0.008, maxSteps: 18 },
+  difficile: { base: 0.16, growth: 0.014, maxSteps: 12 },
+  hardcore:  { base: 0.25, growth: 0.025, maxSteps: 8 },
+};
+
+// Probabilité de se faire renverser en tentant la ligne numéro `step` (1-indexé).
+function chickenDeathProb(diff, step) {
+  const p = diff.base + diff.growth * (step - 1);
+  return clamp(p, 0.01, 0.75);
+}
+
+// Multiplicateur (avec marge maison) après avoir franchi `step` lignes sans encombre.
+function chickenMultiplier(diffKey, step) {
+  const diff = CHICKEN_DIFFICULTIES[diffKey];
+  if (!diff || step <= 0) return 1;
+  let mult = CHICKEN_HOUSE_EDGE;
+  for (let i = 1; i <= step; i++) {
+    mult *= 1 / (1 - chickenDeathProb(diff, i));
+  }
+  return mult;
+}
+
+function chickenPublicState(game) {
+  const diff = CHICKEN_DIFFICULTIES[game.difficulty];
+  const finished = game.status !== "playing";
+  const nextMultiplier = game.step < diff.maxSteps ? chickenMultiplier(game.difficulty, game.step + 1) : null;
+  // liste des multiplicateurs de chaque ligne, pour l'affichage de la route côté client
+  const lanes = Array.from({ length: diff.maxSteps }, (_, i) => Number(chickenMultiplier(game.difficulty, i + 1).toFixed(2)));
+  return {
+    status: game.status, // 'playing' | 'lost' | 'won' | 'cashed'
+    bet: game.bet,
+    difficulty: game.difficulty,
+    maxSteps: diff.maxSteps,
+    step: game.step,
+    lanes,
+    multiplier: chickenMultiplier(game.difficulty, game.step),
+    nextMultiplier,
+    payout: game.payout || 0,
+  };
+}
+
+app.get("/api/casino/chicken/state", authRequired, (req, res) => {
+  const game = chickenGames.get(req.user.id);
+  if (!game) return res.json({ active: false });
+  res.json({ active: true, ...chickenPublicState(game) });
+});
+
+app.post("/api/casino/chicken/start", authRequired, async (req, res) => {
+  try {
+    if (CASINO_MAINTENANCE.chicken) {
+      return res.status(503).json({ error: "Chicken Road est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
+    const existing = chickenGames.get(req.user.id);
+    if (existing && existing.status === "playing") {
+      return res.status(400).json({ error: "Termine ta traversée de Chicken Road en cours." });
+    }
+
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = clamp(Math.round(Number(req.body?.amount) || 0), CHICKEN_MIN_BET, Math.max(CHICKEN_MIN_BET, account.balance));
+    if (bet < CHICKEN_MIN_BET || bet > account.balance) {
+      return res.status(400).json({ error: `Mise invalide : entre ${CHICKEN_MIN_BET} 💎 et ton solde.` });
+    }
+    const difficulty = ["facile", "moyen", "difficile", "hardcore"].includes(req.body?.difficulty) ? req.body.difficulty : "moyen";
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
+
+    const game = { bet, difficulty, step: 0, status: "playing", payout: 0 };
+    chickenGames.set(req.user.id, game);
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...chickenPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du lancement de la partie." });
+  }
+});
+
+const chickenLocks = new Set(); // anti double-avance en parallèle, comme minesLocks
+
+app.post("/api/casino/chicken/step", authRequired, async (req, res) => {
+  if (chickenLocks.has(req.user.id)) {
+    return res.status(429).json({ error: "Le poulet est déjà en train d'avancer." });
+  }
+  chickenLocks.add(req.user.id);
+  try {
+    const game = chickenGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune traversée en cours." });
+
+    const diff = CHICKEN_DIFFICULTIES[game.difficulty];
+    const nextStep = game.step + 1;
+    const p = chickenDeathProb(diff, nextStep);
+
+    if (Math.random() < p) {
+      game.status = "lost";
+      game.payout = 0;
+      await pool.query(
+        "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+        [req.user.pseudo, "no", `🐔 Chicken Road — ${req.user.pseudo} s'est fait renverser (-${game.bet} 💎)`]
+      );
+      await pool.query(
+        "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+        [req.user.id, "chicken", game.bet, 0, "lose", `${game.difficulty} · renversé à la ligne ${nextStep}`]
+      );
+    } else {
+      game.step = nextStep;
+      if (game.step >= diff.maxSteps) {
+        // traversée complète : victoire automatique, encaissement immédiat
+        game.status = "won";
+        game.payout = Math.round(game.bet * chickenMultiplier(game.difficulty, game.step));
+        await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [game.payout, req.user.id]);
+        const net = game.payout - game.bet;
+        await pool.query(
+          "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+          [req.user.pseudo, "yes", `🐔 Chicken Road — ${req.user.pseudo} a traversé toute la route ! (+${net} 💎)`]
+        );
+        await pool.query(
+          "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+          [req.user.id, "chicken", game.bet, game.payout, "win", `${game.difficulty} · route entière traversée`]
+        );
+      }
+    }
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...chickenPublicState(game) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  } finally {
+    chickenLocks.delete(req.user.id);
+  }
+});
+
+app.post("/api/casino/chicken/cashout", authRequired, async (req, res) => {
+  try {
+    const game = chickenGames.get(req.user.id);
+    if (!game || game.status !== "playing") return res.status(400).json({ error: "Aucune traversée en cours." });
+    if (game.step === 0) return res.status(400).json({ error: "Avance d'au moins une ligne avant d'encaisser." });
+
+    game.status = "cashed";
+    game.payout = Math.round(game.bet * chickenMultiplier(game.difficulty, game.step));
+    await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [game.payout, req.user.id]);
+
+    const net = game.payout - game.bet;
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🐔 Chicken Road — ${req.user.pseudo} a encaissé (+${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "chicken", game.bet, game.payout, "cashout", `${game.difficulty} · encaissé après ${game.step} ligne${game.step === 1 ? "" : "s"}`]
+    );
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({ balance: after[0].balance, wageringRequired: after[0].wagering_required, wageringProgress: after[0].wagering_progress, ...chickenPublicState(game) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
