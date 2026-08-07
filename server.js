@@ -959,11 +959,12 @@ const CHICKEN_HOUSE_EDGE = 0.97; // 3% de marge maison
 // à la 1ère ligne (base), l'augmentation de cette probabilité à chaque ligne
 // suivante (growth, la route devient plus dangereuse au fur et à mesure), et
 // le nombre de lignes total avant la traversée complète (maxSteps).
+// (valeurs doublées, ex: hardcore 25% -> 50%, pour un jeu plus corsé)
 const CHICKEN_DIFFICULTIES = {
-  facile:    { base: 0.05, growth: 0.004, maxSteps: 24 },
-  moyen:     { base: 0.10, growth: 0.008, maxSteps: 18 },
-  difficile: { base: 0.16, growth: 0.014, maxSteps: 12 },
-  hardcore:  { base: 0.25, growth: 0.025, maxSteps: 8 },
+  facile:    { base: 0.10, growth: 0.008, maxSteps: 24 },
+  moyen:     { base: 0.20, growth: 0.016, maxSteps: 18 },
+  difficile: { base: 0.32, growth: 0.028, maxSteps: 12 },
+  hardcore:  { base: 0.50, growth: 0.050, maxSteps: 8 },
 };
 
 // Probabilité de se faire renverser en tentant la ligne numéro `step` (1-indexé).
@@ -1477,26 +1478,46 @@ app.post("/api/casino/slots/play", authRequired, async (req, res) => {
 // multiplicateur courant, recalculé indépendamment côté serveur.
 
 const AVIATOR_MIN_BET = 10;
-const AVIATOR_HOUSE_EDGE = 0.97; // 3% de marge maison, comme les autres jeux "réguliers" du casino
 const AVIATOR_WAITING_MS = 7000; // durée de la phase de mise
 const AVIATOR_CRASHED_MS = 4000; // durée d'affichage du résultat avant la manche suivante
 // Vitesse de montée du multiplicateur : m(t) = e^(K*t), t en secondes.
 // Avec ce K, le multiplicateur double environ toutes les 6 secondes de vol.
 const AVIATOR_GROWTH_K = Math.log(2) / 6;
 const AVIATOR_TICK_MS = 100;
-const AVIATOR_MAX_MULTIPLIER_CENTS = 100_000_00; // plafond de sécurité : 100 000x
+const AVIATOR_MAX_MULTIPLIER = 100; // plafond de la manche : l'avion "explose" automatiquement à ce multiplicateur s'il l'atteint — modifie juste ce chiffre si tu veux un plafond différent
+const AVIATOR_MAX_MULTIPLIER_CENTS = AVIATOR_MAX_MULTIPLIER * 100;
 
-// Tirage du point de crash (en centièmes, ex: 250 = 2.50x). Distribution
-// classique des jeux "crash" à marge maison fixe : une probabilité égale à
-// la marge maison de "crasher" instantanément à 1.00x, sinon une loi en
-// 1/(1-r) qui donne beaucoup de petits multiplicateurs et occasionnellement
-// un gros — avec un gain moyen pour le joueur égal à la marge maison.
+// Tirage du point de crash (en centièmes, ex: 250 = 2.50x), via une table de
+// points de contrôle : chaque ligne dit "il y a f% de chances que le crash
+// arrive à m× ou moins". Ça permet de régler chaque tranche indépendamment
+// (ex: souvent jusqu'à x1.5, mais rarement au-delà de x2), ce qu'une simple
+// courbe à un seul paramètre ne peut pas faire. Pour ajuster le jeu, modifie
+// juste les valeurs `f` ci-dessous (chacune doit rester entre la précédente
+// et la suivante, et la dernière doit valoir 1).
+const AVIATOR_CDF_ANCHORS = [
+  { m: 100,                        f: 0.20 }, // 20% de crash pile à 1.00x
+  { m: 130,                        f: 0.35 }, // 35% de chances de crasher à 1.30x ou moins
+  { m: 150,                        f: 0.50 },
+  { m: 200,                        f: 0.75 }, // -> 25% de chances d'atteindre x2 ou plus
+  { m: 300,                        f: 0.82 }, // -> 18% de chances d'atteindre x3 ou plus
+  { m: 500,                        f: 0.90 }, // -> 10% de chances d'atteindre x5 ou plus
+  { m: AVIATOR_MAX_MULTIPLIER_CENTS, f: 1.00 },
+];
+
 function aviatorRollCrash() {
-  const edge = 1 - AVIATOR_HOUSE_EDGE; // ex: 0.03
   const r = crypto.randomInt(1, 1_000_000) / 1_000_000; // r dans (0, 1]
-  if (r <= edge) return 100; // 1.00x
-  const raw = (1 - edge) / (1 - r);
-  return clamp(Math.floor(raw * 100), 100, AVIATOR_MAX_MULTIPLIER_CENTS);
+  if (r <= AVIATOR_CDF_ANCHORS[0].f) return AVIATOR_CDF_ANCHORS[0].m;
+  for (let i = 1; i < AVIATOR_CDF_ANCHORS.length; i++) {
+    const prev = AVIATOR_CDF_ANCHORS[i - 1];
+    const cur = AVIATOR_CDF_ANCHORS[i];
+    if (r <= cur.f) {
+      const frac = (r - prev.f) / (cur.f - prev.f);
+      // interpolation en échelle logarithmique, adaptée aux multiplicateurs
+      const logM = Math.log(prev.m) + frac * (Math.log(cur.m) - Math.log(prev.m));
+      return clamp(Math.round(Math.exp(logM)), prev.m + 1, AVIATOR_MAX_MULTIPLIER_CENTS);
+    }
+  }
+  return AVIATOR_MAX_MULTIPLIER_CENTS;
 }
 
 let aviatorRound = {
