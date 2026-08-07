@@ -750,11 +750,8 @@ const CASINO_MAINTENANCE = {
   mines: true,
   flip: false,
   roulette: false,
-<<<<<<< HEAD
   chicken: false,
-=======
   slots: false,
->>>>>>> 3d2864c621d789476748260f03389e924cfe59f8
 };
 
 app.get("/api/casino/status", authRequired, (req, res) => {
