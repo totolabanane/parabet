@@ -750,7 +750,11 @@ const CASINO_MAINTENANCE = {
   mines: true,
   flip: false,
   roulette: false,
+<<<<<<< HEAD
   chicken: false,
+=======
+  slots: false,
+>>>>>>> 3d2864c621d789476748260f03389e924cfe59f8
 };
 
 app.get("/api/casino/status", authRequired, (req, res) => {
@@ -1331,6 +1335,121 @@ app.post("/api/casino/roulette/play", authRequired, async (req, res) => {
       wageringProgress: after[0].wagering_progress,
       pocket, color, bets: resolvedBets, totalBet: total, totalPayout, net,
       history: list,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : SLOTS ================= */
+
+// Machine à sous à 3 rouleaux / 1 ligne de paiement. Comme Flip et Roulette,
+// chaque partie est un seul tirage résolu instantanément côté serveur — pas
+// de partie "en cours" à conserver, juste un petit historique en mémoire par
+// compte pour l'affichage côté client (le plus récent en tête).
+const slotsHistory = new Map(); // accountId -> [{ reels, win, kind, multiplier, bet, payout, ts }, ...]
+
+const SLOTS_MIN_BET = 10;
+
+// Symboles pondérés (poids sur 100) + table de gains :
+//  - "triple" : multiplicateur si les 3 rouleaux affichent le même symbole
+//  - "pair"   : multiplicateur si exactement 2 des 3 rouleaux matchent
+//               (seulement pour les symboles "fruits", comme sur une vraie
+//               machine à sous — les symboles rares ne paient qu'au triple)
+// Poids élevé = symbole fréquent = petit gain ; poids faible = symbole rare
+// = gros gain. Réglé pour un RTP théorique d'environ 95% (léger avantage
+// maison, comme un vrai bandit-manchot).
+const SLOTS_SYMBOLS = [
+  { id: "cherry",  emoji: "🍒", weight: 34, triple: 3,   pair: 1.2 },
+  { id: "lemon",   emoji: "🍋", weight: 24, triple: 5,   pair: 1.75 },
+  { id: "grape",   emoji: "🍇", weight: 17, triple: 9,   pair: 2.25 },
+  { id: "bell",    emoji: "🔔", weight: 13, triple: 17,  pair: 0 },
+  { id: "star",    emoji: "⭐", weight: 8,  triple: 33,  pair: 0 },
+  { id: "diamond", emoji: "💎", weight: 3,  triple: 68,  pair: 0 },
+  { id: "seven",   emoji: "7️⃣", weight: 1,  triple: 225, pair: 0 },
+];
+const SLOTS_TOTAL_WEIGHT = SLOTS_SYMBOLS.reduce((s, x) => s + x.weight, 0);
+const slotsSymbolById = id => SLOTS_SYMBOLS.find(s => s.id === id);
+
+function spinSlotReel() {
+  let r = Math.random() * SLOTS_TOTAL_WEIGHT;
+  for (const sym of SLOTS_SYMBOLS) {
+    if (r < sym.weight) return sym.id;
+    r -= sym.weight;
+  }
+  return SLOTS_SYMBOLS[0].id;
+}
+
+// Détermine le gain d'un tirage [a, b, c]. Triple d'abord, sinon la
+// meilleure paire éligible parmi les 3 combinaisons de 2 rouleaux.
+function resolveSlotsSpin(reels) {
+  const [a, b, c] = reels;
+  if (a === b && b === c) {
+    return { multiplier: slotsSymbolById(a).triple, kind: "triple", matchSymbol: a };
+  }
+  let best = 0, matchSymbol = null;
+  for (const [x, y] of [[a, b], [b, c], [a, c]]) {
+    if (x === y) {
+      const m = slotsSymbolById(x).pair || 0;
+      if (m > best) { best = m; matchSymbol = x; }
+    }
+  }
+  if (best > 0) return { multiplier: best, kind: "pair", matchSymbol };
+  return { multiplier: 0, kind: "none", matchSymbol: null };
+}
+
+app.get("/api/casino/slots/state", authRequired, (req, res) => {
+  const history = slotsHistory.get(req.user.id) || [];
+  res.json({ last: history[0] || null, history });
+});
+
+app.post("/api/casino/slots/play", authRequired, async (req, res) => {
+  try {
+    if (CASINO_MAINTENANCE.slots) {
+      return res.status(503).json({ error: "Slots est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = clamp(Math.round(Number(req.body?.amount) || 0), SLOTS_MIN_BET, Math.max(SLOTS_MIN_BET, account.balance));
+    if (bet < SLOTS_MIN_BET || bet > account.balance) {
+      return res.status(400).json({ error: `Mise invalide : entre ${SLOTS_MIN_BET} 💎 et ton solde.` });
+    }
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
+
+    const reels = [spinSlotReel(), spinSlotReel(), spinSlotReel()];
+    const { multiplier, kind, matchSymbol } = resolveSlotsSpin(reels);
+    const win = multiplier > 0;
+    const payout = win ? Math.round(bet * multiplier) : 0;
+    if (payout > 0) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
+    }
+
+    const entry = { reels, win, kind, multiplier, bet, payout, ts: Date.now() };
+    const list = [entry, ...(slotsHistory.get(req.user.id) || [])].slice(0, 20);
+    slotsHistory.set(req.user.id, list);
+
+    const net = payout - bet;
+    const detailLabel = kind === "triple" ? `Triple ${matchSymbol}` : kind === "pair" ? `Paire ${matchSymbol}` : "Aucune combinaison";
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🎰 Slots — ${req.user.pseudo} : ${detailLabel} (${net >= 0 ? "+" : ""}${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "slots", bet, payout, win ? "win" : "lose", `${reels.join(" · ")} · ${detailLabel}`]
+    );
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      reels, win, kind, multiplier, bet, payout, history: list,
     });
   } catch (e) {
     console.error(e);
