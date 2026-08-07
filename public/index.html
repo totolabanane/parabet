@@ -416,6 +416,51 @@
     100% { transform: scale(1) rotate(0); }
   }
 
+  /* aviator — manche partagée en temps réel */
+  .av-layout { display: flex; flex-direction: column; gap: 14px; }
+  @media (min-width: 760px) { .av-layout { flex-direction: row; align-items: flex-start; } }
+  .av-stage {
+    position: relative; flex: 1; min-width: 0;
+    background: radial-gradient(circle at 50% 0%, #1a1030 0%, #0a0b14 70%);
+    border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column; min-height: 420px;
+  }
+  .av-history { display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px; scrollbar-width: none; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+  .av-history::-webkit-scrollbar { display: none; }
+  .av-hist-chip { flex-shrink: 0; font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); }
+  .av-graph-wrap { position: relative; flex: 1; min-height: 220px; display: flex; align-items: center; justify-content: center; }
+  .av-graph-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .av-plane { position: absolute; font-size: 22px; transform: translate(-50%, -50%); filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); transition: opacity 0.2s ease; }
+  .av-center { position: relative; z-index: 2; text-align: center; }
+  .av-multiplier { font-family: var(--font-mono); font-size: 46px; font-weight: 800; color: #fff; text-shadow: 0 0 24px rgba(156,107,255,0.5); transition: color 0.2s ease; }
+  .av-multiplier.av-crashed { color: var(--red); text-shadow: 0 0 24px rgba(255,77,94,0.5); }
+  .av-multiplier.av-cashed { color: var(--green); }
+  .av-phase-label { font-size: 12.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; }
+  .av-phase-label.av-waiting-label { color: var(--amber); }
+  .av-countdown-bar { width: 180px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 10px auto 0; }
+  .av-countdown-bar > div { height: 100%; background: var(--amber); transition: width 0.1s linear; }
+  .av-players { border-top: 1px solid rgba(255,255,255,0.06); max-height: 180px; overflow-y: auto; flex-shrink: 0; }
+  .av-players-head { display: grid; grid-template-columns: 1fr 70px 60px 70px; gap: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); padding: 8px 12px 4px; position: sticky; top: 0; background: #0d0e18; }
+  .av-player-row { display: grid; grid-template-columns: 1fr 70px 60px 70px; gap: 6px; font-size: 12px; padding: 5px 12px; align-items: center; }
+  .av-player-row.av-me { background: rgba(16,207,124,0.08); }
+  .av-player-pseudo { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .av-player-amount { font-family: var(--font-mono); color: var(--text-dim); }
+  .av-player-mult { font-family: var(--font-mono); font-weight: 700; }
+  .av-player-mult.av-out { color: var(--text-faint); }
+  .av-player-gain { font-family: var(--font-mono); font-weight: 700; text-align: right; }
+  .av-empty-players { padding: 14px 12px; font-size: 12px; color: var(--text-faint); text-align: center; }
+  .av-auto-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
+  .av-auto-row label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-dim); flex-shrink: 0; }
+  .av-auto-row input[type="number"] {
+    flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--font-mono); font-size: 13px; font-weight: 700; padding: 8px 10px; outline: none;
+  }
+  .av-auto-row input:disabled, .av-auto-row input[type="checkbox"]:disabled { opacity: 0.5; }
+  .av-mybet-status { font-size: 11.5px; color: var(--text-dim); text-align: center; margin-top: 8px; line-height: 1.5; }
+  .av-mybet-status.av-win { color: var(--green); font-weight: 700; }
+  .av-mybet-status.av-lose { color: var(--red); font-weight: 700; }
+  .av-btn-cashout { background: var(--amber) !important; color: #2b1c00 !important; border: none !important; }
+
   /* chicken road — habillage "Minecraft" (pixel-art, blocs, police pixel) */
   .ckr-mc {
     --mc-font: 'Press Start 2P', var(--font-mono);
@@ -1031,6 +1076,15 @@ const state = {
   slotsSpinning: false,   // vrai pendant l'animation des rouleaux, pour retarder l'affichage du résultat
   slotsError: "",
   slotsHistory: [],        // historique des derniers tirages (les plus récents en tête)
+
+  aviator: null,           // dernier état de la manche partagée renvoyé par le serveur (phase, multiplicateur, joueurs...)
+  aviatorBetAmount: 100,
+  aviatorAutoOn: false,
+  aviatorAutoValue: 2,
+  aviatorBusy: false,
+  aviatorError: "",
+  aviatorPollTimer: null,  // id du setInterval de polling (état de la manche)
+  aviatorRafId: null,      // id du requestAnimationFrame (animation fluide du multiplicateur/courbe)
 };
 
 /* ---------- helpers ---------- */
@@ -1637,7 +1691,7 @@ async function loadAdminCasinoBets() {
   state.adminCasinoBets = await api("/api/admin/casino-bets");
 }
 
-const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road" };
+const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road", aviator: "✈️ Aviator" };
 const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
 const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
 
@@ -1940,6 +1994,7 @@ const CASINO_GAMES = [
   { id: "roulette",  title: "Roulette",  poster: "/casino/roulette-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
   { id: "slots",     title: "Slots",     icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
   { id: "chicken",   title: "Chicken Road", poster: "/casino/chicken-poster.png", gradient: "linear-gradient(165deg,#8fe07a,#1f6b2e)", enabled: true },
+  { id: "aviator",   title: "Aviator",   poster: "/casino/aviator-poster.png", gradient: "linear-gradient(165deg,#5b6bff,#1a1030)", enabled: true },
 ];
 
 // Statut effectif d'un jeu pour le lobby : combine le flag `enabled` (jeu pas
@@ -2043,6 +2098,7 @@ function renderCasinoLobby() {
     else if (g.id === "roulette") openRoulette();
     else if (g.id === "slots") openSlots();
     else if (g.id === "chicken") openChicken();
+    else if (g.id === "aviator") openAviator();
   }));
 }
 
@@ -2163,6 +2219,7 @@ function renderCasino() {
   if (state.casinoGame === "roulette") { renderRouletteGame(); return; }
   if (state.casinoGame === "slots") { renderSlotsGame(); return; }
   if (state.casinoGame === "chicken") { renderChickenGame(); return; }
+  if (state.casinoGame === "aviator") { renderAviatorGame(); return; }
   renderCasinoLobby();
 }
 
@@ -3233,6 +3290,350 @@ function renderSlotsGame() {
       });
     }, 80);
   }
+}
+
+/* ---------- casino : aviator (manche partagée en temps réel) ---------- */
+
+const AVIATOR_MIN_BET_CLIENT = 10; // doit correspondre à AVIATOR_MIN_BET côté serveur
+const AVIATOR_GROWTH_K_CLIENT = Math.log(2) / 6; // doit être identique à AVIATOR_GROWTH_K côté serveur
+const AVIATOR_POLL_MS = 350; // fréquence de rafraîchissement de l'état de la manche (joueurs, phase, historique)
+
+function avFmt(centsOrX, isCents = true) {
+  const x = isCents ? centsOrX / 100 : centsOrX;
+  return `${x.toFixed(2)}×`;
+}
+function avHistColor(cents) {
+  const x = cents / 100;
+  if (x >= 10) return "#ff5fd1";
+  if (x >= 2) return "#9c6bff";
+  return "#4fb3ff";
+}
+
+async function openAviator() {
+  state.casinoGame = "aviator";
+  state.aviatorError = "";
+  state.aviator = null;
+  render();
+  await aviatorPoll();
+  clearInterval(state.aviatorPollTimer);
+  state.aviatorPollTimer = setInterval(aviatorPoll, AVIATOR_POLL_MS);
+}
+
+function aviatorStopLoops() {
+  clearInterval(state.aviatorPollTimer);
+  state.aviatorPollTimer = null;
+  if (state.aviatorRafId) cancelAnimationFrame(state.aviatorRafId);
+  state.aviatorRafId = null;
+}
+
+async function aviatorPoll() {
+  if (state.casinoGame !== "aviator") { aviatorStopLoops(); return; }
+  try {
+    const s = await api("/api/casino/aviator/state");
+    if (state.casinoGame !== "aviator") { aviatorStopLoops(); return; }
+    const prevPhase = state.aviator ? state.aviator.phase : null;
+    state.aviator = s;
+    if (!document.getElementById("avStage") || prevPhase !== s.phase) {
+      render();
+    } else {
+      aviatorPatchDom();
+    }
+    if (s.phase === "flying" && !state.aviatorRafId) {
+      state.aviatorRafId = requestAnimationFrame(aviatorRafTick);
+    }
+    if (s.phase !== "flying" && state.aviatorRafId) {
+      cancelAnimationFrame(state.aviatorRafId);
+      state.aviatorRafId = null;
+    }
+  } catch (e) { /* on ignore les ratés ponctuels de polling */ }
+}
+
+// Boucle d'animation fluide (60fps) pendant le vol : recalcule le
+// multiplicateur/la courbe à partir de flightStartedAt (formule identique au
+// serveur), sans attendre le prochain polling — le point de crash n'étant
+// jamais connu à l'avance côté client, ça ne triche pas, ça lisse juste
+// l'affichage entre deux rafraîchissements de l'état.
+function aviatorRafTick() {
+  if (state.casinoGame !== "aviator" || !state.aviator || state.aviator.phase !== "flying") {
+    state.aviatorRafId = null;
+    return;
+  }
+  const elapsedSec = (Date.now() - state.aviator.flightStartedAt) / 1000;
+  const liveMultCents = Math.floor(Math.exp(AVIATOR_GROWTH_K_CLIENT * Math.max(0, elapsedSec)) * 100);
+  avRenderMultiplier(liveMultCents, elapsedSec);
+  state.aviatorRafId = requestAnimationFrame(aviatorRafTick);
+}
+
+function avRenderMultiplier(cents, elapsedSec) {
+  const el = document.getElementById("avMultiplier");
+  if (el) el.textContent = avFmt(cents);
+  avDrawGraph(elapsedSec, cents);
+  const myBet = state.aviator && state.aviator.myBet;
+  const cashoutBtn = document.getElementById("avActionBtn");
+  if (cashoutBtn && myBet && myBet.cashedOutAt == null) {
+    cashoutBtn.textContent = `Encaisser — ${Math.round((myBet.amount * cents) / 100)} 💎`;
+  }
+}
+
+function avDrawGraph(elapsedSec, currentCents) {
+  const path = document.getElementById("avGraphPath");
+  const plane = document.getElementById("avPlane");
+  if (!path) return;
+  const W = 600, H = 240, PAD = 16;
+  const t = Math.max(0.4, elapsedSec);
+  const xMax = t * 1.15;
+  const yMax = Math.max(2, (currentCents / 100) * 1.2);
+  const N = 40;
+  let d = "";
+  let lastX = PAD, lastY = H - PAD;
+  for (let i = 0; i <= N; i++) {
+    const ti = (t * i) / N;
+    const m = Math.exp(AVIATOR_GROWTH_K_CLIENT * ti);
+    const x = PAD + (ti / xMax) * (W - 2 * PAD);
+    const y = (H - PAD) - (Math.log(m) / Math.log(yMax)) * (H - 2 * PAD);
+    d += (i === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1) + " ";
+    lastX = x; lastY = y;
+  }
+  path.setAttribute("d", d);
+  const fill = document.getElementById("avGraphFill");
+  if (fill) fill.setAttribute("d", d + `L ${lastX.toFixed(1)} ${H - PAD} L ${PAD} ${H - PAD} Z`);
+  if (plane) {
+    plane.style.left = `${(lastX / W) * 100}%`;
+    plane.style.top = `${(lastY / H) * 100}%`;
+  }
+}
+
+async function aviatorAction(path, body) {
+  if (state.aviatorBusy) return;
+  state.aviatorBusy = true; state.aviatorError = ""; render();
+  try {
+    const r = await api(`/api/casino/aviator/${path}`, { method: "POST", body });
+    state.account.balance = r.balance;
+    state.account.wageringRequired = r.wageringRequired;
+    state.account.wageringProgress = r.wageringProgress;
+    state.aviator = r;
+  } catch (e) {
+    state.aviatorError = e.message;
+  }
+  state.aviatorBusy = false;
+  render();
+}
+
+function aviatorBet() {
+  const amount = clamp(Math.round(Number(state.aviatorBetAmount) || 0), AVIATOR_MIN_BET_CLIENT, state.account.balance || AVIATOR_MIN_BET_CLIENT);
+  const body = { amount };
+  if (state.aviatorAutoOn) {
+    const auto = Number(state.aviatorAutoValue);
+    if (auto && auto > 1) body.autoCashout = auto;
+  }
+  aviatorAction("bet", body);
+}
+function aviatorCashout() { aviatorAction("cashout"); }
+
+function avActionBtnClick() {
+  const s = state.aviator;
+  if (!s || state.aviatorBusy) return;
+  if (s.phase === "waiting" && !s.myBet) { aviatorBet(); return; }
+  if (s.phase === "flying" && s.myBet && s.myBet.cashedOutAt == null) { aviatorCashout(); return; }
+}
+
+function avPlayersListHtml(s) {
+  if (!s || !s.bets || s.bets.length === 0) {
+    return `<div class="av-empty-players">Personne n'a encore misé sur cette manche — sois le premier 🚀</div>`;
+  }
+  return s.bets.map(b => {
+    const isMe = state.account && b.pseudo === state.account.pseudo;
+    const out = b.cashedOutAt != null;
+    const mult = out ? avFmt(b.cashedOutAt) : (s.phase === "flying" ? "en vol…" : "—");
+    const gain = out ? `+${b.payout - b.amount} 💎` : (s.phase === "crashed" ? `-${b.amount} 💎` : "");
+    return `
+      <div class="av-player-row ${isMe ? "av-me" : ""}">
+        <div class="av-player-pseudo">${esc(b.pseudo)}</div>
+        <div class="av-player-amount">${b.amount} 💎</div>
+        <div class="av-player-mult ${out ? "" : "av-out"}" style="${out ? `color:${avHistColor(b.cashedOutAt)}` : ""}">${mult}</div>
+        <div class="av-player-gain" style="color:${out ? "var(--green)" : (s.phase === "crashed" ? "var(--red)" : "var(--text-faint)")}">${gain}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function avHistoryHtml(s) {
+  if (!s || !s.history || s.history.length === 0) return `<span style="color:var(--text-faint);font-size:11.5px;">Pas encore de manche jouée.</span>`;
+  return s.history.map(c => `<span class="av-hist-chip" style="color:${avHistColor(c)}">${avFmt(c)}</span>`).join("");
+}
+
+// Rafraîchit uniquement les éléments qui changent à chaque tick de polling
+// (phase inchangée) : historique, liste des joueurs, statut de ma mise,
+// bouton d'action. On ne touche jamais aux champs de saisie (mise, auto-cashout)
+// pour ne pas perdre le focus/curseur pendant que le joueur tape.
+function aviatorPatchDom() {
+  const s = state.aviator;
+  if (!s) return;
+
+  const histEl = document.getElementById("avHistory");
+  if (histEl) histEl.innerHTML = avHistoryHtml(s);
+
+  const playersEl = document.getElementById("avPlayersList");
+  if (playersEl) playersEl.innerHTML = avPlayersListHtml(s);
+
+  const phaseLabel = document.getElementById("avPhaseLabel");
+  const countdownFill = document.getElementById("avCountdownFill");
+  const now = Date.now();
+  if (s.phase === "waiting") {
+    const remain = Math.max(0, s.phaseEndsAt - now);
+    if (phaseLabel) { phaseLabel.textContent = `Décollage dans ${(remain / 1000).toFixed(1)}s`; phaseLabel.className = "av-phase-label av-waiting-label"; }
+    if (countdownFill) countdownFill.style.width = `${clamp((remain / 7000) * 100, 0, 100)}%`;
+  } else if (s.phase === "flying") {
+    if (phaseLabel) { phaseLabel.textContent = "🚀 En vol — encaisse avant le crash !"; phaseLabel.className = "av-phase-label"; }
+  } else if (s.phase === "crashed") {
+    if (phaseLabel) { phaseLabel.textContent = "💥 Envolé !"; phaseLabel.className = "av-phase-label"; }
+    avRenderMultiplier(s.crashPoint, 6);
+    const multEl = document.getElementById("avMultiplier");
+    if (multEl) multEl.className = "av-multiplier av-crashed";
+  }
+
+  const btn = document.getElementById("avActionBtn");
+  const statusEl = document.getElementById("avMyBetStatus");
+  if (btn) {
+    btn.disabled = state.aviatorBusy;
+    btn.className = "bj-btn primary bj-bet-btn";
+    if (s.phase === "waiting") {
+      if (s.myBet) { btn.textContent = "Mise placée ✓"; btn.disabled = true; }
+      else { btn.textContent = state.aviatorBusy ? "…" : "🚀 Miser"; if (state.account.balance < AVIATOR_MIN_BET_CLIENT) btn.disabled = true; }
+    } else if (s.phase === "flying") {
+      if (s.myBet && s.myBet.cashedOutAt == null) { btn.textContent = `Encaisser — ${Math.round((s.myBet.amount * s.multiplier) / 100)} 💎`; btn.className = "bj-btn primary bj-bet-btn av-btn-cashout"; }
+      else { btn.textContent = s.myBet ? "Encaissé ✓" : "En attente…"; btn.disabled = true; }
+    } else {
+      btn.textContent = "Manche terminée…"; btn.disabled = true;
+    }
+  }
+  if (statusEl) {
+    if (s.myBet && s.myBet.cashedOutAt != null) {
+      statusEl.className = "av-mybet-status av-win";
+      statusEl.textContent = `🎉 Encaissé à ${avFmt(s.myBet.cashedOutAt)} — gain net +${s.myBet.payout - s.myBet.amount} 💎`;
+    } else if (s.myBet && s.phase === "crashed") {
+      statusEl.className = "av-mybet-status av-lose";
+      statusEl.textContent = `💥 L'avion a explosé avant que tu encaisses — perdu ${s.myBet.amount} 💎`;
+    } else if (s.myBet) {
+      statusEl.className = "av-mybet-status";
+      statusEl.textContent = `Mise en cours : ${s.myBet.amount} 💎${s.myBet.autoCashout ? ` · auto-cashout à ${avFmt(s.myBet.autoCashout)}` : ""}`;
+    } else {
+      statusEl.className = "av-mybet-status";
+      statusEl.textContent = "";
+    }
+  }
+
+  if (s.phase !== "flying") {
+    avDrawGraph(s.phase === "waiting" ? 0.4 : 6, s.phase === "waiting" ? 100 : s.crashPoint);
+  }
+}
+
+function renderAviatorGame() {
+  const app = document.getElementById("app");
+  const s = state.aviator;
+  const phase = s ? s.phase : "waiting";
+  const betLocked = phase !== "waiting" || (s && s.myBet);
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">✈️</div> Aviator</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="av-layout">
+
+        <div class="bj-panel">
+          <div class="bj-panel-label">
+            <span>Montant du pari</span>
+            <span class="bj-panel-label-sub">💎 fictif</span>
+          </div>
+          <div class="bj-panel-input-row">
+            <input type="number" id="avBetInput" min="${AVIATOR_MIN_BET_CLIENT}" max="${state.account.balance}"
+              value="${state.aviatorBetAmount}" ${betLocked ? "disabled" : ""} />
+            <button class="bj-mini-btn" id="avHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
+            <button class="bj-mini-btn" id="avDblBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
+          </div>
+
+          <div class="av-auto-row">
+            <label><input type="checkbox" id="avAutoCheck" ${state.aviatorAutoOn ? "checked" : ""} ${betLocked ? "disabled" : ""} /> Auto-cashout</label>
+            <input type="number" id="avAutoInput" min="1.01" step="0.1" value="${state.aviatorAutoValue}" ${betLocked || !state.aviatorAutoOn ? "disabled" : ""} />
+          </div>
+
+          <button class="bj-btn primary bj-bet-btn" id="avActionBtn">🚀 Miser</button>
+          <div class="av-mybet-status" id="avMyBetStatus"></div>
+
+          ${state.aviatorError ? `<p class="auth-error">${esc(state.aviatorError)}</p>` : ""}
+
+          <p class="bj-rules">Mise avant le décollage, puis encaisse à tout moment pendant que l'avion vole pour empocher ta mise × le multiplicateur du moment. S'il explose avant que tu encaisses, la mise est perdue. 💎 Émeraudes fictives, 100% pour le fun — la manche est partagée avec tous les joueurs connectés en même temps.</p>
+        </div>
+
+        <div class="av-stage" id="avStage">
+          <div class="av-history" id="avHistory">${avHistoryHtml(s)}</div>
+          <div class="av-graph-wrap">
+            <svg viewBox="0 0 600 240" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="avFillGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#9c6bff" stop-opacity="0.35" />
+                  <stop offset="100%" stop-color="#9c6bff" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path id="avGraphFill" fill="url(#avFillGrad)" stroke="none" />
+              <path id="avGraphPath" fill="none" stroke="#9c6bff" stroke-width="3" stroke-linecap="round" />
+            </svg>
+            <div class="av-plane" id="avPlane">✈️</div>
+            <div class="av-center">
+              <div class="av-multiplier" id="avMultiplier">${avFmt(s ? s.multiplier : 100)}</div>
+              <div class="av-phase-label" id="avPhaseLabel">Chargement…</div>
+              <div class="av-countdown-bar"><div id="avCountdownFill" style="width:0%;"></div></div>
+            </div>
+          </div>
+          <div class="av-players">
+            <div class="av-players-head"><span>Joueur</span><span>Mise</span><span>Cote</span><span style="text-align:right;">Gain</span></div>
+            <div id="avPlayersList">${avPlayersListHtml(s)}</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  avDrawGraph(0.4, s ? s.multiplier : 100);
+  aviatorPatchDom();
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", () => { aviatorStopLoops(); backToCasinoLobby(); });
+
+  const betInput = document.getElementById("avBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.aviatorBetAmount = e.target.value; });
+  const halfBtn = document.getElementById("avHalfBtn");
+  if (halfBtn) halfBtn.addEventListener("click", () => {
+    state.aviatorBetAmount = clamp(Math.round((Number(state.aviatorBetAmount) || 0) / 2), AVIATOR_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+  const dblBtn = document.getElementById("avDblBtn");
+  if (dblBtn) dblBtn.addEventListener("click", () => {
+    state.aviatorBetAmount = clamp(Math.round((Number(state.aviatorBetAmount) || 0) * 2), AVIATOR_MIN_BET_CLIENT, state.account.balance);
+    render();
+  });
+  const autoCheck = document.getElementById("avAutoCheck");
+  if (autoCheck) autoCheck.addEventListener("change", e => { state.aviatorAutoOn = e.target.checked; render(); });
+  const autoInput = document.getElementById("avAutoInput");
+  if (autoInput) autoInput.addEventListener("input", e => { state.aviatorAutoValue = e.target.value; });
+
+  const actionBtn = document.getElementById("avActionBtn");
+  if (actionBtn) actionBtn.addEventListener("click", avActionBtnClick);
 }
 
 /* ---------- casino : roulette ---------- */

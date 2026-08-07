@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
@@ -752,6 +753,7 @@ const CASINO_MAINTENANCE = {
   roulette: false,
   chicken: false,
   slots: false,
+  aviator: false,
 };
 
 app.get("/api/casino/status", authRequired, (req, res) => {
@@ -1451,6 +1453,259 @@ app.post("/api/casino/slots/play", authRequired, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : AVIATOR ================= */
+
+// Jeu à "manche partagée" : contrairement aux autres jeux du casino (une
+// partie privée par joueur), Aviator tourne comme une seule table pour tout
+// le site — tous les joueurs connectés voient le même avion, le même
+// multiplicateur et misent sur la même manche en même temps.
+//
+// Cycle de la manche, entièrement piloté par le serveur (boucle en mémoire,
+// tick toutes les 100ms) :
+//   1. "waiting" (mises ouvertes, AVIATOR_WAITING_MS)
+//   2. "flying"  (le multiplicateur grimpe, retrait possible à tout moment)
+//   3. "crashed" (résultat affiché, AVIATOR_CRASHED_MS)
+//   -> retour à 1.
+//
+// Le point de crash est tiré au moment où la manche démarre mais n'est
+// JAMAIS envoyé au client avant que l'avion n'explose réellement (sinon un
+// joueur inspectant les requêtes réseau pourrait connaître le résultat à
+// l'avance et encaisser juste avant à coup sûr). Le client ne reçoit que le
+// multiplicateur courant, recalculé indépendamment côté serveur.
+
+const AVIATOR_MIN_BET = 10;
+const AVIATOR_HOUSE_EDGE = 0.97; // 3% de marge maison, comme les autres jeux "réguliers" du casino
+const AVIATOR_WAITING_MS = 7000; // durée de la phase de mise
+const AVIATOR_CRASHED_MS = 4000; // durée d'affichage du résultat avant la manche suivante
+// Vitesse de montée du multiplicateur : m(t) = e^(K*t), t en secondes.
+// Avec ce K, le multiplicateur double environ toutes les 6 secondes de vol.
+const AVIATOR_GROWTH_K = Math.log(2) / 6;
+const AVIATOR_TICK_MS = 100;
+const AVIATOR_MAX_MULTIPLIER_CENTS = 100_000_00; // plafond de sécurité : 100 000x
+
+// Tirage du point de crash (en centièmes, ex: 250 = 2.50x). Distribution
+// classique des jeux "crash" à marge maison fixe : une probabilité égale à
+// la marge maison de "crasher" instantanément à 1.00x, sinon une loi en
+// 1/(1-r) qui donne beaucoup de petits multiplicateurs et occasionnellement
+// un gros — avec un gain moyen pour le joueur égal à la marge maison.
+function aviatorRollCrash() {
+  const edge = 1 - AVIATOR_HOUSE_EDGE; // ex: 0.03
+  const r = crypto.randomInt(1, 1_000_000) / 1_000_000; // r dans (0, 1]
+  if (r <= edge) return 100; // 1.00x
+  const raw = (1 - edge) / (1 - r);
+  return clamp(Math.floor(raw * 100), 100, AVIATOR_MAX_MULTIPLIER_CENTS);
+}
+
+let aviatorRound = {
+  id: 0,
+  phase: "waiting", // "waiting" | "flying" | "crashed"
+  phaseEndsAt: Date.now() + AVIATOR_WAITING_MS,
+  flightStartedAt: null,
+  crashAt: null,
+  crashPoint: null, // en centièmes, tenu secret tant que phase !== "crashed"
+  bets: new Map(), // accountId -> { pseudo, amount, autoCashout|null, cashedOutAt|null, payout }
+};
+const aviatorHistory = []; // multiplicateurs de crash récents (centièmes), les plus récents en tête
+const aviatorLocks = new Set(); // accountId en cours de traitement (anti double-requête)
+
+function aviatorCurrentMultiplier() {
+  if (aviatorRound.phase !== "flying" || !aviatorRound.flightStartedAt) return 100;
+  const elapsedSec = (Date.now() - aviatorRound.flightStartedAt) / 1000;
+  const m = Math.floor(Math.exp(AVIATOR_GROWTH_K * elapsedSec) * 100);
+  return Math.min(m, aviatorRound.crashPoint || AVIATOR_MAX_MULTIPLIER_CENTS);
+}
+
+function aviatorStartWaiting() {
+  aviatorRound = {
+    id: aviatorRound.id + 1,
+    phase: "waiting",
+    phaseEndsAt: Date.now() + AVIATOR_WAITING_MS,
+    flightStartedAt: null,
+    crashAt: null,
+    crashPoint: null,
+    bets: new Map(),
+  };
+}
+
+function aviatorStartFlying() {
+  aviatorRound.phase = "flying";
+  aviatorRound.crashPoint = aviatorRollCrash();
+  aviatorRound.flightStartedAt = Date.now();
+  const flightSeconds = Math.log(aviatorRound.crashPoint / 100) / AVIATOR_GROWTH_K;
+  aviatorRound.crashAt = aviatorRound.flightStartedAt + Math.max(150, flightSeconds * 1000);
+}
+
+async function aviatorDoCashout(accountId, bet, multiplierCents) {
+  bet.cashedOutAt = multiplierCents;
+  bet.payout = Math.round((bet.amount * multiplierCents) / 100);
+  await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [bet.payout, accountId]);
+  const net = bet.payout - bet.amount;
+  await pool.query(
+    "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+    [bet.pseudo, "yes", `✈️ Aviator — ${bet.pseudo} a encaissé à ${(multiplierCents / 100).toFixed(2)}x (+${net} 💎)`]
+  );
+  await pool.query(
+    "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+    [accountId, "aviator", bet.amount, bet.payout, "cashout", `Encaissé à ${(multiplierCents / 100).toFixed(2)}x`]
+  );
+}
+
+async function aviatorCrash() {
+  const losers = [];
+  for (const [accountId, bet] of aviatorRound.bets) {
+    if (bet.cashedOutAt == null) losers.push([accountId, bet]);
+  }
+  aviatorRound.phase = "crashed";
+  aviatorRound.phaseEndsAt = Date.now() + AVIATOR_CRASHED_MS;
+  aviatorHistory.unshift(aviatorRound.crashPoint);
+  if (aviatorHistory.length > 30) aviatorHistory.length = 30;
+
+  for (const [accountId, bet] of losers) {
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [accountId, "aviator", bet.amount, 0, "lose", `Crash à ${(aviatorRound.crashPoint / 100).toFixed(2)}x`]
+    );
+  }
+  if (losers.length > 0) {
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [losers[0][1].pseudo, "no", `✈️ Aviator — Crash à ${(aviatorRound.crashPoint / 100).toFixed(2)}x (${losers.length} joueur${losers.length === 1 ? "" : "s"} n'${losers.length === 1 ? "a" : "ont"} pas encaissé)`]
+    );
+  }
+}
+
+async function aviatorTick() {
+  try {
+    const now = Date.now();
+    if (aviatorRound.phase === "waiting" && now >= aviatorRound.phaseEndsAt) {
+      aviatorStartFlying();
+    } else if (aviatorRound.phase === "flying") {
+      const current = aviatorCurrentMultiplier();
+      for (const [accountId, bet] of aviatorRound.bets) {
+        if (bet.cashedOutAt == null && bet.autoCashout && bet.autoCashout <= current && bet.autoCashout < aviatorRound.crashPoint) {
+          await aviatorDoCashout(accountId, bet, bet.autoCashout);
+        }
+      }
+      if (now >= aviatorRound.crashAt) {
+        await aviatorCrash();
+      }
+    } else if (aviatorRound.phase === "crashed" && now >= aviatorRound.phaseEndsAt) {
+      aviatorStartWaiting();
+    }
+  } catch (e) {
+    console.error("Erreur boucle Aviator :", e);
+  }
+}
+setInterval(aviatorTick, AVIATOR_TICK_MS);
+
+function aviatorPublicBets() {
+  return Array.from(aviatorRound.bets.values())
+    .map(b => ({ pseudo: b.pseudo, amount: b.amount, cashedOutAt: b.cashedOutAt, payout: b.payout || 0 }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function aviatorStateFor(accountId) {
+  const myBet = aviatorRound.bets.get(accountId) || null;
+  return {
+    phase: aviatorRound.phase,
+    roundId: aviatorRound.id,
+    multiplier: aviatorCurrentMultiplier(),
+    phaseEndsAt: aviatorRound.phaseEndsAt,
+    flightStartedAt: aviatorRound.flightStartedAt,
+    crashPoint: aviatorRound.phase === "crashed" ? aviatorRound.crashPoint : null,
+    bets: aviatorPublicBets(),
+    history: aviatorHistory,
+    myBet: myBet
+      ? { amount: myBet.amount, autoCashout: myBet.autoCashout, cashedOutAt: myBet.cashedOutAt, payout: myBet.payout || 0 }
+      : null,
+  };
+}
+
+app.get("/api/casino/aviator/state", authRequired, (req, res) => {
+  res.json(aviatorStateFor(req.user.id));
+});
+
+app.post("/api/casino/aviator/bet", authRequired, async (req, res) => {
+  if (aviatorLocks.has(req.user.id)) return res.status(429).json({ error: "Requête déjà en cours." });
+  aviatorLocks.add(req.user.id);
+  try {
+    if (CASINO_MAINTENANCE.aviator) {
+      return res.status(503).json({ error: "Aviator est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
+    if (aviatorRound.phase !== "waiting") {
+      return res.status(400).json({ error: "Les mises sont fermées, attends la prochaine manche." });
+    }
+    if (aviatorRound.bets.has(req.user.id)) {
+      return res.status(400).json({ error: "Tu as déjà misé sur cette manche." });
+    }
+
+    const [arows] = await pool.query("SELECT balance FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const amount = Math.round(Number(req.body?.amount) || 0);
+    if (amount < AVIATOR_MIN_BET || amount > account.balance) {
+      return res.status(400).json({ error: `Mise invalide : entre ${AVIATOR_MIN_BET} 💎 et ton solde.` });
+    }
+    let autoCashout = req.body?.autoCashout != null ? Math.round(Number(req.body.autoCashout) * 100) : null;
+    if (!Number.isFinite(autoCashout) || autoCashout < 101) autoCashout = null;
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [amount, req.user.id]);
+
+    // La manche peut avoir démarré pendant cet appel (await ci-dessus) : on
+    // revérifie juste avant d'enregistrer la mise, et on rembourse sinon.
+    if (aviatorRound.phase !== "waiting" || aviatorRound.bets.has(req.user.id)) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [amount, req.user.id]);
+      return res.status(400).json({ error: "Manche déjà lancée, réessaie à la prochaine." });
+    }
+
+    await addWageringProgress(pool, req.user.id, amount);
+    aviatorRound.bets.set(req.user.id, { pseudo: req.user.pseudo, amount, autoCashout, cashedOutAt: null, payout: 0 });
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      ...aviatorStateFor(req.user.id),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  } finally {
+    aviatorLocks.delete(req.user.id);
+  }
+});
+
+app.post("/api/casino/aviator/cashout", authRequired, async (req, res) => {
+  if (aviatorLocks.has(req.user.id)) return res.status(429).json({ error: "Requête déjà en cours." });
+  aviatorLocks.add(req.user.id);
+  try {
+    if (aviatorRound.phase !== "flying") return res.status(400).json({ error: "Impossible d'encaisser maintenant." });
+    const bet = aviatorRound.bets.get(req.user.id);
+    if (!bet) return res.status(400).json({ error: "Tu n'as pas de mise sur cette manche." });
+    if (bet.cashedOutAt != null) return res.status(400).json({ error: "Déjà encaissé." });
+
+    const current = aviatorCurrentMultiplier();
+    if (current >= aviatorRound.crashPoint) return res.status(400).json({ error: "Trop tard, l'avion a explosé." });
+
+    await aviatorDoCashout(req.user.id, bet, current);
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      ...aviatorStateFor(req.user.id),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  } finally {
+    aviatorLocks.delete(req.user.id);
   }
 });
 
