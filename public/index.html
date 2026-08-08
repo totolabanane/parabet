@@ -3327,7 +3327,7 @@ function renderBlackjackGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="bjBetInput" min="${BJ_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="bjBetInput" min="${BJ_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.bjBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="bj-mini-btn" id="bjHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="bjDblBetBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -3549,7 +3549,7 @@ function renderMinesGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="mnBetInput" min="${MINES_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="mnBetInput" min="${MINES_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.minesBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="bj-mini-btn" id="mnHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="mnDblBetBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -3889,7 +3889,7 @@ function renderChickenGame() {
           <div class="ckr-box-label">Montant du pari · <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</div>
           <div class="ckr-bet-row">
             <button class="ckr-minmax-btn" id="ckMinBtn" ${betLocked ? "disabled" : ""}>MIN</button>
-            <input type="number" id="ckBetInput" min="${CHICKEN_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="ckBetInput" min="${CHICKEN_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.chickenBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="ckr-minmax-btn" id="ckMaxBtn" ${betLocked ? "disabled" : ""}>MAX</button>
           </div>
@@ -4092,7 +4092,7 @@ function renderFlipGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="cfBetInput" min="${FLIP_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="cfBetInput" min="${FLIP_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.flipBetAmount}" ${busy || spinning ? "disabled" : ""} />
             <button class="bj-mini-btn" id="cfHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="cfDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -4380,7 +4380,7 @@ function renderDiceGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="dcBetInput" min="${DICE_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, DICE_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="dcBetInput" min="${DICE_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, DICE_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.diceBetAmount}" ${busy || rolling ? "disabled" : ""} />
             <button class="bj-mini-btn" id="dcHalfBtn" ${busy || rolling ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="dcDblBetBtn" ${busy || rolling ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -4798,7 +4798,7 @@ function renderPlinkoGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="pkBetInput" min="${PLINKO_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, PLINKO_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="pkBetInput" min="${PLINKO_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, PLINKO_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.plinkoBetAmount}" />
             <button class="bj-mini-btn" id="pkHalfBtn" title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="pkDblBetBtn" title="Doubler la mise">2×</button>
@@ -5022,7 +5022,7 @@ function renderUnclaimFinderGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="ufBetInput" min="${UF_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, UF_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="ufBetInput" min="${UF_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, UF_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.ufBetAmount}" ${busy || spinning ? "disabled" : ""} />
             <button class="bj-mini-btn" id="ufHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="ufDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -5203,7 +5203,7 @@ function renderSlotsGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="slBetInput" min="${SLOTS_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="slBetInput" min="${SLOTS_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.slotsBetAmount}" ${busy || spinning ? "disabled" : ""} />
             <button class="bj-mini-btn" id="slHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="slDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -5562,7 +5562,7 @@ function renderAviatorGame() {
             <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="avBetInput" min="${AVIATOR_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity)}"
+            <input type="text" inputmode="numeric" id="avBetInput" min="${AVIATOR_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.aviatorBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="bj-mini-btn" id="avHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="avDblBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -6049,7 +6049,7 @@ function renderModal() {
     <label class="modal-label">Montant · ${balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> disponibles</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
-      <input type="number" id="amountInput" min="10" max="${Math.max(10, balance)}" value="${state.amount}" />
+      <input type="text" inputmode="numeric" id="amountInput" min="10" max="${Math.max(10, balance)}" value="${state.amount}" />
     </div>
     <div class="quick-row">
       ${quicks.map((q, i) => `<button class="quick-btn" data-quick="${q}">${i === 3 ? "Max" : q}</button>`).join("")}
@@ -6102,7 +6102,7 @@ function renderDepositModalContent(overlay, modal) {
     <label class="modal-label">Montant à déposer ($)</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">$</span>
-      <input type="number" id="depAmountInput" min="${minUsd}" step="0.01" value="${f.amountUsd}" />
+      <input type="text" inputmode="decimal" id="depAmountInput" min="${minUsd}" step="0.01" value="${f.amountUsd}" />
     </div>
     <p class="dep-usd">= ${diamondsPreview.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · taux : 1 <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> = ${EMERALD_USD_RATE.toFixed(2)} $</p>
     ${belowMin ? `<p class="dep-inline-error">Le minimum est de ${minUsd.toFixed(2)} $ (${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎).</p>` : ""}
@@ -6226,7 +6226,7 @@ function renderWithdrawModalContent(overlay, modal) {
     <label class="modal-label">Montant à retirer · ${balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> disponibles</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
-      <input type="number" id="wdAmountInput" min="${WITHDRAW_MIN_AMOUNT}" max="${maxAmount}" value="${f.amount}" ${wageringBlocked ? "disabled" : ""} />
+      <input type="text" inputmode="numeric" id="wdAmountInput" min="${WITHDRAW_MIN_AMOUNT}" max="${maxAmount}" value="${f.amount}" ${wageringBlocked ? "disabled" : ""} />
     </div>
     <p class="dep-usd">Tu recevras environ <b>${netUsd.toFixed(2)} $</b> · taux : 1 <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> = ${EMERALD_USD_RATE.toFixed(2)} $ · taxe de retrait : ${WITHDRAW_TAX_PERCENT}%</p>
     <div class="quick-row">
