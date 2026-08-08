@@ -20,6 +20,7 @@ const {
   WITHDRAW_MIN_AMOUNT = 15000,
   REFERRAL_BONUS_REFERRER = 100,
   REFERRAL_BONUS_REFEREE = 50,
+  DISCORD_WEBHOOK_URL = "",
 } = process.env;
 
 if (!JWT_SECRET) {
@@ -33,6 +34,43 @@ const DEP_MIN = Number(DEPOSIT_MIN_AMOUNT);
 const WD_MIN = Number(WITHDRAW_MIN_AMOUNT);
 const REF_BONUS_REFERRER = Number(REFERRAL_BONUS_REFERRER);
 const REF_BONUS_REFEREE = Number(REFERRAL_BONUS_REFEREE);
+
+/* ---------- notifications Discord ---------- */
+// Construit une URL publique absolue (https derrière un proxy) à partir d'un chemin relatif,
+// par ex. buildPublicUrl(req, "/uploads/xxx.png") -> "https://mon-domaine.com/uploads/xxx.png"
+function buildPublicUrl(req, relativePath) {
+  return `${req.protocol}://${req.get("host")}${relativePath}`;
+}
+
+// Envoie un embed vers le webhook Discord configuré dans .env (DISCORD_WEBHOOK_URL).
+// Ne bloque jamais la requête HTTP en cours : les erreurs sont juste loguées.
+async function notifyDiscord({ title, color, fields, imageUrl, thumbnailUrl }) {
+  if (!DISCORD_WEBHOOK_URL) return; // pas de webhook configuré -> on ignore silencieusement
+
+  const embed = {
+    title,
+    color,
+    fields,
+    timestamp: new Date().toISOString(),
+  };
+  if (imageUrl) embed.image = { url: imageUrl };
+  if (thumbnailUrl) embed.thumbnail = { url: thumbnailUrl };
+
+  const payload = { embeds: [embed] };
+
+  try {
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error("Webhook Discord: réponse non-OK", res.status, await res.text().catch(() => ""));
+    }
+  } catch (e) {
+    console.error("Webhook Discord: échec d'envoi", e);
+  }
+}
 
 /* ---------- base de données ---------- */
 // La connexion et la création des tables sont gérées dans db.js (Postgres / Neon).
@@ -61,6 +99,7 @@ const upload = multer({
 /* ---------- app ---------- */
 
 const app = express();
+app.set("trust proxy", true); // pour construire des URLs publiques correctes (https) derrière un proxy/CDN
 app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(UPLOAD_DIR));
@@ -429,6 +468,16 @@ app.post("/api/deposits", authRequired, upload.single("screenshot"), async (req,
       [req.user.id, amount, req.file.filename]
     );
     res.json({ ok: true });
+
+    notifyDiscord({
+      title: "💰 Nouveau dépôt en attente",
+      color: 0x2ecc71,
+      fields: [
+        { name: "Joueur", value: req.user.pseudo || String(req.user.id), inline: true },
+        { name: "Montant", value: `${amount} 💎`, inline: true },
+      ],
+      imageUrl: buildPublicUrl(req, `/uploads/${req.file.filename}`),
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur lors de l'envoi du dépôt." });
@@ -490,6 +539,16 @@ app.post("/api/withdrawals", authRequired, async (req, res) => {
 
     await conn.commit();
     res.json({ ok: true, balance: account.balance - amount });
+
+    notifyDiscord({
+      title: "💸 Nouvelle demande de retrait",
+      color: 0xe67e22,
+      fields: [
+        { name: "Joueur", value: req.user.pseudo || String(req.user.id), inline: true },
+        { name: "Montant", value: `${amount} 💎`, inline: true },
+        { name: "Pseudo Minecraft", value: minecraftPseudo, inline: true },
+      ],
+    });
   } catch (e) {
     await conn.rollback();
     console.error(e);

@@ -615,7 +615,28 @@
   .av-hist-chip { flex-shrink: 0; font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); }
   .av-graph-wrap { position: relative; flex: 1; min-height: 220px; display: flex; align-items: center; justify-content: center; }
   .av-graph-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .av-plane { position: absolute; font-size: 22px; transform: translate(-50%, -50%); filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); transition: opacity 0.2s ease; }
+  .av-plane { position: absolute; width: 28px; height: 28px; transform: translate(-50%, -50%); transition: opacity 0.2s ease; }
+  .av-plane img { width: 100%; height: 100%; object-fit: contain; display: block; position: relative; z-index: 2; filter: drop-shadow(0 0 6px rgba(190,80,255,0.85)) drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+  .av-plane::before {
+    content: ""; position: absolute; top: 50%; left: 50%; z-index: 1;
+    width: 22px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(216,140,255,0.95) 0%, rgba(168,60,255,0.55) 45%, rgba(168,60,255,0) 80%);
+    transform: translate(-135%, -50%) rotate(-28deg) scaleX(1);
+    filter: blur(1px);
+    animation: avFlameFlicker 0.35s ease-in-out infinite alternate;
+  }
+  .av-plane::after {
+    content: ""; position: absolute; top: 50%; left: 50%; z-index: 0;
+    width: 34px; height: 5px; border-radius: 50%;
+    background: linear-gradient(90deg, rgba(168,60,255,0.5), rgba(168,60,255,0));
+    transform: translate(-155%, -50%) rotate(-28deg);
+    filter: blur(2px);
+    animation: avFlameFlicker 0.4s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes avFlameFlicker {
+    0%   { opacity: 0.55; transform: translate(-130%, -50%) rotate(-28deg) scaleX(0.85); }
+    100% { opacity: 1;    transform: translate(-150%, -50%) rotate(-28deg) scaleX(1.15); }
+  }
   .av-center { position: relative; z-index: 2; text-align: center; }
   .av-multiplier { font-family: var(--font-mono); font-size: 46px; font-weight: 800; color: #fff; text-shadow: 0 0 24px rgba(156,107,255,0.5); transition: color 0.2s ease; }
   .av-multiplier.av-crashed { color: var(--red); text-shadow: 0 0 24px rgba(255,77,94,0.5); }
@@ -1428,7 +1449,7 @@ function getResolveTime(marketId) {
 
 function showToast(msg) {
   const el = document.getElementById("toast");
-  el.textContent = msg;
+  el.innerHTML = msg;
   el.classList.add("show");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.remove("show"), 2400);
@@ -4233,7 +4254,7 @@ function avRenderMultiplier(cents, elapsedSec) {
   const myBet = state.aviator && state.aviator.myBet;
   const cashoutBtn = document.getElementById("avActionBtn");
   if (cashoutBtn && myBet && myBet.cashedOutAt == null) {
-    cashoutBtn.textContent = `Encaisser — ${Math.round((myBet.amount * cents) / 100)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
+    cashoutBtn.innerHTML = `Encaisser — ${Math.round((myBet.amount * cents) / 100)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
   }
 }
 
@@ -4363,7 +4384,7 @@ function aviatorPatchDom() {
       if (s.myBet) { btn.textContent = "Mise placée ✓"; btn.disabled = true; }
       else { btn.textContent = state.aviatorBusy ? "…" : "🚀 Miser"; if (state.account.balance < AVIATOR_MIN_BET_CLIENT) btn.disabled = true; }
     } else if (s.phase === "flying") {
-      if (s.myBet && s.myBet.cashedOutAt == null) { btn.textContent = `Encaisser — ${Math.round((s.myBet.amount * s.multiplier) / 100)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; btn.className = "bj-btn primary bj-bet-btn av-btn-cashout"; }
+      if (s.myBet && s.myBet.cashedOutAt == null) { btn.innerHTML = `Encaisser — ${Math.round((s.myBet.amount * s.multiplier) / 100)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; btn.className = "bj-btn primary bj-bet-btn av-btn-cashout"; }
       else { btn.textContent = s.myBet ? "Encaissé ✓" : "En attente…"; btn.disabled = true; }
     } else {
       btn.textContent = "Manche terminée…"; btn.disabled = true;
@@ -4372,13 +4393,13 @@ function aviatorPatchDom() {
   if (statusEl) {
     if (s.myBet && s.myBet.cashedOutAt != null) {
       statusEl.className = "av-mybet-status av-win";
-      statusEl.textContent = `🎉 Encaissé à ${avFmt(s.myBet.cashedOutAt)} — gain net +${s.myBet.payout - s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
+      statusEl.innerHTML = `🎉 Encaissé à ${avFmt(s.myBet.cashedOutAt)} — gain net +${s.myBet.payout - s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
     } else if (s.myBet && s.phase === "crashed") {
       statusEl.className = "av-mybet-status av-lose";
-      statusEl.textContent = `💥 L'avion a explosé avant que tu encaisses — perdu ${s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
+      statusEl.innerHTML = `💥 L'avion a explosé avant que tu encaisses — perdu ${s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
     } else if (s.myBet) {
       statusEl.className = "av-mybet-status";
-      statusEl.textContent = `Mise en cours : ${s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${s.myBet.autoCashout ? ` · auto-cashout à ${avFmt(s.myBet.autoCashout)}` : ""}`;
+      statusEl.innerHTML = `Mise en cours : ${s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${s.myBet.autoCashout ? ` · auto-cashout à ${avFmt(s.myBet.autoCashout)}` : ""}`;
     } else {
       statusEl.className = "av-mybet-status";
       statusEl.textContent = "";
@@ -4454,7 +4475,7 @@ function renderAviatorGame() {
               <path id="avGraphFill" fill="url(#avFillGrad)" stroke="none" />
               <path id="avGraphPath" fill="none" stroke="#9c6bff" stroke-width="3" stroke-linecap="round" />
             </svg>
-            <div class="av-plane" id="avPlane">✈️</div>
+            <div class="av-plane" id="avPlane"><img src="/icons/hangglider.png" alt="✈️" /></div>
             <div class="av-center">
               <div class="av-multiplier" id="avMultiplier">${avFmt(s ? s.multiplier : 100)}</div>
               <div class="av-phase-label" id="avPhaseLabel">Chargement…</div>
