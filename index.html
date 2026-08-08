@@ -900,71 +900,6 @@
   .cf-history-chip img { width: 16px; height: 16px; object-fit: contain; }
   .cf-history-empty { font-size: 12px; color: var(--text-faint); }
 
-  /* ---------- dice ---------- */
-  .dc-direction-row { display: flex; gap: 8px; margin-bottom: 14px; }
-
-  .dc-quick-row { display: flex; gap: 6px; margin-bottom: 14px; }
-  .dc-quick-btn {
-    flex: 1; padding: 7px 0; border-radius: 7px; font-size: 11.5px; font-weight: 600;
-    border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim);
-    transition: color 0.15s ease, border-color 0.15s ease;
-  }
-  .dc-quick-btn:hover:not(:disabled) { color: var(--text); border-color: #414560; }
-  .dc-quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .dc-stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
-  .dc-stat-box { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; }
-  .dc-stat-label { font-size: 10px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-  .dc-stat-value { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); }
-
-  .dc-stage { padding: 34px 14px 10px; }
-  .dc-roll-readout { text-align: center; margin-bottom: 22px; }
-  .dc-roll-number { font-family: var(--font-mono); font-size: 44px; font-weight: 700; color: var(--text-dim); line-height: 1; transition: color 0.2s ease; }
-  .dc-roll-number.win { color: var(--green); text-shadow: 0 0 22px rgba(139,92,246,0.4); }
-  .dc-roll-number.lose { color: var(--red); text-shadow: 0 0 22px rgba(255,92,106,0.3); }
-  .dc-roll-number.rolling { color: var(--text-dim); animation: dcPulse 0.55s ease-in-out infinite; }
-  @keyframes dcPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-  .dc-roll-caption { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
-
-  .dc-gauge-wrap { position: relative; padding: 0 4px; }
-  .dc-gauge-track { position: relative; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
-  .dc-gauge-zone { position: absolute; top: 0; bottom: 0; }
-  .dc-gauge-zone.win { background: rgba(139,92,246,0.35); }
-  .dc-gauge-zone.lose { background: rgba(255,92,106,0.20); }
-  .dc-gauge-target {
-    position: absolute; top: -4px; bottom: -4px; width: 3px; background: var(--text);
-    border-radius: 2px; box-shadow: 0 0 8px rgba(238,241,251,0.6);
-  }
-  .dc-gauge-marker {
-    position: absolute; top: -9px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%;
-    background: var(--surface); border: 2px solid var(--text-dim); box-shadow: 0 3px 10px rgba(0,0,0,0.5);
-    transition: left 0.5s cubic-bezier(.25,.8,.35,1), border-color 0.2s ease;
-  }
-  .dc-gauge-marker.win { border-color: var(--green); box-shadow: 0 0 12px rgba(139,92,246,0.55); }
-  .dc-gauge-marker.lose { border-color: var(--red); box-shadow: 0 0 12px rgba(255,92,106,0.4); }
-  .dc-gauge-scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10.5px; color: var(--text-faint); font-family: var(--font-mono); }
-
-  .dc-slider-wrap { padding: 26px 4px 6px; }
-  .dc-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--surface-2); outline: none; }
-  .dc-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%;
-    background: var(--green); border: 3px solid var(--bg-deep); box-shadow: 0 2px 8px rgba(139,92,246,0.5); cursor: pointer;
-  }
-  .dc-slider::-moz-range-thumb {
-    width: 20px; height: 20px; border-radius: 50%; background: var(--green); border: 3px solid var(--bg-deep);
-    box-shadow: 0 2px 8px rgba(139,92,246,0.5); cursor: pointer;
-  }
-  .dc-slider:disabled { opacity: 0.5; }
-
-  .dc-history-row { display: flex; gap: 6px; flex-wrap: wrap; }
-  .dc-history-chip {
-    min-width: 44px; padding: 4px 6px; border-radius: 7px; text-align: center;
-    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
-    background: var(--surface-2); border: 1px solid var(--border);
-  }
-  .dc-history-chip.win { color: var(--green); border-color: rgba(139,92,246,0.4); }
-  .dc-history-chip.lose { color: var(--red); border-color: rgba(255,92,106,0.3); }
-
   /* ---------- plinko ---------- */
   .pk-board { position: relative; width: 100%; max-width: 560px; margin: 10px auto 0; aspect-ratio: 6 / 5; }
   .pk-peg { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,0.55); transform: translate(-50%, -50%); }
@@ -1434,15 +1369,6 @@ const state = {
   flipSpinning: false,   // vrai pendant l'animation de la pièce, pour retarder l'affichage du résultat
   flipError: "",
   flipHistory: [],        // historique des derniers résultats (les plus récents en tête)
-
-  dice: null,             // dernier résultat de Dice renvoyé par le serveur (ou null)
-  diceBetAmount: 100,
-  diceTarget: 50,          // cible choisie (2 à 98)
-  diceDirection: "under",  // "under" | "over"
-  diceBusy: false,
-  diceRolling: false,      // vrai pendant la brève animation du dé, pour retarder l'affichage du résultat
-  diceError: "",
-  diceHistory: [],         // historique des derniers tirages (les plus récents en tête)
 
   uf: null,               // dernier résultat de Unclaim Finder renvoyé par le serveur (ou null)
   ufBetAmount: 100,
@@ -2137,8 +2063,8 @@ async function adminSetCasinoLimit(game, minBet, maxBet) {
   state.adminBusy = false; render();
 }
 
-const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", dice: "🎲 Dice", unclaimfinder: "🔎 Unclaim Finder", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road", aviator: "✈️ Aviator", plinko: "🔴 Plinko" };
-const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "dice", "unclaimfinder", "roulette", "slots", "aviator", "plinko"]; // doit correspondre à CASINO_GAMES_LIST côté serveur
+const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", unclaimfinder: "🔎 Unclaim Finder", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road", aviator: "✈️ Aviator", plinko: "🔴 Plinko" };
+const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "unclaimfinder", "roulette", "slots", "aviator", "plinko"]; // doit correspondre à CASINO_GAMES_LIST côté serveur
 const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
 const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
 
@@ -2469,7 +2395,6 @@ function playCasinoGame(id) {
   if (g.id === "blackjack") openBlackjack();
   else if (g.id === "mines") openMines();
   else if (g.id === "flip") openFlip();
-  else if (g.id === "dice") openDice();
   else if (g.id === "unclaimfinder") openUnclaimFinder();
   else if (g.id === "roulette") openRoulette();
   else if (g.id === "slots") openSlots();
@@ -2599,7 +2524,6 @@ const CASINO_GAME_LABELS = {
   mines: "💣 Mines",
   chicken: "🐔 Chicken",
   flip: "🪙 Pile ou face",
-  dice: "🎲 Dice",
   unclaimfinder: "🔎 Unclaim Finder",
   roulette: "🎡 Roulette",
   slots: "🎰 Machine à sous",
@@ -2758,7 +2682,7 @@ function renderProfile() {
 
 const CASINO_GAMES = [
   { id: "blackjack", title: "Blackjack", kicker: "Table", poster: "/casino/blackjack-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#a4172c)", enabled: true },
-  { id: "dice",      title: "Dice",      kicker: "Instant", poster: "/casino/dice-poster.png", gradient: "linear-gradient(165deg,#9c6bff,#5b21b6)", enabled: true },
+  { id: "dice",      title: "Dice",      kicker: "Instant", poster: "/casino/dice-poster.png", gradient: "linear-gradient(165deg,#9c6bff,#5b21b6)", enabled: false },
   { id: "mines",     title: "Mines",     kicker: "Instant", poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
   { id: "hilo",      title: "Hilo",      kicker: "Instant", poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
   { id: "flip",      title: "Flip",      kicker: "Pile ou face", poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
@@ -2767,7 +2691,7 @@ const CASINO_GAMES = [
   { id: "slots",     title: "Slots",     kicker: "Machine à sous", icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
   { id: "chicken",   title: "Chicken Road", kicker: "Crash", poster: "/casino/chicken-poster.png", gradient: "linear-gradient(165deg,#8fe07a,#1f6b2e)", enabled: true },
   { id: "aviator",   title: "Aviator",   kicker: "Crash", poster: "/casino/aviator-poster.png", gradient: "linear-gradient(165deg,#5b6bff,#1a1030)", enabled: true },
-  { id: "plinko",    title: "Plinko",    kicker: "Instant", poster: "/casino/plinko-poster.png", gradient: "linear-gradient(165deg,#5b9bff,#12225c)", enabled: true },
+  { id: "plinko",    title: "Plinko",    kicker: "Instant", icon: "🔴", gradient: "linear-gradient(165deg,#5b9bff,#12225c)", enabled: true },
 ];
 
 // Statut effectif d'un jeu pour le lobby : combine le flag `enabled` (jeu pas
@@ -2803,7 +2727,6 @@ function applyCasinoLimitsToClientConstants() {
   if (L.mines)     { MINES_MIN_BET_CLIENT = L.mines.minBet; MINES_MAX_BET_CLIENT = L.mines.maxBet; }
   if (L.chicken)   { CHICKEN_MIN_BET_CLIENT = L.chicken.minBet; CHICKEN_MAX_BET_CLIENT = L.chicken.maxBet; }
   if (L.flip)      { FLIP_MIN_BET_CLIENT = L.flip.minBet; FLIP_MAX_BET_CLIENT = L.flip.maxBet; }
-  if (L.dice)      { DICE_MIN_BET_CLIENT = L.dice.minBet; DICE_MAX_BET_CLIENT = L.dice.maxBet; }
   if (L.unclaimfinder) { UF_MIN_BET_CLIENT = L.unclaimfinder.minBet; UF_MAX_BET_CLIENT = L.unclaimfinder.maxBet; }
   if (L.slots)     { SLOTS_MIN_BET_CLIENT = L.slots.minBet; SLOTS_MAX_BET_CLIENT = L.slots.maxBet; }
   if (L.aviator)   { AVIATOR_MIN_BET_CLIENT = L.aviator.minBet; AVIATOR_MAX_BET_CLIENT = L.aviator.maxBet; }
@@ -2996,7 +2919,6 @@ function renderCasino() {
   if (state.casinoGame === "blackjack") { renderBlackjackGame(); return; }
   if (state.casinoGame === "mines") { renderMinesGame(); return; }
   if (state.casinoGame === "flip") { renderFlipGame(); return; }
-  if (state.casinoGame === "dice") { renderDiceGame(); return; }
   if (state.casinoGame === "unclaimfinder") { renderUnclaimFinderGame(); return; }
   if (state.casinoGame === "roulette") { renderRouletteGame(); return; }
   if (state.casinoGame === "slots") { renderSlotsGame(); return; }
@@ -3899,338 +3821,6 @@ function renderFlipGame() {
   if (startBtn) startBtn.addEventListener("click", flipStart);
 }
 
-/* ---------- casino : dice ---------- */
-
-let DICE_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
-let DICE_MAX_BET_CLIENT = null; // idem — null = pas de plafond
-const DICE_TARGET_MIN = 2;
-const DICE_TARGET_MAX = 98;
-
-// Même formule que côté serveur (voir diceMultiplier dans server.js) : la
-// chance de gagner découle de la cible + du sens choisi, et le multiplicateur
-// garde ~1% de marge maison (99 / winChance). Recalculé ici uniquement pour
-// l'affichage en direct pendant que le joueur bouge le curseur — le serveur
-// reste seul juge du résultat réel.
-function diceWinChanceClient(target, direction) {
-  return direction === "under" ? target : 100 - target;
-}
-function diceMultiplierClient(target, direction) {
-  const winChance = diceWinChanceClient(target, direction);
-  return Math.round((99 / winChance) * 100) / 100;
-}
-
-async function openDice() {
-  state.casinoGame = "dice";
-  state.diceError = "";
-  state.diceRolling = false;
-  render();
-  try {
-    const s = await api("/api/casino/dice/state");
-    state.dice = s.last || null;
-    state.diceHistory = s.history || [];
-  } catch (e) { /* pas de partie précédente, on part d'un état vide */ }
-  render();
-}
-
-function diceSetTarget(v) {
-  if (state.diceBusy || state.diceRolling) return;
-  state.diceTarget = clamp(Math.round(Number(v) || 50), DICE_TARGET_MIN, DICE_TARGET_MAX);
-  render();
-}
-
-// Version "légère" utilisée pendant qu'on glisse le slider : met à jour
-// l'état + les quelques éléments concernés directement dans le DOM, SANS
-// passer par render(). render() reconstruit tout le panneau via innerHTML,
-// ce qui recrée le <input type="range"> à chaque frame — le navigateur coupe
-// alors le geste de glissement en cours, d'où l'impression de "freeze".
-// On ne fait un render() complet qu'au relâchement (évènement "change").
-function diceSetTargetLive(v) {
-  if (state.diceBusy || state.diceRolling) return;
-  const target = clamp(Math.round(Number(v) || 50), DICE_TARGET_MIN, DICE_TARGET_MAX);
-  state.diceTarget = target;
-
-  const direction = state.diceDirection;
-  const winChance = diceWinChanceClient(target, direction);
-  const multiplier = diceMultiplierClient(target, direction);
-  const potential = Math.round((Number(state.diceBetAmount) || 0) * multiplier);
-
-  const targetLabel = document.getElementById("dcTargetLabel");
-  if (targetLabel) targetLabel.textContent = `Cible : ${target}`;
-  const winChanceEl = document.getElementById("dcWinChance");
-  if (winChanceEl) winChanceEl.textContent = `${winChance}%`;
-  const multEl = document.getElementById("dcMultiplier");
-  if (multEl) multEl.textContent = `x${multiplier}`;
-  const multLabelEl = document.getElementById("dcMultiplierLabel");
-  if (multLabelEl) multLabelEl.textContent = `Profit total (x${multiplier})`;
-  const potentialEl = document.getElementById("dcPotentialValue");
-  if (potentialEl) potentialEl.textContent = potential;
-
-  const gaugeTarget = document.getElementById("dcGaugeTarget");
-  if (gaugeTarget) gaugeTarget.style.left = `${target}%`;
-  const zoneWin = document.getElementById("dcZoneWin");
-  const zoneLose = document.getElementById("dcZoneLose");
-  if (zoneWin && zoneLose) {
-    if (direction === "under") {
-      zoneWin.style.left = "0%"; zoneWin.style.width = `${target}%`;
-      zoneLose.style.left = `${target}%`; zoneLose.style.width = `${100 - target}%`;
-    } else {
-      zoneLose.style.left = "0%"; zoneLose.style.width = `${target}%`;
-      zoneWin.style.left = `${target}%`; zoneWin.style.width = `${100 - target}%`;
-    }
-  }
-}
-
-function diceSetDirection(dir) {
-  if (state.diceBusy || state.diceRolling) return;
-  state.diceDirection = dir === "over" ? "over" : "under";
-  render();
-}
-
-function diceStart() {
-  if (state.diceBusy || state.diceRolling) return;
-  const amount = clamp(Math.round(Number(state.diceBetAmount) || 0), DICE_MIN_BET_CLIENT, Math.min(state.account.balance, DICE_MAX_BET_CLIENT ?? Infinity) || DICE_MIN_BET_CLIENT);
-  state.diceBetAmount = amount;
-  state.diceBusy = true; state.diceError = ""; render();
-
-  (async () => {
-    try {
-      const r = await api("/api/casino/dice/play", { method: "POST", body: { amount, target: state.diceTarget, direction: state.diceDirection } });
-      // Le marqueur reste où était le dernier tirage (voir renderDiceGame) le
-      // temps du "lancer"...
-      state.diceRolling = true;
-      render();
-      // ...puis on le fait glisser DIRECTEMENT de sa position actuelle vers le
-      // nouveau résultat, en modifiant son style.left sur l'élément déjà
-      // présent dans le DOM : un render() complet recréerait l'élément et
-      // empêcherait la transition CSS de jouer (elle a besoin du même noeud
-      // avant/après le changement).
-      requestAnimationFrame(() => {
-        const marker = document.getElementById("dcMarker");
-        const rollNum = document.getElementById("dcRollNumber");
-        const caption = document.getElementById("dcRollCaption");
-        if (marker) {
-          marker.style.left = `${clamp(r.roll, 0, 100)}%`;
-          marker.classList.remove("win", "lose");
-          marker.classList.add(r.win ? "win" : "lose");
-        }
-        if (rollNum) {
-          rollNum.textContent = r.roll.toFixed(2);
-          rollNum.classList.remove("rolling");
-          rollNum.classList.add(r.win ? "win" : "lose");
-        }
-        if (caption) caption.textContent = "Dernier tirage";
-      });
-      // Laisse l'animation du marqueur se terminer (transition CSS de 0.5s)
-      // avant de faire un render() complet qui synchronise tout le reste
-      // (solde, historique, bouton "Parier" réactivé, etc).
-      setTimeout(() => {
-        state.account.balance = r.balance;
-        state.account.wageringRequired = r.wageringRequired;
-        state.account.wageringProgress = r.wageringProgress;
-        state.dice = r;
-        state.diceHistory = r.history || [r, ...state.diceHistory].slice(0, 20);
-        state.diceRolling = false;
-        state.diceBusy = false;
-        render();
-      }, 750);
-    } catch (e) {
-      state.diceError = e.message;
-      state.diceBusy = false;
-      render();
-    }
-  })();
-}
-
-function renderDiceGame() {
-  const app = document.getElementById("app");
-  const g = state.dice;
-  const busy = state.diceBusy;
-  const rolling = state.diceRolling;
-  const showingResult = g && !rolling && !busy;
-  const target = state.diceTarget;
-  const direction = state.diceDirection;
-  const winChance = diceWinChanceClient(target, direction);
-  const multiplier = diceMultiplierClient(target, direction);
-  const potential = Math.round((Number(state.diceBetAmount) || 0) * multiplier);
-
-  // Le marqueur reste sur la position du DERNIER tirage connu tant qu'un
-  // nouveau résultat n'est pas arrivé (y compris pendant "busy"/"rolling") :
-  // ça évite qu'il saute vers la cible ou le centre avant de glisser vers le
-  // nouveau tirage. Il ne bouge que via l'animation déclenchée dans
-  // diceStart() (modif directe du DOM), jamais par un recalcul ici.
-  const lastRoll = state.dice ? state.dice.roll : null;
-  const lastWin = state.dice ? state.dice.win : null;
-  const rollValue = showingResult ? g.roll : null;
-  const rollWin = showingResult ? g.win : null;
-  const rollNumberClass = rolling ? "rolling" : (showingResult ? (rollWin ? "win" : "lose") : "");
-  const rollNumberText = rolling ? "…" : (showingResult ? g.roll.toFixed(2) : "0.00");
-  const markerLeft = lastRoll != null ? clamp(lastRoll, 0, 100) : target;
-  const markerClass = lastRoll != null ? (lastWin ? "win" : "lose") : "";
-
-  const resultLabel = showingResult
-    ? (g.win
-        ? `<p class="cf-result-label win">🎉 ${g.roll.toFixed(2)} — +${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
-        : `<p class="cf-result-label lose">💥 ${g.roll.toFixed(2)} — tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
-    : "";
-
-  app.innerHTML = `
-    <div class="topnav">
-      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
-        <div class="logo"><div class="logo-badge">🎲</div> Dice</div>
-        <div style="flex:1;"></div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <div class="wallet-chip">
-            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
-            <span class="sep"></span>
-            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
-            <span class="wallet-balance">${state.account.balance}</span>
-          </div>
-          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="max-w casino-wrap">
-      <div class="bj-layout">
-
-        <div class="bj-panel">
-          <div class="auth-tabs">
-            <button class="auth-tab active" id="diceManualTab">Manuel</button>
-            <button class="auth-tab" id="diceAutoTab">Auto</button>
-          </div>
-
-          <div class="bj-panel-label">
-            <span>Montant du pari</span>
-            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
-          </div>
-          <div class="bj-panel-input-row">
-            <input type="number" id="dcBetInput" min="${DICE_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, DICE_MAX_BET_CLIENT ?? Infinity)}"
-              value="${state.diceBetAmount}" ${busy || rolling ? "disabled" : ""} />
-            <button class="bj-mini-btn" id="dcHalfBtn" ${busy || rolling ? "disabled" : ""} title="Diviser la mise par 2">½</button>
-            <button class="bj-mini-btn" id="dcDblBetBtn" ${busy || rolling ? "disabled" : ""} title="Doubler la mise">2×</button>
-          </div>
-
-          <div class="dc-direction-row">
-            <button class="cf-side-btn green ${direction === "under" ? "active" : ""}" id="dcUnderBtn" ${busy || rolling ? "disabled" : ""}>
-              🔽 Passer sous
-            </button>
-            <button class="cf-side-btn amber ${direction === "over" ? "active" : ""}" id="dcOverBtn" ${busy || rolling ? "disabled" : ""}>
-              🔼 Passer au-dessus
-            </button>
-          </div>
-
-          <div class="bj-panel-label">
-            <span id="dcTargetLabel">Cible : ${target}</span>
-          </div>
-          <div class="dc-slider-wrap">
-            <input type="range" class="dc-slider" id="dcTargetSlider" min="${DICE_TARGET_MIN}" max="${DICE_TARGET_MAX}" step="1" value="${target}" ${busy || rolling ? "disabled" : ""} />
-          </div>
-
-          <div class="dc-quick-row">
-            <button class="dc-quick-btn" data-dc-target="25" ${busy || rolling ? "disabled" : ""}>25</button>
-            <button class="dc-quick-btn" data-dc-target="50" ${busy || rolling ? "disabled" : ""}>50</button>
-            <button class="dc-quick-btn" data-dc-target="75" ${busy || rolling ? "disabled" : ""}>75</button>
-            <button class="dc-quick-btn" data-dc-target="95" ${busy || rolling ? "disabled" : ""}>95</button>
-          </div>
-
-          <div class="dc-stat-row">
-            <div class="dc-stat-box">
-              <div class="dc-stat-label">Chance de gagner</div>
-              <div class="dc-stat-value" id="dcWinChance">${winChance}%</div>
-            </div>
-            <div class="dc-stat-box">
-              <div class="dc-stat-label">Multiplicateur</div>
-              <div class="dc-stat-value" id="dcMultiplier">x${multiplier}</div>
-            </div>
-          </div>
-
-          <button class="bj-btn primary bj-bet-btn" id="dcStartBtn" ${busy || rolling || state.account.balance < DICE_MIN_BET_CLIENT ? "disabled" : ""}>
-            ${busy || rolling ? "Lancer…" : "▶️ Parier"}
-          </button>
-
-          <div class="bj-panel-label" style="margin-top:14px;">
-            <span id="dcMultiplierLabel">Profit total (x${multiplier})</span>
-          </div>
-          <div class="mn-readout mn-readout-green"><span id="dcPotentialValue">${busy || rolling ? potential : (showingResult ? g.payout : potential)}</span> <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
-
-          ${state.diceError ? `<p class="auth-error">${esc(state.diceError)}</p>` : ""}
-
-          <p class="bj-rules">Choisis une cible et parie que le dé tombera en dessous ou au dessus. Plus la chance de gagner est faible, plus le multiplicateur est élevé. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
-        </div>
-
-        <div class="bj-table" style="min-height:auto;">
-          <div class="dc-stage">
-            <div class="dc-roll-readout">
-              <div class="dc-roll-number ${rollNumberClass}" id="dcRollNumber">${rollNumberText}</div>
-              <div class="dc-roll-caption" id="dcRollCaption">${rolling ? "Lancer en cours…" : "Dernier tirage"}</div>
-            </div>
-
-            <div class="dc-gauge-wrap">
-              <div class="dc-gauge-track">
-                <div class="dc-gauge-zone win" id="dcZoneWin" style="${direction === "under" ? `left:0%; width:${target}%;` : `left:${target}%; width:${100 - target}%;`}"></div>
-                <div class="dc-gauge-zone lose" id="dcZoneLose" style="${direction === "under" ? `left:${target}%; width:${100 - target}%;` : `left:0%; width:${target}%;`}"></div>
-                <div class="dc-gauge-target" id="dcGaugeTarget" style="left:${target}%;"></div>
-              </div>
-              <div class="dc-gauge-marker ${markerClass}" id="dcMarker" style="left:${markerLeft}%;"></div>
-              <div class="dc-gauge-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
-            </div>
-          </div>
-          ${resultLabel}
-
-          <div class="cf-history-box">
-            <div class="cf-history-title">Historique</div>
-            <div class="dc-history-row">
-              ${state.diceHistory.length === 0
-                ? `<span class="cf-history-empty">Aucun lancer pour l'instant.</span>`
-                : state.diceHistory.slice(0, 20).map(h => `
-                  <div class="dc-history-chip ${h.win ? "win" : "lose"}" title="${h.direction === "under" ? "Sous" : "Au-dessus de"} ${h.target}">
-                    ${h.roll.toFixed(2)}
-                  </div>
-                `).join("")}
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  `;
-
-  const backBtn = document.getElementById("casinoBackBtn");
-  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
-
-  const autoTab = document.getElementById("diceAutoTab");
-  if (autoTab) autoTab.addEventListener("click", () => showToast("Le mode Auto arrive bientôt sur Dice 👀"));
-
-  const betInput = document.getElementById("dcBetInput");
-  if (betInput) betInput.addEventListener("input", e => { state.diceBetAmount = e.target.value; render(); });
-  const halfBtn = document.getElementById("dcHalfBtn");
-  if (halfBtn) halfBtn.addEventListener("click", () => {
-    state.diceBetAmount = clamp(Math.round((Number(state.diceBetAmount) || 0) / 2), DICE_MIN_BET_CLIENT, Math.min(state.account.balance, DICE_MAX_BET_CLIENT ?? Infinity));
-    render();
-  });
-  const dblBtn = document.getElementById("dcDblBetBtn");
-  if (dblBtn) dblBtn.addEventListener("click", () => {
-    state.diceBetAmount = clamp(Math.round((Number(state.diceBetAmount) || 0) * 2), DICE_MIN_BET_CLIENT, Math.min(state.account.balance, DICE_MAX_BET_CLIENT ?? Infinity));
-    render();
-  });
-
-  const underBtn = document.getElementById("dcUnderBtn");
-  if (underBtn) underBtn.addEventListener("click", () => diceSetDirection("under"));
-  const overBtn = document.getElementById("dcOverBtn");
-  if (overBtn) overBtn.addEventListener("click", () => diceSetDirection("over"));
-
-  const slider = document.getElementById("dcTargetSlider");
-  if (slider) {
-    slider.addEventListener("input", e => diceSetTargetLive(e.target.value));
-    slider.addEventListener("change", e => diceSetTarget(e.target.value));
-  }
-
-  document.querySelectorAll("[data-dc-target]").forEach(b => b.addEventListener("click", () => diceSetTarget(b.dataset.dcTarget)));
-
-  const startBtn = document.getElementById("dcStartBtn");
-  if (startBtn) startBtn.addEventListener("click", diceStart);
-}
-
 /* ---------- casino : plinko ---------- */
 
 let PLINKO_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
@@ -4348,22 +3938,12 @@ function plinkoStart() {
 // directement le style de son noeud DOM à chaque frame (sans passer par
 // render()), pour un vrai mouvement fluide : chaque rangée va un peu plus
 // vite que la précédente (accélération, comme la gravité) et la bille
-// "s'écrase" légèrement à chaque picot croisé (effet rebond).
-//
-// Important pour le multi-billes : comme le panneau entier est redessiné via
-// innerHTML à chaque render() (ajout d'une autre bille, atterrissage d'une
-// bille voisine, etc.), le noeud DOM de CETTE bille peut être détruit et
-// recréé en plein milieu de sa propre chute par un événement qui ne la
-// concerne même pas. On récupère donc le noeud par son id à CHAQUE frame
-// (jamais une seule fois au début) : comme la position à chaque instant est
-// recalculée uniquement à partir du temps écoulé (pas d'état stocké sur le
-// noeud lui-même), la bille continue sa trajectoire de façon invisible même
-// si son élément a été remplacé entre deux frames — ce qui permet à
-// plusieurs billes de tomber vraiment en parallèle sans se figer les unes
-// les autres.
+// "s'écrase" légèrement à chaque picot croisé (effet rebond). Chaque bille a
+// son propre id DOM donc plusieurs chutes peuvent être animées en parallèle
+// sans se marcher dessus.
 function plinkoAnimateDrop(ballState, path, rows, onDone) {
-  const elId = `pkBall-${ballState.id}`;
-  if (!document.getElementById(elId)) { onDone(); return; }
+  const ball = document.getElementById(`pkBall-${ballState.id}`);
+  if (!ball) { onDone(); return; }
 
   const waypoints = [];
   for (let s = 0; s <= rows; s++) {
@@ -4380,19 +3960,11 @@ function plinkoAnimateDrop(ballState, path, rows, onDone) {
 
   let seg = 0;
   let segStart = null;
-  let done = false;
 
   function frame(now) {
-    if (done) return;
-    // Re-récupéré à chaque frame : le noeud a pu être recréé entre-temps par
-    // le render() d'une AUTRE bille (voir commentaire ci-dessus).
-    const ball = document.getElementById(elId);
-    if (!ball) {
-      // La bille a disparu du DOM avant la fin de sa chute (cas limite très
-      // rare) : on termine proprement sans relancer onDone si on l'a déjà fait.
-      if (!done) { done = true; onDone(); }
-      return;
-    }
+    // La bille a pu être retirée du DOM entre-temps (fondu de sortie terminé
+    // avant la fin de l'animation, cas limite) : on arrête proprement.
+    if (!document.body.contains(ball)) return;
     if (segStart === null) segStart = now;
     const dur = durations[seg];
     const t = Math.min(1, (now - segStart) / dur);
@@ -4412,7 +3984,6 @@ function plinkoAnimateDrop(ballState, path, rows, onDone) {
       segStart = now;
       if (seg >= rows) {
         ball.style.transform = "translate(-50%, -50%)";
-        done = true;
         onDone();
         return;
       }

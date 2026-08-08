@@ -634,7 +634,7 @@ app.get("/api/referrals", authRequired, async (req, res) => {
 // base (table casino_limits) et gardées en cache mémoire pour ne pas requêter
 // la DB à chaque mise. Le cache est rechargé après chaque modif admin.
 
-const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "unclaimfinder", "roulette", "slots", "aviator"];
+const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "dice", "unclaimfinder", "roulette", "slots", "aviator", "plinko"];
 let casinoLimits = {}; // game -> { minBet, maxBet: number|null }
 
 async function loadCasinoLimits() {
@@ -668,6 +668,121 @@ function validateBetAmount(game, amount, balance) {
   }
   return null;
 }
+
+/* ================= CASINO : PLINKO (aides) ================= */
+// La table de multiplicateurs est calculée à partir de la loi binomiale :
+// chaque bille traverse `rows` rangées de picots, avec à chaque rangée 50%
+// de chances de partir à gauche ou à droite (comme un vrai plateau physique).
+// La case d'arrivée `k` (0..rows) suit donc une loi binomiale(rows, 0.5).
+// Les cases centrales (les plus probables) ont un petit multiplicateur, les
+// cases extrêmes (les plus rares) un gros multiplicateur — exactement comme
+// sur un vrai Plinko. Le paramètre "risque" ne change que l'écart entre le
+// centre et les extrêmes ; la marge maison (3%) est appliquée en dernier en
+// mettant à l'échelle toute la table pour que l'espérance de gain soit fixe.
+const PLINKO_ROWS_OPTIONS = [8, 9, 10, 11, 12, 13, 14, 15, 16];
+const PLINKO_RISK_EXPONENT = { low: 0.35, medium: 0.62, high: 1.0 };
+const PLINKO_HOUSE_EDGE = 0.97; // 3% de marge maison, cohérent avec les autres jeux "instant"
+
+function plinkoBinomialCoeffs(rows) {
+  const c = [1];
+  for (let k = 1; k <= rows; k++) c.push((c[k - 1] * (rows - k + 1)) / k);
+  return c; // C(rows, k) pour k = 0..rows
+}
+
+function plinkoMultiplierTable(rows, risk) {
+  const combos = plinkoBinomialCoeffs(rows);
+  const total = 2 ** rows;
+  const probs = combos.map(c => c / total);
+  const centerProb = rows % 2 === 0 ? probs[rows / 2] : (probs[(rows - 1) / 2] + probs[(rows + 1) / 2]) / 2;
+  const exponent = PLINKO_RISK_EXPONENT[risk] || PLINKO_RISK_EXPONENT.medium;
+  const raw = probs.map(p => (centerProb / p) ** exponent);
+  const ev = raw.reduce((sum, m, k) => sum + m * probs[k], 0);
+  const scale = PLINKO_HOUSE_EDGE / ev;
+  return raw.map(m => Math.max(0.1, Math.round(m * scale * 10) / 10));
+}
+
+function plinkoValidateRows(v) {
+  const n = Math.round(Number(v));
+  return PLINKO_ROWS_OPTIONS.includes(n) ? n : 14;
+}
+function plinkoValidateRisk(v) {
+  return ["low", "medium", "high"].includes(v) ? v : "medium";
+}
+
+const plinkoHistory = new Map(); // accountId -> [{ bucket, rows, risk, multiplier, path, bet, payout, ts }, ...]
+
+app.get("/api/casino/plinko/state", authRequired, (req, res) => {
+  const history = plinkoHistory.get(req.user.id) || [];
+  res.json({ last: history[0] || null, history });
+});
+
+app.get("/api/casino/plinko/table", authRequired, (req, res) => {
+  const rows = plinkoValidateRows(req.query.rows || 14);
+  const risk = plinkoValidateRisk(req.query.risk);
+  res.json({ rows, risk, table: plinkoMultiplierTable(rows, risk) });
+});
+
+app.post("/api/casino/plinko/play", authRequired, async (req, res) => {
+  try {
+    if (CASINO_MAINTENANCE.plinko) {
+      return res.status(503).json({ error: "Plinko est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("plinko", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
+
+    const rows = plinkoValidateRows(req.body?.rows);
+    const risk = plinkoValidateRisk(req.body?.risk);
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
+
+    // Simule la chute de la bille : à chaque rangée, 50/50 gauche ou droite.
+    const path = [];
+    let bucket = 0;
+    for (let i = 0; i < rows; i++) {
+      const goRight = crypto.randomInt(2) === 1;
+      if (goRight) bucket++;
+      path.push(goRight ? 1 : 0);
+    }
+
+    const table = plinkoMultiplierTable(rows, risk);
+    const multiplier = table[bucket];
+    const payout = Math.round(bet * multiplier);
+    if (payout > 0) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
+    }
+
+    const entry = { bucket, rows, risk, multiplier, path, bet, payout, ts: Date.now() };
+    const list = [entry, ...(plinkoHistory.get(req.user.id) || [])].slice(0, 20);
+    plinkoHistory.set(req.user.id, list);
+
+    const net = payout - bet;
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🔴 Plinko — ${req.user.pseudo} : x${multiplier} (${net >= 0 ? "+" : ""}${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "plinko", bet, payout, net >= 0 ? "win" : "lose", `${rows} lignes · risque ${risk} · case ${bucket} · x${multiplier}`]
+    );
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      bucket, rows, risk, multiplier, path, bet, payout, table, history: list,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
 
 /* ================= CASINO : BLACKJACK ================= */
 // Parties en cours stockées en mémoire (une seule partie active par compte à
@@ -900,11 +1015,13 @@ const CASINO_MAINTENANCE = {
   blackjack: false,
   mines: true,
   flip: false,
+  dice: false,
   unclaimfinder: false,
   roulette: false,
   chicken: false,
   slots: false,
   aviator: false,
+  plinko: false,
 };
 
 app.get("/api/casino/status", authRequired, (req, res) => {
@@ -1329,6 +1446,103 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
       wageringRequired: after[0].wagering_required,
       wageringProgress: after[0].wagering_progress,
       result, win, bet, payout, history: list,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : DICE ================= */
+
+// Dice classique : le joueur choisit une cible (2 à 98) et parie que le tirage
+// tombera EN DESSOUS (under) ou AU DESSUS (over) de cette cible. Le tirage est
+// un nombre à deux décimales entre 0.00 et 99.99 (uniforme). La chance de
+// gagner découle directement de la cible et du sens choisi, et le
+// multiplicateur est calculé pour garder la même marge maison que Flip
+// (~1% : 99 / winChance, comme 99/50 = 1.98x sur une pièce 50/50).
+const diceHistory = new Map(); // accountId -> [{ target, direction, roll, win, multiplier, bet, payout, ts }, ...]
+
+const DICE_HOUSE_EDGE = 99;
+const DICE_TARGET_MIN = 2;
+const DICE_TARGET_MAX = 98;
+
+function diceValidateTarget(v) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return 50;
+  return clamp(n, DICE_TARGET_MIN, DICE_TARGET_MAX);
+}
+function diceValidateDirection(v) {
+  return v === "over" ? "over" : "under";
+}
+function diceWinChance(target, direction) {
+  return direction === "under" ? target : 100 - target;
+}
+function diceMultiplier(target, direction) {
+  const winChance = diceWinChance(target, direction);
+  return Math.round((DICE_HOUSE_EDGE / winChance) * 100) / 100;
+}
+
+app.get("/api/casino/dice/state", authRequired, (req, res) => {
+  const history = diceHistory.get(req.user.id) || [];
+  res.json({ last: history[0] || null, history });
+});
+
+app.get("/api/casino/dice/table", authRequired, (req, res) => {
+  const target = diceValidateTarget(req.query.target);
+  const direction = diceValidateDirection(req.query.direction);
+  res.json({ target, direction, winChance: diceWinChance(target, direction), multiplier: diceMultiplier(target, direction) });
+});
+
+app.post("/api/casino/dice/play", authRequired, async (req, res) => {
+  try {
+    if (CASINO_MAINTENANCE.dice) {
+      return res.status(503).json({ error: "Dice est actuellement en maintenance. Réessaie un peu plus tard 🔧" });
+    }
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("dice", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
+
+    const target = diceValidateTarget(req.body?.target);
+    const direction = diceValidateDirection(req.body?.direction);
+    const multiplier = diceMultiplier(target, direction);
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
+
+    // Tirage uniforme à deux décimales entre 0.00 et 99.99, généré via une
+    // source cryptographique sûre (pas de Math.random pour l'issue du jeu).
+    const roll = crypto.randomInt(0, 10000) / 100;
+    const win = direction === "under" ? roll < target : roll > target;
+    const payout = win ? Math.round(bet * multiplier) : 0;
+    if (payout > 0) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
+    }
+
+    const entry = { target, direction, roll, win, multiplier, bet, payout, ts: Date.now() };
+    const list = [entry, ...(diceHistory.get(req.user.id) || [])].slice(0, 20);
+    diceHistory.set(req.user.id, list);
+
+    const net = payout - bet;
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🎲 Dice — ${req.user.pseudo} : ${roll.toFixed(2)} (${net >= 0 ? "+" : ""}${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "dice", bet, payout, win ? "win" : "lose", `${direction === "under" ? "Sous" : "Au-dessus de"} ${target} · tirage ${roll.toFixed(2)} · x${multiplier}`]
+    );
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      target, direction, roll, win, multiplier, bet, payout, history: list,
     });
   } catch (e) {
     console.error(e);
