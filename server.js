@@ -348,6 +348,19 @@ app.get("/api/mybets", authRequired, async (req, res) => {
   })));
 });
 
+// Historique perso des parties de casino (pendant à /api/mybets côté marché),
+// utilisé par l'onglet "Casino" de la page "Mon profil".
+app.get("/api/mycasinobets", authRequired, async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT * FROM casino_bets WHERE account_id = ? ORDER BY created_at DESC LIMIT 200`,
+    [req.user.id]
+  );
+  res.json(rows.map(b => ({
+    game: b.game, bet: b.bet, payout: b.payout, result: b.result,
+    detail: b.detail, ts: new Date(b.created_at).getTime(),
+  })));
+});
+
 app.post("/api/bets", authRequired, async (req, res) => {
   const { marketId, side, amount } = req.body || {};
   if (!marketId || (side !== "yes" && side !== "no")) return res.status(400).json({ error: "Requête invalide." });
@@ -522,7 +535,7 @@ app.get("/api/referrals", authRequired, async (req, res) => {
 // base (table casino_limits) et gardées en cache mémoire pour ne pas requêter
 // la DB à chaque mise. Le cache est rechargé après chaque modif admin.
 
-const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "roulette", "slots", "aviator"];
+const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "unclaimfinder", "roulette", "slots", "aviator"];
 let casinoLimits = {}; // game -> { minBet, maxBet: number|null }
 
 async function loadCasinoLimits() {
@@ -788,6 +801,7 @@ const CASINO_MAINTENANCE = {
   blackjack: false,
   mines: true,
   flip: false,
+  unclaimfinder: false,
   roulette: false,
   chicken: false,
   slots: false,
@@ -1216,6 +1230,77 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
       wageringRequired: after[0].wagering_required,
       wageringProgress: after[0].wagering_progress,
       result, win, bet, payout, history: list,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/* ================= CASINO : UNCLAIM FINDER ================= */
+
+// Mini-jeu Paladium : le joueur choisit un Unclaim Finder (vert / jaune /
+// rouge). Le serveur tire un pourcentage aléatoire pour chacun des trois ;
+// celui qui obtient le plus gros pourcentage l'emporte. Si le choix du
+// joueur correspond au gagnant, la mise est multipliée par 3 (1 chance sur
+// 3 de gagner, comme un vrai tirage à trois issues égales — aucune marge
+// maison cachée ici, c'est un x3 "brut" comme demandé).
+const UNCLAIMFINDER_MULTIPLIER = 3;
+const UNCLAIMFINDER_COLORS = ["vert", "jaune", "rouge"];
+const unclaimFinderHistory = new Map(); // accountId -> [{ percentages, winner, choice, win, bet, payout, ts }, ...]
+
+app.get("/api/casino/unclaimfinder/state", authRequired, (req, res) => {
+  const history = unclaimFinderHistory.get(req.user.id) || [];
+  res.json({ last: history[0] || null, history });
+});
+
+app.post("/api/casino/unclaimfinder/play", authRequired, async (req, res) => {
+  try {
+    if (CASINO_MAINTENANCE.unclaimfinder) {
+      return res.status(503).json({ error: "Unclaim Finder est en maintenance, réessaie plus tard." });
+    }
+    const [arows] = await pool.query("SELECT * FROM accounts WHERE id = ?", [req.user.id]);
+    const account = arows[0];
+    if (!account) return res.status(401).json({ error: "Compte introuvable." });
+
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("unclaimfinder", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
+    const choice = UNCLAIMFINDER_COLORS.includes(req.body?.choice) ? req.body.choice : "vert";
+
+    await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
+    await addWageringProgress(pool, req.user.id, bet);
+
+    // Un pourcentage indépendant par Unclaim Finder ; le plus haut gagne.
+    const percentages = {};
+    for (const c of UNCLAIMFINDER_COLORS) percentages[c] = Math.round(crypto.randomInt(100, 10000) / 100 * 100) / 100; // 1.00 → 99.99
+    const winner = UNCLAIMFINDER_COLORS.reduce((best, c) => (percentages[c] > percentages[best] ? c : best), UNCLAIMFINDER_COLORS[0]);
+    const win = choice === winner;
+    const payout = win ? Math.round(bet * UNCLAIMFINDER_MULTIPLIER) : 0;
+    if (payout > 0) {
+      await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
+    }
+
+    const entry = { percentages, winner, choice, win, bet, payout, ts: Date.now() };
+    const list = [entry, ...(unclaimFinderHistory.get(req.user.id) || [])].slice(0, 20);
+    unclaimFinderHistory.set(req.user.id, list);
+
+    const net = payout - bet;
+    await pool.query(
+      "INSERT INTO feed (pseudo, side, amount, title) VALUES (?, ?, 0, ?)",
+      [req.user.pseudo, net >= 0 ? "yes" : "no", `🔎 Unclaim Finder — ${req.user.pseudo} : ${winner} gagnant (${net >= 0 ? "+" : ""}${net} 💎)`]
+    );
+    await pool.query(
+      "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+      [req.user.id, "unclaimfinder", bet, payout, win ? "win" : "lose", `Choisi ${choice} · gagnant ${winner} (${percentages[winner]}%)`]
+    );
+
+    const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
+    res.json({
+      balance: after[0].balance,
+      wageringRequired: after[0].wagering_required,
+      wageringProgress: after[0].wagering_progress,
+      percentages, winner, choice, win, bet, payout, history: list,
     });
   } catch (e) {
     console.error(e);

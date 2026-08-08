@@ -21,6 +21,7 @@
     --green-hi: #8FB6EE;
     --green-bg: rgba(139,92,246,0.12);
     --green-deep: #21324B;
+    --chart-up: #22c55e;
     --red: #ff5c6a;
     --red-bg: rgba(255,92,106,0.12);
     --amber: #eeb654;
@@ -878,6 +879,55 @@
   .cf-history-chip img { width: 16px; height: 16px; object-fit: contain; }
   .cf-history-empty { font-size: 12px; color: var(--text-faint); }
 
+  /* unclaim finder */
+  .uf-side-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .uf-side-btn {
+    flex: 1; padding: 8px 4px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 700;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+  .uf-side-btn:disabled { cursor: not-allowed; }
+  .uf-side-btn.vert.active { background: var(--green-bg); color: var(--green); border-color: rgba(16,207,124,0.45); }
+  .uf-side-btn.jaune.active { background: var(--amber-bg); color: var(--amber); border-color: rgba(238,182,84,0.45); }
+  .uf-side-btn.rouge.active { background: var(--red-bg); color: var(--red); border-color: rgba(255,92,106,0.45); }
+  .uf-side-icon { width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
+  /* L'image "Orange" du wiki a un fond blanc plein (pas de transparence) : plutôt
+     que d'essayer de la fondre dans le thème sombre (ça assombrit l'orange), on
+     lui donne une petite plaque claire, comme un slot d'objet Minecraft. */
+  .uf-icon-whitebg { background: #efe6d3; border-radius: 7px; padding: 3px; box-sizing: border-box; filter: none; }
+
+  .uf-stage { display: flex; align-items: flex-end; justify-content: center; gap: 22px; padding: 30px 10px 6px; }
+  .uf-stage-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .uf-pct-badge {
+    font-family: var(--font-mono); font-size: 15px; font-weight: 800; color: var(--text-dim);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px;
+    font-variant-numeric: tabular-nums; min-width: 64px; text-align: center;
+    transition: all 0.25s ease;
+  }
+  .uf-pct-badge.spinning { color: var(--text-faint); }
+  .uf-pct-badge.winner.vert { color: var(--green); background: var(--green-bg); border-color: rgba(16,207,124,0.5); }
+  .uf-pct-badge.winner.jaune { color: var(--amber); background: var(--amber-bg); border-color: rgba(238,182,84,0.5); }
+  .uf-pct-badge.winner.rouge { color: var(--red); background: var(--red-bg); border-color: rgba(255,92,106,0.5); }
+  .uf-finder {
+    width: 82px; height: 82px; border-radius: 14px; background: var(--surface);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+    padding: 10px; transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .uf-finder.chosen { border-color: rgba(255,255,255,0.35); }
+  .uf-finder.winner.vert { box-shadow: 0 0 0 2px var(--green), 0 8px 22px rgba(16,207,124,0.35); transform: translateY(-6px); }
+  .uf-finder.winner.jaune { box-shadow: 0 0 0 2px var(--amber), 0 8px 22px rgba(238,182,84,0.35); transform: translateY(-6px); }
+  .uf-finder.winner.rouge { box-shadow: 0 0 0 2px var(--red), 0 8px 22px rgba(255,92,106,0.35); transform: translateY(-6px); }
+  .uf-finder img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); }
+  .uf-finder.spinning img { animation: ufPulse 0.5s ease-in-out infinite; }
+  @keyframes ufPulse {
+    0%, 100% { opacity: 0.5; transform: scale(0.92); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+  .uf-history-chip.vert { color: var(--green); }
+  .uf-history-chip.jaune { color: var(--amber); }
+  .uf-history-chip.rouge { color: var(--red); }
+
   /* slots */
   .sl-stage { display: flex; flex-direction: column; align-items: center; padding: 30px 10px 6px; }
   .sl-reels { display: flex; gap: 12px; }
@@ -1186,7 +1236,10 @@ const state = {
   markets: [],
   feed: [],
   mybets: [],
-  profileBetFilter: "all", // filtre de l'historique des paris sur la page "Mon profil" : all|open|won|lost
+  mycasinobets: [],
+  profileTab: "market", // onglet actif sur la page "Mon profil" : market|casino
+  profileBetFilter: "all", // filtre de l'historique des paris (marché) sur la page "Mon profil" : all|open|won|lost
+  profileCasinoFilter: "all", // filtre de l'historique casino sur la page "Mon profil" : all|won|lost
   deposits: [],          // mes dépôts (joueur) ou tous les dépôts (admin)
   withdrawals: [],       // mes retraits (joueur) ou tous les retraits (admin)
   adminAccounts: [],     // liste des joueurs inscrits (admin)
@@ -1265,6 +1318,15 @@ const state = {
   flipError: "",
   flipHistory: [],        // historique des derniers résultats (les plus récents en tête)
 
+  uf: null,               // dernier résultat de Unclaim Finder renvoyé par le serveur (ou null)
+  ufBetAmount: 100,
+  ufChoice: "vert",        // "vert" | "jaune" | "rouge", choisi par le joueur avant de lancer
+  ufBusy: false,
+  ufSpinning: false,      // vrai pendant l'animation de révélation des pourcentages
+  ufAnimPercentages: null, // pourcentages affichés pendant le défilement (avant la révélation finale)
+  ufError: "",
+  ufHistory: [],           // historique des derniers résultats (les plus récents en tête)
+
   slots: null,            // dernier résultat de Slots renvoyé par le serveur (ou null)
   slotsBetAmount: 100,
   slotsBusy: false,
@@ -1292,6 +1354,28 @@ const ENDIUM_INGOT_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/3
 function ingotIcon(size) {
   return `<img class="logo-ingot" src="${ENDIUM_INGOT_URL}" alt="Lingot d'Endium" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;image-rendering:pixelated;" />`;
 }
+// Icône utilisée pour le programme de parrainage
+const FINDIUM_ICON_URL = "/icons/referral.png";
+function findiumIcon(size) {
+  return `<img class="referral-icon" src="${FINDIUM_ICON_URL}" alt="Parrainage" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;vertical-align:middle;" />`;
+}
+// Icônes externes diverses (Discord, FAQ, CGU, déconnexion)
+const DISCORD_ICON_URL = "https://upload.wikimedia.org/wikipedia/fr/thumb/4/4f/Discord_Logo_sans_texte.svg/1920px-Discord_Logo_sans_texte.svg.png";
+const FAQ_ICON_URL = "https://cdn3d.iconscout.com/3d/premium/thumb/point-dinterrogation-3d-icon-png-download-12618711.png";
+const CGU_ICON_URL = "/icons/cgu.png";
+const LOGOUT_ICON_URL = "/icons/logout.png";
+function discordIcon(size) {
+  return `<img src="${DISCORD_ICON_URL}" alt="Discord" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;vertical-align:middle;" />`;
+}
+function faqIcon(size) {
+  return `<img src="${FAQ_ICON_URL}" alt="FAQ" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;vertical-align:middle;" />`;
+}
+function cguIcon(size) {
+  return `<img src="${CGU_ICON_URL}" alt="CGU" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;vertical-align:middle;" />`;
+}
+function logoutIcon(size) {
+  return `<img src="${LOGOUT_ICON_URL}" alt="Déconnexion" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;vertical-align:middle;" />`;
+}
 function logoWordmark() {
   return `<span class="logo-word"><span class="lw-para">PARA</span><span class="lw-bet">BET</span></span>`;
 }
@@ -1311,13 +1395,13 @@ function wageringBarHtml(account) {
     <div class="wager-box ${done ? "done" : ""}">
       <div class="wager-head">
         <span>🎯 Objectif de mise avant retrait</span>
-        <strong>${progress.toLocaleString("fr-FR")} / ${required.toLocaleString("fr-FR")} 💎</strong>
+        <strong>${progress.toLocaleString("fr-FR")} / ${required.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></strong>
       </div>
       <div class="wager-bar ${done ? "done" : ""}"><div style="width:${pct}%;"></div></div>
       <p class="wager-note ${done ? "done" : ""}">
         ${done
           ? "✅ Objectif atteint, tu peux retirer."
-          : `Il te reste à miser ${remaining.toLocaleString("fr-FR")} 💎 (sur des marchés ou au casino) avant de pouvoir retirer — un dépôt validé doit être remisé en totalité.`}
+          : `Il te reste à miser ${remaining.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> (sur des marchés ou au casino) avant de pouvoir retirer — un dépôt validé doit être remisé en totalité.`}
       </p>
     </div>
   `;
@@ -1369,7 +1453,7 @@ function sparklineSvg(id, yes) {
   const step = w / (pts.length - 1);
   const path = pts.map((v, i) => `${i === 0 ? "M" : "L"} ${(i * step).toFixed(1)} ${(h - (v / 100) * h).toFixed(1)}`).join(" ");
   const up = pts[pts.length - 1] >= pts[0];
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${path}" fill="none" stroke="${up ? "var(--green)" : "var(--red)"}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/></svg>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${path}" fill="none" stroke="${up ? "var(--chart-up)" : "var(--red)"}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/></svg>`;
 }
 
 /* ---------- client API : parle au backend Express ---------- */
@@ -1421,10 +1505,11 @@ function compressImageFile(file) {
 /* ---------- boot ---------- */
 
 async function loadEverything() {
-  const [markets, feed, mybets, mydeposits, mywithdrawals, referrals] = await Promise.all([
+  const [markets, feed, mybets, mycasinobets, mydeposits, mywithdrawals, referrals] = await Promise.all([
     api("/api/markets"),
     api("/api/feed"),
     api("/api/mybets"),
+    api("/api/mycasinobets"),
     api("/api/mydeposits"),
     api("/api/mywithdrawals"),
     api("/api/referrals"),
@@ -1432,6 +1517,7 @@ async function loadEverything() {
   state.markets = markets;
   state.feed = feed;
   state.mybets = mybets;
+  state.mycasinobets = mycasinobets;
   state.deposits = mydeposits;
   state.withdrawals = mywithdrawals;
   state.referral = referrals;
@@ -1514,7 +1600,7 @@ async function claimBonus() {
     const r = await api("/api/bonus", { method: "POST" });
     state.account.balance = r.balance;
     state.account.lastBonusDate = todayStr();
-    showToast(`+${r.bonus} 💎 de bonus quotidien !`);
+    showToast(`+${r.bonus} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> de bonus quotidien !`);
   } catch (e) {
     showToast(e.message);
   }
@@ -1558,7 +1644,7 @@ async function submitDeposit() {
   const f = state.depositForm;
   if (!f.blob) { showToast("Ajoute une capture d'écran prouvant le dépôt en jeu."); return; }
   const amount = Math.round(Number(f.amount) || 0);
-  if (amount < DEPOSIT_MIN_AMOUNT) { showToast(`Le montant minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎.`); return; }
+  if (amount < DEPOSIT_MIN_AMOUNT) { showToast(`Le montant minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />.`); return; }
 
   state.depositBusy = true; renderModal();
   try {
@@ -1680,7 +1766,7 @@ async function placeBet() {
     state.markets = markets;
     state.feed = feed;
     state.mybets = mybets;
-    showToast(`Mise placée : ${r.stake} 💎 sur "${side === "yes" ? "Oui" : "Non"}"`);
+    showToast(`Mise placée : ${r.stake} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> sur "${side === "yes" ? "Oui" : "Non"}"`);
     closeBetModal();
   } catch (e) {
     showToast(e.message);
@@ -1791,7 +1877,7 @@ async function adminSetBalance(accountId, mode, value) {
     const acc = state.adminAccounts.find(a => a.id === Number(accountId));
     if (acc) acc.balance = r.balance;
     if (state.account && state.account.id === Number(accountId)) state.account.balance = r.balance;
-    showToast(`Solde mis à jour : ${r.balance} 💎`);
+    showToast(`Solde mis à jour : ${r.balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`);
   } catch (e) {
     showToast(e.message);
   }
@@ -1915,8 +2001,8 @@ async function adminSetCasinoLimit(game, minBet, maxBet) {
   state.adminBusy = false; render();
 }
 
-const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road", aviator: "✈️ Aviator" };
-const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "roulette", "slots", "aviator"]; // doit correspondre à CASINO_GAMES_LIST côté serveur
+const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", unclaimfinder: "🔎 Unclaim Finder", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road", aviator: "✈️ Aviator" };
+const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "unclaimfinder", "roulette", "slots", "aviator"]; // doit correspondre à CASINO_GAMES_LIST côté serveur
 const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
 const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
 
@@ -2021,10 +2107,10 @@ function renderAuth() {
           ${state.authBusy ? "..." : (isLogin ? "Se connecter" : "Créer mon compte")}
         </button>
         <p class="auth-note">
-          Compte propre à ParaBet, séparé de ton compte Minecraft. 💎 sont des émeraudes fictives sans valeur réelle : solde de départ, bonus quotidien, ou dépôt de tes émeraudes Paladium (validé manuellement par le staff).
+          Compte propre à ParaBet, séparé de ton compte Minecraft. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> sont des émeraudes fictives sans valeur réelle : solde de départ, bonus quotidien, ou dépôt de tes émeraudes Paladium (validé manuellement par le staff).
         </p>
-        <button class="text-btn" id="authFaqBtn" style="margin-top:10px; width:100%; text-align:center;">❓ Questions fréquentes</button>
-        <button class="text-btn" id="authLegalBtn" style="margin-top:8px; width:100%; text-align:center;">📜 Mentions légales & CGU</button>
+        <button class="text-btn" id="authFaqBtn" style="margin-top:10px; width:100%; text-align:center;">${faqIcon(15)} Questions fréquentes</button>
+        <button class="text-btn" id="authLegalBtn" style="margin-top:8px; width:100%; text-align:center;">${cguIcon(15)} Mentions légales & CGU</button>
       </div>
     </div>
   `;
@@ -2062,7 +2148,6 @@ function renderApp() {
       <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
         <div class="logo">${ingotIcon(32)} ${logoWordmark()}</div>
         <div class="search-box">
-          <span>🔎</span>
           <input id="searchInput" placeholder="Rechercher un marché…" value="${esc(state.query)}" />
         </div>
         <div class="nav-toolbar">
@@ -2070,26 +2155,26 @@ function renderApp() {
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             ${state.account.isAdmin ? `<span class="admin-tag">Staff</span>` : ""}
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
-          <button class="icon-btn" id="bonusBtn" title="Bonus quotidien" ${bonusReady ? "" : "style='opacity:0.4;'"}>🎁</button>
+          <button class="icon-btn" id="bonusBtn" title="Bonus quotidien" ${bonusReady ? "" : "style='opacity:0.4;'"}><img src='/icons/gift.png' alt='🎁' style='width:16px;height:16px;object-fit:contain;vertical-align:-3px;' /></button>
           <div class="nav-primary-actions">
-            <button class="text-btn" id="casinoBtn">🎰 Casino</button>
-            <button class="text-btn deposit" id="depositBtn">💳 Déposer</button>
-            <button class="text-btn" id="withdrawBtn">🏧 Retirer</button>
+            <button class="text-btn" id="casinoBtn"><img src='/icons/casino.png' alt='🎰' style='width:18px;height:18px;object-fit:contain;vertical-align:-4px;' /> Casino</button>
+            <button class="text-btn deposit" id="depositBtn"><img src='/icons/deposit.png' alt='💳' style='width:16px;height:16px;object-fit:contain;vertical-align:-3px;' /> Déposer</button>
+            <button class="text-btn" id="withdrawBtn"><img src='/icons/withdraw.png' alt='🏧' style='width:16px;height:16px;object-fit:contain;vertical-align:-3px;' /> Retirer</button>
           </div>
           <div class="nav-more-wrap">
             <button class="icon-btn" id="moreMenuBtn" title="Plus d'options" aria-haspopup="true" aria-expanded="${state.navMenuOpen ? "true" : "false"}">⋯</button>
             <div class="nav-more-menu" id="moreMenu" ${state.navMenuOpen ? "" : "hidden"}>
               <button id="profileBtn">👤 Mon profil</button>
-              <button id="referralBtn">🤝 Parrainage</button>
-              <button id="faqBtn">❓ FAQ</button>
-              <button id="legalBtn">📜 CGU</button>
-              <a id="discordBtn" href="https://discord.gg/Me8UjM7Uug" target="_blank" rel="noopener noreferrer">💬 Discord</a>
+              <button id="referralBtn">${findiumIcon(16)} Parrainage</button>
+              <button id="faqBtn">${faqIcon(16)} FAQ</button>
+              <button id="legalBtn">${cguIcon(16)} CGU</button>
+              <a id="discordBtn" href="https://discord.gg/Me8UjM7Uug" target="_blank" rel="noopener noreferrer">${discordIcon(16)} Discord</a>
               ${state.account.isAdmin ? `<div class="nav-menu-divider"></div><button id="adminBtn" style="color:var(--amber);">🛠️ Espace admin</button>` : ""}
               <div class="nav-menu-divider"></div>
-              <button id="logoutBtn">🚪 Déconnexion</button>
+              <button id="logoutBtn">${logoutIcon(16)} Déconnexion</button>
             </div>
           </div>
         </div>
@@ -2103,9 +2188,9 @@ function renderApp() {
       ${heroMarket ? heroMarketHtml(heroMarket) : ""}
 
       <div class="stats-grid">
-        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green);">📈</div><div><div class="stat-chip-value">${totalVolume.toLocaleString("fr-FR")} 💎</div><div class="stat-chip-label">Volume total</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green);">📈</div><div><div class="stat-chip-value">${totalVolume.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div class="stat-chip-label">Volume total</div></div></div>
         <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--amber-bg); color:var(--amber);">📊</div><div><div class="stat-chip-value">${state.markets.length}</div><div class="stat-chip-label">Marchés ouverts</div></div></div>
-        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">💎</div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Ton solde</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Ton solde</div></div></div>
       </div>
 
       ${markets.length === 0
@@ -2115,7 +2200,7 @@ function renderApp() {
 
       <div class="promo-head">
         <div>
-          <h2>🎰 Casino ParaBet <span class="promo-live-dot" title="En direct"></span></h2>
+          <h2><img src='/icons/casino.png' alt='🎰' style='width:22px;height:22px;object-fit:contain;vertical-align:-5px;' /> Casino ParaBet <span class="promo-live-dot" title="En direct"></span></h2>
           <p>Blackjack, Mines, Chicken Road… joue en direct avec tes émeraudes.</p>
         </div>
         <button class="promo-see-all" id="casinoPromoAll">Voir tout →</button>
@@ -2143,7 +2228,7 @@ function renderApp() {
           : state.feed.map(feedLineHtml).join("")}
       </div>
 
-      <p class="disclaimer">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. Le solde vient du départ, du bonus quotidien, d'un dépôt d'émeraudes du serveur Paladium (bouton "Déposer") ou d'un parrainage. Les dépôts et retraits sont crédités/débités après vérification manuelle du staff. Un seul compte par joueur. Le pseudo du compte doit correspondre au pseudo qui reçoit le retrait en jeu. Le staff peut annuler un retrait en cas de doute. Voir les <a href="#" id="legalFooterLink" style="color:var(--text-dim); text-decoration:underline;">mentions légales & CGU</a>.</p>
+      <p class="disclaimer"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. Le solde vient du départ, du bonus quotidien, d'un dépôt d'émeraudes du serveur Paladium (bouton "Déposer") ou d'un parrainage. Les dépôts et retraits sont crédités/débités après vérification manuelle du staff. Un seul compte par joueur. Le pseudo du compte doit correspondre au pseudo qui reçoit le retrait en jeu. Le staff peut annuler un retrait en cas de doute. Voir les <a href="#" id="legalFooterLink" style="color:var(--text-dim); text-decoration:underline;">mentions légales & CGU</a>.</p>
     </div>
   `;
 
@@ -2210,7 +2295,7 @@ function heroMarketHtml(m) {
         </div>
       </div>
       <div class="hero-meta">
-        <span>💎 ${m.volume.toLocaleString("fr-FR")} de volume</span>
+        <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> ${m.volume.toLocaleString("fr-FR")} de volume</span>
         <span>⏳ Ferme ${esc(m.closes)}</span>
       </div>
     </div>
@@ -2248,6 +2333,7 @@ function playCasinoGame(id) {
   if (g.id === "blackjack") openBlackjack();
   else if (g.id === "mines") openMines();
   else if (g.id === "flip") openFlip();
+  else if (g.id === "unclaimfinder") openUnclaimFinder();
   else if (g.id === "roulette") openRoulette();
   else if (g.id === "slots") openSlots();
   else if (g.id === "chicken") openChicken();
@@ -2282,7 +2368,7 @@ function cardHtml(m) {
           </div>`
       }
       <div class="card-foot">
-        <span>${m.volume.toLocaleString("fr-FR")} 💎 de volume</span>
+        <span>${m.volume.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> de volume</span>
         <span>${closed ? "Fermé" : locked ? "Verrouillé" : `Ferme ${esc(m.closes)}`}</span>
       </div>
     </div>
@@ -2295,7 +2381,7 @@ function feedLineHtml(e) {
     return `<p class="feed-line">${esc(short)}</p>`;
   }
   return `<p class="feed-line"><span style="color:var(--text);">${esc(e.pseudo)}</span> a misé
-    <span style="color:${e.side === "yes" ? "var(--green)" : "var(--red)"};">${e.amount} 💎 sur "${e.side === "yes" ? "Oui" : "Non"}"</span>
+    <span style="color:${e.side === "yes" ? "var(--green)" : "var(--red)"};">${e.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> sur "${e.side === "yes" ? "Oui" : "Non"}"</span>
     — ${esc(short)}</p>`;
 }
 
@@ -2303,14 +2389,14 @@ function depositLineHtml(d) {
   const label = d.status === "pending" ? "En attente" : d.status === "approved" ? "Approuvé" : "Refusé";
   const color = d.status === "pending" ? "var(--amber)" : d.status === "approved" ? "var(--green)" : "var(--red)";
   const date = new Date(d.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${d.amount} 💎 · demandé le ${date}</p>`;
+  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · demandé le ${date}</p>`;
 }
 
 function withdrawalLineHtml(w) {
   const label = w.status === "pending" ? "En attente" : w.status === "approved" ? "Payé" : "Refusé";
   const color = w.status === "pending" ? "var(--amber)" : w.status === "approved" ? "var(--green)" : "var(--red)";
   const date = new Date(w.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${w.amount} 💎 · demandé le ${date}</p>`;
+  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · demandé le ${date}</p>`;
 }
 
 /* ---------- profil joueur ---------- */
@@ -2353,9 +2439,9 @@ function profileBetRowHtml(b) {
     resultText = "Remboursé"; resultColor = "var(--amber)";
   } else if (b.marketResolution === b.side) {
     const payout = Math.round(b.amount * 100 / Math.max(1, b.price));
-    resultText = `+${payout - b.amount} 💎`; resultColor = "var(--green-hi)";
+    resultText = `+${payout - b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; resultColor = "var(--green-hi)";
   } else {
-    resultText = `-${b.amount} 💎`; resultColor = "var(--red)";
+    resultText = `-${b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; resultColor = "var(--red)";
   }
   const date = new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   return `
@@ -2363,7 +2449,62 @@ function profileBetRowHtml(b) {
       <span class="profile-bet-side ${b.side}">${b.side === "yes" ? "Oui" : "Non"}</span>
       <div style="flex:1; min-width:0;">
         <div class="profile-bet-title">${esc(b.title)}</div>
-        <div class="profile-bet-meta">${b.amount} 💎 à ${b.price}% · ${date}</div>
+        <div class="profile-bet-meta">${b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> à ${b.price}% · ${date}</div>
+      </div>
+      <span class="profile-bet-result" style="color:${resultColor};">${resultText}</span>
+    </div>
+  `;
+}
+
+const CASINO_GAME_LABELS = {
+  blackjack: "🂡 Blackjack",
+  mines: "💣 Mines",
+  chicken: "🐔 Chicken",
+  flip: "🪙 Pile ou face",
+  unclaimfinder: "🔎 Unclaim Finder",
+  roulette: "🎡 Roulette",
+  slots: "🎰 Machine à sous",
+  aviator: "✈️ Aviator",
+};
+
+function computeCasinoStats() {
+  const bets = state.mycasinobets || [];
+  let totalWagered = 0, wins = 0, losses = 0, pushes = 0, netProfit = 0, biggestWin = 0;
+  bets.forEach(b => {
+    totalWagered += b.bet;
+    const profit = b.payout - b.bet;
+    netProfit += profit;
+    if (b.result === "push") { pushes++; return; }
+    if (profit > 0) { wins++; if (profit > biggestWin) biggestWin = profit; }
+    else { losses++; }
+  });
+  const settled = wins + losses;
+  const winRate = settled ? Math.round((wins / settled) * 100) : 0;
+  return { totalGames: bets.length, totalWagered, wins, losses, pushes, netProfit, biggestWin, winRate };
+}
+
+function profileCasinoFilteredBets() {
+  const bets = [...(state.mycasinobets || [])].sort((a, b) => b.ts - a.ts);
+  const f = state.profileCasinoFilter || "all";
+  if (f === "won") return bets.filter(b => b.result !== "push" && (b.payout - b.bet) > 0);
+  if (f === "lost") return bets.filter(b => b.result !== "push" && (b.payout - b.bet) <= 0);
+  return bets;
+}
+
+function profileCasinoRowHtml(b) {
+  const profit = b.payout - b.bet;
+  let resultText, resultColor;
+  if (b.result === "push") { resultText = "Push"; resultColor = "var(--amber)"; }
+  else if (profit > 0) { resultText = `+${profit} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; resultColor = "var(--green-hi)"; }
+  else { resultText = `${profit} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; resultColor = "var(--red)"; }
+  const date = new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const label = CASINO_GAME_LABELS[b.game] || b.game;
+  return `
+    <div class="profile-bet-row">
+      <span class="profile-bet-side" style="background:rgba(91,155,255,0.14); color:#5b9bff;">${label}</span>
+      <div style="flex:1; min-width:0;">
+        <div class="profile-bet-title">${esc(b.detail || label)}</div>
+        <div class="profile-bet-meta">${b.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés · ${date}</div>
       </div>
       <span class="profile-bet-result" style="color:${resultColor};">${resultText}</span>
     </div>
@@ -2372,9 +2513,13 @@ function profileBetRowHtml(b) {
 
 function renderProfile() {
   const app = document.getElementById("app");
+  const tab = state.profileTab || "market";
   const s = computeProfileStats();
   const bets = profileFilteredBets();
   const f = state.profileBetFilter || "all";
+  const cs = computeCasinoStats();
+  const cbets = profileCasinoFilteredBets();
+  const cf = state.profileCasinoFilter || "all";
   const initials = esc(state.account.pseudo.slice(0, 2).toUpperCase());
 
   app.innerHTML = `
@@ -2386,7 +2531,7 @@ function renderProfile() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="profileBackBtn">← Retour</button>
@@ -2403,20 +2548,26 @@ function renderProfile() {
         </div>
       </div>
 
+      <div class="profile-filter-row">
+        <button class="profile-filter-chip ${tab === "market" ? "active" : ""}" data-ptab="market">📊 Marché</button>
+        <button class="profile-filter-chip ${tab === "casino" ? "active" : ""}" data-ptab="casino"><img src='/icons/casino.png' alt='🎰' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Casino</button>
+      </div>
+
+      ${tab === "market" ? `
       <div class="stats-grid">
-        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">💎</div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Solde actuel</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);"><img src='/icons/diamond.png' alt='💎' style='width:20px;height:20px;object-fit:contain;' /></div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Solde actuel</div></div></div>
         <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">📊</div><div><div class="stat-chip-value">${s.totalBets}</div><div class="stat-chip-label">Paris placés</div></div></div>
         <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">🎯</div><div><div class="stat-chip-value">${s.winRate}%</div><div class="stat-chip-label">Taux de réussite</div></div></div>
-        <div class="stat-chip"><div class="stat-chip-icon" style="background:${s.netProfit >= 0 ? "var(--green-bg)" : "var(--red-bg)"}; color:${s.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${s.netProfit >= 0 ? "📈" : "📉"}</div><div><div class="stat-chip-value" style="color:${s.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${s.netProfit >= 0 ? "+" : ""}${s.netProfit.toLocaleString("fr-FR")} 💎</div><div class="stat-chip-label">Gain net</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:${s.netProfit >= 0 ? "var(--green-bg)" : "var(--red-bg)"}; color:${s.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${s.netProfit >= 0 ? "📈" : "📉"}</div><div><div class="stat-chip-value" style="color:${s.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${s.netProfit >= 0 ? "+" : ""}${s.netProfit.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div class="stat-chip-label">Gain net</div></div></div>
         <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--amber-bg); color:var(--amber);">⏳</div><div><div class="stat-chip-value">${s.pending}</div><div class="stat-chip-label">Paris en cours</div></div></div>
-        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">💰</div><div><div class="stat-chip-value">${s.totalWagered.toLocaleString("fr-FR")} 💎</div><div class="stat-chip-label">Total misé</div></div></div>
-        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">🤝</div><div><div class="stat-chip-value">${(state.referral.count || 0)}</div><div class="stat-chip-label">Filleuls</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">💰</div><div><div class="stat-chip-value">${s.totalWagered.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div class="stat-chip-label">Total misé</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">${findiumIcon(20)}</div><div><div class="stat-chip-value">${(state.referral.count || 0)}</div><div class="stat-chip-label">Filleuls</div></div></div>
       </div>
 
       <div class="promo-head" style="margin-top:6px;">
         <div>
           <h2>Historique des paris</h2>
-          <p>${s.wins} gagné${s.wins > 1 ? "s" : ""} · ${s.losses} perdu${s.losses > 1 ? "s" : ""} · ${s.refunded} remboursé${s.refunded > 1 ? "s" : ""}${s.biggestWin > 0 ? ` · meilleur gain +${s.biggestWin} 💎` : ""}</p>
+          <p>${s.wins} gagné${s.wins > 1 ? "s" : ""} · ${s.losses} perdu${s.losses > 1 ? "s" : ""} · ${s.refunded} remboursé${s.refunded > 1 ? "s" : ""}${s.biggestWin > 0 ? ` · meilleur gain +${s.biggestWin} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />` : ""}</p>
         </div>
       </div>
       <div class="profile-filter-row">
@@ -2428,13 +2579,40 @@ function renderProfile() {
       <div class="feed-box" style="height:auto; max-height:420px;">
         ${bets.length === 0 ? `<p class="feed-empty">Aucun pari ici pour l'instant.</p>` : bets.map(profileBetRowHtml).join("")}
       </div>
+      ` : `
+      <div class="stats-grid">
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);"><img src='/icons/diamond.png' alt='💎' style='width:20px;height:20px;object-fit:contain;' /></div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Solde actuel</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;"><img src='/icons/casino.png' alt='🎰' style='width:20px;height:20px;object-fit:contain;' /></div><div><div class="stat-chip-value">${cs.totalGames}</div><div class="stat-chip-label">Parties jouées</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">🎯</div><div><div class="stat-chip-value">${cs.winRate}%</div><div class="stat-chip-label">Taux de réussite</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:${cs.netProfit >= 0 ? "var(--green-bg)" : "var(--red-bg)"}; color:${cs.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${cs.netProfit >= 0 ? "📈" : "📉"}</div><div><div class="stat-chip-value" style="color:${cs.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${cs.netProfit >= 0 ? "+" : ""}${cs.netProfit.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div class="stat-chip-label">Gain net</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">💰</div><div><div class="stat-chip-value">${cs.totalWagered.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div class="stat-chip-label">Total misé (casino)</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--amber-bg); color:var(--amber);">🏆</div><div><div class="stat-chip-value">${cs.biggestWin.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div><div class="stat-chip-label">Meilleur gain</div></div></div>
+      </div>
 
-      <p class="disclaimer" style="margin-top:24px;">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement.</p>
+      <div class="promo-head" style="margin-top:6px;">
+        <div>
+          <h2>Historique casino</h2>
+          <p>${cs.wins} gagné${cs.wins > 1 ? "s" : ""} · ${cs.losses} perdu${cs.losses > 1 ? "s" : ""}${cs.pushes ? ` · ${cs.pushes} push` : ""}</p>
+        </div>
+      </div>
+      <div class="profile-filter-row">
+        <button class="profile-filter-chip ${cf === "all" ? "active" : ""}" data-pcf="all">Tous (${state.mycasinobets.length})</button>
+        <button class="profile-filter-chip ${cf === "won" ? "active" : ""}" data-pcf="won">Gagnés (${cs.wins})</button>
+        <button class="profile-filter-chip ${cf === "lost" ? "active" : ""}" data-pcf="lost">Perdus (${cs.losses})</button>
+      </div>
+      <div class="feed-box" style="height:auto; max-height:420px;">
+        ${cbets.length === 0 ? `<p class="feed-empty">Aucune partie ici pour l'instant.</p>` : cbets.map(profileCasinoRowHtml).join("")}
+      </div>
+      `}
+
+      <p class="disclaimer" style="margin-top:24px;"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement.</p>
     </div>
   `;
 
   document.getElementById("profileBackBtn").addEventListener("click", () => { state.view = "app"; render(); });
+  document.querySelectorAll("[data-ptab]").forEach(b => b.addEventListener("click", () => { state.profileTab = b.dataset.ptab; render(); }));
   document.querySelectorAll("[data-pf]").forEach(b => b.addEventListener("click", () => { state.profileBetFilter = b.dataset.pf; render(); }));
+  document.querySelectorAll("[data-pcf]").forEach(b => b.addEventListener("click", () => { state.profileCasinoFilter = b.dataset.pcf; render(); }));
 }
 
 /* ---------- casino : lobby ---------- */
@@ -2445,10 +2623,11 @@ const CASINO_GAMES = [
   { id: "mines",     title: "Mines",     kicker: "Instant", poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
   { id: "hilo",      title: "Hilo",      kicker: "Instant", poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
   { id: "flip",      title: "Flip",      kicker: "Pile ou face", poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
+  { id: "unclaimfinder", title: "Unclaim Finder", kicker: "Instant", poster: "/casino/finder-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: true },
   { id: "roulette",  title: "Roulette",  kicker: "Table", poster: "/casino/roulette-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
   { id: "slots",     title: "Slots",     kicker: "Machine à sous", icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
   { id: "chicken",   title: "Chicken Road", kicker: "Crash", poster: "/casino/chicken-poster.png", gradient: "linear-gradient(165deg,#8fe07a,#1f6b2e)", enabled: true },
-  { id: "aviator",   title: "Aviator",   kicker: "Crash", icon: "✈️", gradient: "linear-gradient(165deg,#5b6bff,#1a1030)", enabled: true },
+  { id: "aviator",   title: "Aviator",   kicker: "Crash", poster: "/casino/aviator-poster.png", gradient: "linear-gradient(165deg,#5b6bff,#1a1030)", enabled: true },
 ];
 
 // Statut effectif d'un jeu pour le lobby : combine le flag `enabled` (jeu pas
@@ -2484,6 +2663,7 @@ function applyCasinoLimitsToClientConstants() {
   if (L.mines)     { MINES_MIN_BET_CLIENT = L.mines.minBet; MINES_MAX_BET_CLIENT = L.mines.maxBet; }
   if (L.chicken)   { CHICKEN_MIN_BET_CLIENT = L.chicken.minBet; CHICKEN_MAX_BET_CLIENT = L.chicken.maxBet; }
   if (L.flip)      { FLIP_MIN_BET_CLIENT = L.flip.minBet; FLIP_MAX_BET_CLIENT = L.flip.maxBet; }
+  if (L.unclaimfinder) { UF_MIN_BET_CLIENT = L.unclaimfinder.minBet; UF_MAX_BET_CLIENT = L.unclaimfinder.maxBet; }
   if (L.slots)     { SLOTS_MIN_BET_CLIENT = L.slots.minBet; SLOTS_MAX_BET_CLIENT = L.slots.maxBet; }
   if (L.aviator)   { AVIATOR_MIN_BET_CLIENT = L.aviator.minBet; AVIATOR_MAX_BET_CLIENT = L.aviator.maxBet; }
   if (L.roulette)  { ROULETTE_MIN_BET_CLIENT = L.roulette.minBet; ROULETTE_MAX_BET_CLIENT = L.roulette.maxBet; }
@@ -2534,13 +2714,13 @@ function renderCasinoLobby() {
   app.innerHTML = `
     <div class="topnav">
       <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
-        <div class="logo"><div class="logo-badge">🎰</div> ParaBet Casino</div>
+        <div class="logo"><div class="logo-badge"><img src='/icons/casino.png' alt='🎰' style='width:22px;height:22px;object-fit:contain;' /></div> ParaBet Casino</div>
         <div style="flex:1;"></div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Retour</button>
@@ -2549,9 +2729,9 @@ function renderCasinoLobby() {
     </div>
 
     <div class="max-w casino-wrap">
-      <h2 class="section-title" style="margin-top:0;">🎰 Jeux</h2>
+      <h2 class="section-title" style="margin-top:0;"><img src='/icons/casino.png' alt='🎰' style='width:18px;height:18px;object-fit:contain;vertical-align:-4px;' /> Jeux</h2>
       <div class="lobby-grid">${CASINO_GAMES.map(lobbyCardHtml).join("")}</div>
-      <p class="disclaimer">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. D'autres jeux arriveront bientôt.</p>
+      <p class="disclaimer"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. D'autres jeux arriveront bientôt.</p>
     </div>
   `;
 
@@ -2634,7 +2814,7 @@ function bjRenderHands(g) {
 
 function bjParticlesHtml(result) {
   if (result !== "win" && result !== "blackjack") return "";
-  const emojis = result === "blackjack" ? ["🂡", "✨", "💎", "🔥", "✨"] : ["✨", "💎", "🎉", "✨", "💎"];
+  const emojis = result === "blackjack" ? ["🂡", "✨", "<img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />", "🔥", "✨"] : ["✨", "<img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />", "🎉", "✨", "<img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />"];
   return `<div class="bj-particles">${emojis.map((e, i) =>
     `<span class="bj-particle" style="--dx:${Math.round((i - (emojis.length - 1) / 2) * 24)}px; --bj-pdelay:${BJ_BANNER_DELAY_MS + i * 90}ms;">${e}</span>`
   ).join("")}</div>`;
@@ -2674,6 +2854,7 @@ function renderCasino() {
   if (state.casinoGame === "blackjack") { renderBlackjackGame(); return; }
   if (state.casinoGame === "mines") { renderMinesGame(); return; }
   if (state.casinoGame === "flip") { renderFlipGame(); return; }
+  if (state.casinoGame === "unclaimfinder") { renderUnclaimFinderGame(); return; }
   if (state.casinoGame === "roulette") { renderRouletteGame(); return; }
   if (state.casinoGame === "slots") { renderSlotsGame(); return; }
   if (state.casinoGame === "chicken") { renderChickenGame(); return; }
@@ -2709,7 +2890,7 @@ function renderBlackjackGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance${balancePulseClass}">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -2723,7 +2904,7 @@ function renderBlackjackGame() {
         <div class="bj-panel">
           <div class="bj-panel-label">
             <span>Montant du pari</span>
-            <span class="bj-panel-label-sub">💎 fictif</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
             <input type="number" id="bjBetInput" min="${BJ_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity)}"
@@ -2763,7 +2944,7 @@ function renderBlackjackGame() {
 
             ${finished ? `
               <div class="bj-result-banner ${g.result}${justResolved ? " bj-fresh" : ""}" style="${bannerDelayMs ? `animation-delay:${bannerDelayMs}ms;` : ""}">
-                ${resultLabel} — ${netAmount > 0 ? `+${netAmount}` : netAmount} 💎
+                ${resultLabel} — ${netAmount > 0 ? `+${netAmount}` : netAmount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />
                 ${justResolved ? bjParticlesHtml(g.result) : ""}
               </div>
             ` : ""}
@@ -2918,8 +3099,8 @@ function renderMinesGame() {
 
   const resultBanner = finished
     ? (g.status === "lost"
-        ? `<p class="auth-error" style="text-align:center;">💥 Boum ! Tu perds ${g.bet} 💎</p>`
-        : `<p style="text-align:center;color:var(--green);font-weight:700;margin:0 0 14px;">🎉 ${g.status === "won" ? "Toutes les gemmes trouvées ! " : ""}+${g.payout - g.bet} 💎</p>`)
+        ? `<p class="auth-error" style="text-align:center;">💥 Boum ! Tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
+        : `<p style="text-align:center;color:var(--green);font-weight:700;margin:0 0 14px;">🎉 ${g.status === "won" ? "Toutes les gemmes trouvées ! " : ""}+${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
     : "";
 
   app.innerHTML = `
@@ -2931,7 +3112,7 @@ function renderMinesGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -2945,7 +3126,7 @@ function renderMinesGame() {
         <div class="bj-panel">
           <div class="bj-panel-label">
             <span>Montant du pari</span>
-            <span class="bj-panel-label-sub">💎 fictif</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
             <input type="number" id="mnBetInput" min="${MINES_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity)}"
@@ -2963,14 +3144,14 @@ function renderMinesGame() {
           <div class="mn-readout">${gemsCount}</div>
 
           <button class="bj-btn primary bj-bet-btn" id="mnCashoutBtn" style="margin-top:14px;" ${!playing || state.minesBusy || revealedCount === 0 ? "disabled" : ""}>
-            Retrait${playing && revealedCount > 0 ? ` — ${currentWinnings} 💎` : ""}
+            Retrait${playing && revealedCount > 0 ? ` — ${currentWinnings} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />` : ""}
           </button>
           <button class="bj-btn bj-bet-btn" id="mnRandomBtn" style="margin-top:8px;width:100%;" ${!playing || state.minesBusy ? "disabled" : ""}>🎲 Sélection aléatoire</button>
 
           <div class="bj-panel-label" style="margin-top:14px;">
             <span>Profit total (${multLabel}×)</span>
           </div>
-          <div class="mn-readout mn-readout-green">${currentWinnings} 💎</div>
+          <div class="mn-readout mn-readout-green">${currentWinnings} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
 
           <button class="bj-btn primary bj-bet-btn" id="mnStartBtn" style="margin-top:14px;" ${playing || state.minesBusy || state.account.balance < MINES_MIN_BET_CLIENT ? "disabled" : ""}>
             ${state.minesBusy && !playing ? "Lancement…" : finished ? "🔁 Rejouer" : "▶️ Parier"}
@@ -2978,7 +3159,7 @@ function renderMinesGame() {
 
           ${state.minesError ? `<p class="auth-error">${esc(state.minesError)}</p>` : ""}
 
-          <p class="bj-rules">Choisis ton nombre de mines, révèle des cases pour faire monter le multiplicateur, et encaisse quand tu veux avant de tomber sur une mine. 💎 Émeraudes fictives, 100% pour le fun.</p>
+          <p class="bj-rules">Choisis ton nombre de mines, révèle des cases pour faire monter le multiplicateur, et encaisse quand tu veux avant de tomber sur une mine. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
         </div>
 
         <div class="bj-table" style="min-height:auto;">
@@ -3244,8 +3425,8 @@ function renderChickenGame() {
 
   const resultBanner = finished
     ? (g.status === "lost"
-        ? `<p class="auth-error ckr-banner" style="margin:0;">💥 Renversé ! Tu perds ${g.bet} 💎</p>`
-        : `<p class="ckr-banner" style="color:var(--green);font-weight:700;margin:0;">🎉 ${g.status === "won" ? "Route entière traversée ! " : ""}+${g.payout - g.bet} 💎</p>`)
+        ? `<p class="auth-error ckr-banner" style="margin:0;">💥 Renversé ! Tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
+        : `<p class="ckr-banner" style="color:var(--green);font-weight:700;margin:0;">🎉 ${g.status === "won" ? "Route entière traversée ! " : ""}+${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
     : "";
 
   app.innerHTML = `
@@ -3259,7 +3440,7 @@ function renderChickenGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -3273,7 +3454,7 @@ function renderChickenGame() {
         <div class="ckr-howto-panel">
           🐔 Choisis ta mise et ta difficulté, puis lance la partie. À chaque bloc de chemin franchi, le
           multiplicateur augmente — mais le risque de croiser un mob hostile aussi. Encaisse à tout moment
-          avant ça, ou tente de traverser toute la route pour le gain maximum. 💎 Émeraudes fictives liées au
+          avant ça, ou tente de traverser toute la route pour le gain maximum. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives liées au
           serveur Minecraft, 100% pour le fun, aucun argent réel.
         </div>
       ` : ""}
@@ -3285,7 +3466,7 @@ function renderChickenGame() {
 
       <div class="ckr-controls">
         <div class="ckr-box">
-          <div class="ckr-box-label">Montant du pari · 💎 fictif</div>
+          <div class="ckr-box-label">Montant du pari · <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</div>
           <div class="ckr-bet-row">
             <button class="ckr-minmax-btn" id="ckMinBtn" ${betLocked ? "disabled" : ""}>MIN</button>
             <input type="number" id="ckBetInput" min="${CHICKEN_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity)}"
@@ -3319,7 +3500,7 @@ function renderChickenGame() {
               ${state.chickenBusy ? "Traversée…" : `🐔 Avancer${nextMultLabel ? ` (${nextMultLabel}×)` : ""}`}
             </button>
             <button class="ckr-cashout-btn" id="ckCashoutBtn" ${state.chickenBusy || step === 0 ? "disabled" : ""}>
-              💰 Encaisser${step > 0 ? ` — ${currentWinnings} 💎 (${multLabel}×)` : ""}
+              💰 Encaisser${step > 0 ? ` — ${currentWinnings} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> (${multLabel}×)` : ""}
             </button>
           `}
           ${state.chickenError ? `<p class="auth-error" style="margin:0;">${esc(state.chickenError)}</p>` : ""}
@@ -3456,8 +3637,8 @@ function renderFlipGame() {
 
   const resultLabel = showingResult
     ? (g.win
-        ? `<p class="cf-result-label win">🎉 ${g.result === "face" ? "Face" : "Pile"} — +${g.payout - g.bet} 💎</p>`
-        : `<p class="cf-result-label lose">💥 ${g.result === "face" ? "Face" : "Pile"} — tu perds ${g.bet} 💎</p>`)
+        ? `<p class="cf-result-label win">🎉 ${g.result === "face" ? "Face" : "Pile"} — +${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
+        : `<p class="cf-result-label lose">💥 ${g.result === "face" ? "Face" : "Pile"} — tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
     : "";
 
   app.innerHTML = `
@@ -3469,7 +3650,7 @@ function renderFlipGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -3488,7 +3669,7 @@ function renderFlipGame() {
 
           <div class="bj-panel-label">
             <span>Montant du pari</span>
-            <span class="bj-panel-label-sub">💎 fictif</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
             <input type="number" id="cfBetInput" min="${FLIP_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity)}"
@@ -3513,11 +3694,11 @@ function renderFlipGame() {
           <div class="bj-panel-label" style="margin-top:14px;">
             <span>Profit total (${multLabel}×)</span>
           </div>
-          <div class="mn-readout mn-readout-green">${busy || spinning ? potential : (showingResult ? g.payout : potential)} 💎</div>
+          <div class="mn-readout mn-readout-green">${busy || spinning ? potential : (showingResult ? g.payout : potential)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
 
           ${state.flipError ? `<p class="auth-error">${esc(state.flipError)}</p>` : ""}
 
-          <p class="bj-rules">Choisis Face ou Pile et lance la pièce. Une bonne prédiction paie ${multLabel} fois ta mise. 💎 Émeraudes fictives, 100% pour le fun.</p>
+          <p class="bj-rules">Choisis Face ou Pile et lance la pièce. Une bonne prédiction paie ${multLabel} fois ta mise. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
         </div>
 
         <div class="bj-table" style="min-height:auto;">
@@ -3574,12 +3755,230 @@ function renderFlipGame() {
   if (startBtn) startBtn.addEventListener("click", flipStart);
 }
 
+/* ---------- casino : unclaim finder ---------- */
+
+let UF_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let UF_MAX_BET_CLIENT = null; // idem — null = pas de plafond
+const UF_MULTIPLIER = 3;
+const UF_ICON_URL = {
+  vert: "https://static.wikia.nocookie.net/paladiumpvp/images/8/87/Unclaim_Finder_Vert.png/revision/latest?cb=20210811171516&path-prefix=fr",
+  jaune: "https://static.wikia.nocookie.net/paladiumpvp/images/d/df/Unclaim_Finder_Orange.png/revision/latest?cb=20210811171541&path-prefix=fr",
+  rouge: "https://static.wikia.nocookie.net/paladiumpvp/images/a/a3/Unclaim_Finder_Rouge.png/revision/latest?cb=20210811171601&path-prefix=fr",
+};
+// L'image "Orange" du wiki a un fond blanc plein (pas de transparence) : on la
+// fait fondre dans le fond sombre du site avec un blend mode, plutôt que de
+// laisser un carré blanc moche autour de l'icône.
+const UF_ICON_WHITEBG = { vert: false, jaune: true, rouge: false };
+const UF_LABEL = { vert: "Vert", jaune: "Orange", rouge: "Rouge" };
+
+async function openUnclaimFinder() {
+  state.casinoGame = "unclaimfinder";
+  state.ufError = "";
+  state.ufSpinning = false;
+  render();
+  try {
+    const s = await api("/api/casino/unclaimfinder/state");
+    state.uf = s.last || null;
+    state.ufHistory = s.history || [];
+  } catch (e) { /* pas de partie précédente, on part d'un état vide */ }
+  render();
+}
+
+function ufChoose(color) {
+  if (state.ufBusy || state.ufSpinning) return;
+  state.ufChoice = color;
+  render();
+}
+
+function ufStart() {
+  if (state.ufBusy || state.ufSpinning) return;
+  const amount = clamp(Math.round(Number(state.ufBetAmount) || 0), UF_MIN_BET_CLIENT, Math.min(state.account.balance, UF_MAX_BET_CLIENT ?? Infinity) || UF_MIN_BET_CLIENT);
+  state.ufBetAmount = amount;
+  state.ufBusy = true; state.ufError = ""; render();
+
+  (async () => {
+    try {
+      const r = await api("/api/casino/unclaimfinder/play", { method: "POST", body: { amount, choice: state.ufChoice } });
+      state.ufSpinning = true;
+      state.ufAnimPercentages = { vert: Math.random() * 100, jaune: Math.random() * 100, rouge: Math.random() * 100 };
+      render();
+
+      // Les pourcentages défilent aléatoirement un court instant avant de se
+      // figer sur le vrai résultat renvoyé par le serveur (effet "machine à
+      // sous" plutôt qu'un résultat qui apparaît d'un coup).
+      const SPIN_MS = 700, TICK_MS = 65;
+      let elapsed = 0;
+      const tick = setInterval(() => {
+        elapsed += TICK_MS;
+        if (elapsed >= SPIN_MS) {
+          clearInterval(tick);
+          state.ufAnimPercentages = r.percentages; // révélation des vrais chiffres
+          render();
+          setTimeout(() => {
+            state.account.balance = r.balance;
+            state.account.wageringRequired = r.wageringRequired;
+            state.account.wageringProgress = r.wageringProgress;
+            state.uf = r;
+            state.ufHistory = r.history || [r, ...state.ufHistory].slice(0, 20);
+            state.ufSpinning = false;
+            state.ufBusy = false;
+            render();
+          }, 380);
+          return;
+        }
+        state.ufAnimPercentages = { vert: Math.random() * 100, jaune: Math.random() * 100, rouge: Math.random() * 100 };
+        render();
+      }, TICK_MS);
+    } catch (e) {
+      state.ufError = e.message;
+      state.ufBusy = false;
+      render();
+    }
+  })();
+}
+
+function renderUnclaimFinderGame() {
+  const app = document.getElementById("app");
+  const g = state.uf;
+  const busy = state.ufBusy;
+  const spinning = state.ufSpinning;
+  const showingResult = g && !spinning && !busy;
+  const potential = Math.round((Number(state.ufBetAmount) || 0) * UF_MULTIPLIER);
+
+  const resultLabel = showingResult
+    ? (g.win
+        ? `<p class="cf-result-label win">🎉 ${UF_LABEL[g.winner]} gagnant — +${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
+        : `<p class="cf-result-label lose">💥 ${UF_LABEL[g.winner]} gagnant — tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
+    : "";
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo"><div class="logo-badge">🔎</div> Unclaim Finder</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="casinoBackBtn">← Jeux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w casino-wrap">
+      <div class="bj-layout">
+
+        <div class="bj-panel">
+          <div class="auth-tabs">
+            <button class="auth-tab active" id="ufManualTab">Manuel</button>
+            <button class="auth-tab" id="ufAutoTab">Auto</button>
+          </div>
+
+          <div class="bj-panel-label">
+            <span>Montant du pari</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
+          </div>
+          <div class="bj-panel-input-row">
+            <input type="number" id="ufBetInput" min="${UF_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, UF_MAX_BET_CLIENT ?? Infinity)}"
+              value="${state.ufBetAmount}" ${busy || spinning ? "disabled" : ""} />
+            <button class="bj-mini-btn" id="ufHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
+            <button class="bj-mini-btn" id="ufDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
+          </div>
+
+          <div class="uf-side-row">
+            ${["vert", "jaune", "rouge"].map(c => `
+              <button class="uf-side-btn ${c} ${state.ufChoice === c ? "active" : ""}" data-uf-choice="${c}" ${busy || spinning ? "disabled" : ""}>
+                <img class="uf-side-icon ${UF_ICON_WHITEBG[c] ? "uf-icon-whitebg" : ""}" src="${UF_ICON_URL[c]}" alt="" /> ${UF_LABEL[c]}
+              </button>
+            `).join("")}
+          </div>
+
+          <button class="bj-btn primary bj-bet-btn" id="ufStartBtn" ${busy || spinning || state.account.balance < UF_MIN_BET_CLIENT ? "disabled" : ""}>
+            ${busy || spinning ? "Recherche…" : "▶️ Parier"}
+          </button>
+
+          <div class="bj-panel-label" style="margin-top:14px;">
+            <span>Profit total (${UF_MULTIPLIER}×)</span>
+          </div>
+          <div class="mn-readout mn-readout-green">${busy || spinning ? potential : (showingResult ? g.payout : potential)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
+
+          ${state.ufError ? `<p class="auth-error">${esc(state.ufError)}</p>` : ""}
+
+          <p class="bj-rules">Choisis un Unclaim Finder. Celui qui trouve le plus gros pourcentage gagne : s'il correspond à ton choix, ta mise est multipliée par ${UF_MULTIPLIER}. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
+        </div>
+
+        <div class="bj-table" style="min-height:auto;">
+          <div class="uf-stage">
+            ${["vert", "jaune", "rouge"].map(c => {
+              const pct = showingResult ? g.percentages[c] : (spinning ? state.ufAnimPercentages?.[c] : null);
+              const isWinner = showingResult && g.winner === c;
+              const isChosen = c === state.ufChoice;
+              return `
+                <div class="uf-stage-item">
+                  <div class="uf-pct-badge ${isWinner ? "winner " + c : ""} ${spinning ? "spinning" : ""}">${pct != null ? pct.toFixed(2) + "%" : "--%"}</div>
+                  <div class="uf-finder ${isChosen ? "chosen" : ""} ${isWinner ? "winner " + c : ""} ${spinning ? "spinning" : ""}">
+                    <img class="${UF_ICON_WHITEBG[c] ? "uf-icon-whitebg" : ""}" src="${UF_ICON_URL[c]}" alt="${UF_LABEL[c]}" />
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+          ${resultLabel}
+
+          <div class="cf-history-box">
+            <div class="cf-history-title">Historique</div>
+            <div class="cf-history-row">
+              ${state.ufHistory.length === 0
+                ? `<span class="cf-history-empty">Aucune recherche pour l'instant.</span>`
+                : state.ufHistory.slice(0, 20).map(h => `
+                  <div class="cf-history-chip ${h.win ? h.winner : ""}" title="${UF_LABEL[h.winner]} gagnant (${h.win ? "gagné" : "perdu"})">
+                    <img class="${UF_ICON_WHITEBG[h.winner] ? "uf-icon-whitebg" : ""}" src="${UF_ICON_URL[h.winner]}" alt="" />
+                  </div>
+                `).join("")}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById("casinoBackBtn");
+  if (backBtn) backBtn.addEventListener("click", backToCasinoLobby);
+
+  const autoTab = document.getElementById("ufAutoTab");
+  if (autoTab) autoTab.addEventListener("click", () => showToast("Le mode Auto arrive bientôt sur Unclaim Finder 👀"));
+
+  const betInput = document.getElementById("ufBetInput");
+  if (betInput) betInput.addEventListener("input", e => { state.ufBetAmount = e.target.value; render(); });
+  const halfBtn = document.getElementById("ufHalfBtn");
+  if (halfBtn) halfBtn.addEventListener("click", () => {
+    state.ufBetAmount = clamp(Math.round((Number(state.ufBetAmount) || 0) / 2), UF_MIN_BET_CLIENT, Math.min(state.account.balance, UF_MAX_BET_CLIENT ?? Infinity));
+    render();
+  });
+  const dblBtn = document.getElementById("ufDblBetBtn");
+  if (dblBtn) dblBtn.addEventListener("click", () => {
+    state.ufBetAmount = clamp(Math.round((Number(state.ufBetAmount) || 0) * 2), UF_MIN_BET_CLIENT, Math.min(state.account.balance, UF_MAX_BET_CLIENT ?? Infinity));
+    render();
+  });
+
+  document.querySelectorAll("[data-uf-choice]").forEach(btn => {
+    btn.addEventListener("click", () => ufChoose(btn.getAttribute("data-uf-choice")));
+  });
+
+  const startBtn = document.getElementById("ufStartBtn");
+  if (startBtn) startBtn.addEventListener("click", ufStart);
+}
+
 /* ---------- casino : slots ---------- */
 
 let SLOTS_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
 let SLOTS_MAX_BET_CLIENT = null; // idem — null = pas de plafond
-const SLOTS_SYMBOL_EMOJI = { cherry: "🍒", lemon: "🍋", grape: "🍇", bell: "🔔", star: "⭐", diamond: "💎", seven: "7️⃣" };
-const SLOTS_SPIN_SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "⭐", "💎", "7️⃣"]; // pour l'animation de défilement
+const SLOTS_SYMBOL_EMOJI = { cherry: "🍒", lemon: "🍋", grape: "🍇", bell: "🔔", star: "⭐", diamond: "<img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />", seven: "7️⃣" };
+const SLOTS_SPIN_SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "⭐", "<img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />", "7️⃣"]; // pour l'animation de défilement
 const SLOTS_MULT_LABEL = { triple: "triple", pair: "paire" };
 
 async function openSlots() {
@@ -3634,8 +4033,8 @@ function renderSlotsGame() {
 
   const resultLabel = showingResult
     ? (g.win
-        ? `<p class="cf-result-label win">🎉 ${SLOTS_MULT_LABEL[g.kind] || g.kind} — +${g.payout - g.bet} 💎 (×${g.multiplier})</p>`
-        : `<p class="cf-result-label lose">💥 Aucune combinaison — tu perds ${g.bet} 💎</p>`)
+        ? `<p class="cf-result-label win">🎉 ${SLOTS_MULT_LABEL[g.kind] || g.kind} — +${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> (×${g.multiplier})</p>`
+        : `<p class="cf-result-label lose">💥 Aucune combinaison — tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
     : "";
 
   app.innerHTML = `
@@ -3647,7 +4046,7 @@ function renderSlotsGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -3661,7 +4060,7 @@ function renderSlotsGame() {
         <div class="bj-panel">
           <div class="bj-panel-label">
             <span>Montant du pari</span>
-            <span class="bj-panel-label-sub">💎 fictif</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
             <input type="number" id="slBetInput" min="${SLOTS_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity)}"
@@ -3677,14 +4076,14 @@ function renderSlotsGame() {
           <div class="bj-panel-label" style="margin-top:14px;">
             <span>Gains potentiels</span>
           </div>
-          <div class="mn-readout mn-readout-green">${showingResult ? g.payout : "?"} 💎</div>
+          <div class="mn-readout mn-readout-green">${showingResult ? g.payout : "?"} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
 
           ${state.slotsError ? `<p class="auth-error">${esc(state.slotsError)}</p>` : ""}
 
           <p class="bj-rules">
             3 symboles identiques paient le gros lot, 2 symboles identiques (fruits) paient un petit bonus.
-            🍒 ×3 · 🍋 ×5 · 🍇 ×9 · 🔔 ×17 · ⭐ ×33 · 💎 ×68 · 7️⃣ ×225.
-            💎 Émeraudes fictives, 100% pour le fun.
+            🍒 ×3 · 🍋 ×5 · 🍇 ×9 · 🔔 ×17 · ⭐ ×33 · <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> ×68 · 7️⃣ ×225.
+            <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.
           </p>
         </div>
 
@@ -3834,7 +4233,7 @@ function avRenderMultiplier(cents, elapsedSec) {
   const myBet = state.aviator && state.aviator.myBet;
   const cashoutBtn = document.getElementById("avActionBtn");
   if (cashoutBtn && myBet && myBet.cashedOutAt == null) {
-    cashoutBtn.textContent = `Encaisser — ${Math.round((myBet.amount * cents) / 100)} 💎`;
+    cashoutBtn.textContent = `Encaisser — ${Math.round((myBet.amount * cents) / 100)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
   }
 }
 
@@ -3908,11 +4307,11 @@ function avPlayersListHtml(s) {
     const isMe = state.account && b.pseudo === state.account.pseudo;
     const out = b.cashedOutAt != null;
     const mult = out ? avFmt(b.cashedOutAt) : (s.phase === "flying" ? "en vol…" : "—");
-    const gain = out ? `+${b.payout - b.amount} 💎` : (s.phase === "crashed" ? `-${b.amount} 💎` : "");
+    const gain = out ? `+${b.payout - b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />` : (s.phase === "crashed" ? `-${b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />` : "");
     return `
       <div class="av-player-row ${isMe ? "av-me" : ""}">
         <div class="av-player-pseudo">${esc(b.pseudo)}</div>
-        <div class="av-player-amount">${b.amount} 💎</div>
+        <div class="av-player-amount">${b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
         <div class="av-player-mult ${out ? "" : "av-out"}" style="${out ? `color:${avHistColor(b.cashedOutAt)}` : ""}">${mult}</div>
         <div class="av-player-gain" style="color:${out ? "var(--green)" : (s.phase === "crashed" ? "var(--red)" : "var(--text-faint)")}">${gain}</div>
       </div>
@@ -3964,7 +4363,7 @@ function aviatorPatchDom() {
       if (s.myBet) { btn.textContent = "Mise placée ✓"; btn.disabled = true; }
       else { btn.textContent = state.aviatorBusy ? "…" : "🚀 Miser"; if (state.account.balance < AVIATOR_MIN_BET_CLIENT) btn.disabled = true; }
     } else if (s.phase === "flying") {
-      if (s.myBet && s.myBet.cashedOutAt == null) { btn.textContent = `Encaisser — ${Math.round((s.myBet.amount * s.multiplier) / 100)} 💎`; btn.className = "bj-btn primary bj-bet-btn av-btn-cashout"; }
+      if (s.myBet && s.myBet.cashedOutAt == null) { btn.textContent = `Encaisser — ${Math.round((s.myBet.amount * s.multiplier) / 100)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`; btn.className = "bj-btn primary bj-bet-btn av-btn-cashout"; }
       else { btn.textContent = s.myBet ? "Encaissé ✓" : "En attente…"; btn.disabled = true; }
     } else {
       btn.textContent = "Manche terminée…"; btn.disabled = true;
@@ -3973,13 +4372,13 @@ function aviatorPatchDom() {
   if (statusEl) {
     if (s.myBet && s.myBet.cashedOutAt != null) {
       statusEl.className = "av-mybet-status av-win";
-      statusEl.textContent = `🎉 Encaissé à ${avFmt(s.myBet.cashedOutAt)} — gain net +${s.myBet.payout - s.myBet.amount} 💎`;
+      statusEl.textContent = `🎉 Encaissé à ${avFmt(s.myBet.cashedOutAt)} — gain net +${s.myBet.payout - s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
     } else if (s.myBet && s.phase === "crashed") {
       statusEl.className = "av-mybet-status av-lose";
-      statusEl.textContent = `💥 L'avion a explosé avant que tu encaisses — perdu ${s.myBet.amount} 💎`;
+      statusEl.textContent = `💥 L'avion a explosé avant que tu encaisses — perdu ${s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />`;
     } else if (s.myBet) {
       statusEl.className = "av-mybet-status";
-      statusEl.textContent = `Mise en cours : ${s.myBet.amount} 💎${s.myBet.autoCashout ? ` · auto-cashout à ${avFmt(s.myBet.autoCashout)}` : ""}`;
+      statusEl.textContent = `Mise en cours : ${s.myBet.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${s.myBet.autoCashout ? ` · auto-cashout à ${avFmt(s.myBet.autoCashout)}` : ""}`;
     } else {
       statusEl.className = "av-mybet-status";
       statusEl.textContent = "";
@@ -4006,7 +4405,7 @@ function renderAviatorGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -4020,7 +4419,7 @@ function renderAviatorGame() {
         <div class="bj-panel">
           <div class="bj-panel-label">
             <span>Montant du pari</span>
-            <span class="bj-panel-label-sub">💎 fictif</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="bj-panel-input-row">
             <input type="number" id="avBetInput" min="${AVIATOR_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity)}"
@@ -4039,7 +4438,7 @@ function renderAviatorGame() {
 
           ${state.aviatorError ? `<p class="auth-error">${esc(state.aviatorError)}</p>` : ""}
 
-          <p class="bj-rules">Mise avant le décollage, puis encaisse à tout moment pendant que l'avion vole pour empocher ta mise × le multiplicateur du moment. S'il explose avant que tu encaisses, la mise est perdue. 💎 Émeraudes fictives, 100% pour le fun — la manche est partagée avec tous les joueurs connectés en même temps.</p>
+          <p class="bj-rules">Mise avant le décollage, puis encaisse à tout moment pendant que l'avion vole pour empocher ta mise × le multiplicateur du moment. S'il explose avant que tu encaisses, la mise est perdue. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun — la manche est partagée avec tous les joueurs connectés en même temps.</p>
         </div>
 
         <div class="av-stage" id="avStage">
@@ -4321,8 +4720,8 @@ function renderRouletteGame() {
 
   const resultLabel = showingResult
     ? (g.net >= 0
-        ? `<p class="rl-result-label win">🎉 Bille sur ${g.pocket} ${g.color === "red" ? "🔴" : g.color === "black" ? "⚫" : "🟢"} — +${g.net} 💎</p>`
-        : `<p class="rl-result-label lose">💥 Bille sur ${g.pocket} ${g.color === "red" ? "🔴" : g.color === "black" ? "⚫" : "🟢"} — tu perds ${Math.abs(g.net)} 💎</p>`)
+        ? `<p class="rl-result-label win">🎉 Bille sur ${g.pocket} ${g.color === "red" ? "🔴" : g.color === "black" ? "⚫" : "🟢"} — +${g.net} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
+        : `<p class="rl-result-label lose">💥 Bille sur ${g.pocket} ${g.color === "red" ? "🔴" : g.color === "black" ? "⚫" : "🟢"} — tu perds ${Math.abs(g.net)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
     : "";
 
   const total = rouletteTotalBets();
@@ -4336,7 +4735,7 @@ function renderRouletteGame() {
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             <span class="sep"></span>
-            <span>💎</span>
+            <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="text-btn" id="casinoBackBtn">← Jeux</button>
@@ -4350,7 +4749,7 @@ function renderRouletteGame() {
         <div class="bj-panel">
           <div class="bj-panel-label">
             <span>Jeton</span>
-            <span class="bj-panel-label-sub">💎 fictif</span>
+            <span class="bj-panel-label-sub"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> fictif</span>
           </div>
           <div class="rl-chip-row">
             ${ROULETTE_CHIPS.map(c => `<button class="rl-chip-btn ${state.rouletteChip === c ? "active" : ""}" data-rl-chip="${c}" ${disabled ? "disabled" : ""}>${c}</button>`).join("")}
@@ -4359,8 +4758,8 @@ function renderRouletteGame() {
           <div class="rl-bets-box">
             ${state.rouletteBets.length === 0
               ? `<span class="rl-bets-empty">Clique sur la table pour placer une mise.</span>`
-              : state.rouletteBets.map(b => `<div class="rl-bet-line"><span>${esc(b.label)}</span><span>${b.amount} 💎</span></div>`).join("")}
-            ${state.rouletteBets.length > 0 ? `<div class="rl-bets-total"><span>Total misé</span><span>${total} 💎</span></div>` : ""}
+              : state.rouletteBets.map(b => `<div class="rl-bet-line"><span>${esc(b.label)}</span><span>${b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span></div>`).join("")}
+            ${state.rouletteBets.length > 0 ? `<div class="rl-bets-total"><span>Total misé</span><span>${total} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span></div>` : ""}
           </div>
 
           <button class="bj-btn primary bj-bet-btn" id="rlSpinBtn" ${disabled || state.rouletteBets.length === 0 ? "disabled" : ""}>
@@ -4369,7 +4768,7 @@ function renderRouletteGame() {
 
           ${state.rouletteError ? `<p class="auth-error">${esc(state.rouletteError)}</p>` : ""}
 
-          <p class="bj-rules">Numéro plein (36×), rouge/noir, pair/impair, manque/passe (2×), douzaine/colonne (3×). 💎 Émeraudes fictives, 100% pour le fun.</p>
+          <p class="bj-rules">Numéro plein (36×), rouge/noir, pair/impair, manque/passe (2×), douzaine/colonne (3×). <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
         </div>
 
         <div class="bj-table" style="min-height:auto;">
@@ -4488,9 +4887,9 @@ function renderModal() {
       <button class="modal-close" id="modalClose">✕</button>
     </div>
     <p class="modal-title">${esc(market.title)}</p>
-    <label class="modal-label">Montant · ${balance} 💎 disponibles</label>
+    <label class="modal-label">Montant · ${balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> disponibles</label>
     <div class="amount-row">
-      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">💎</span>
+      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
       <input type="number" id="amountInput" min="10" max="${Math.max(10, balance)}" value="${state.amount}" />
     </div>
     <div class="quick-row">
@@ -4499,7 +4898,7 @@ function renderModal() {
     <button class="confirm-btn ${isYes ? "btn-yes" : "btn-no"}" id="confirmBtn" ${state.busy || balance < 10 ? "disabled style='opacity:0.55;'" : ""}>
       ${state.busy ? "Confirmation…" : "Confirmer la mise"}
     </button>
-    <p class="price-note">Si "${isYes ? "Oui" : "Non"}" l'emporte, tu recevrais environ ${potential} 💎.</p>
+    <p class="price-note">Si "${isYes ? "Oui" : "Non"}" l'emporte, tu recevrais environ ${potential} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />.</p>
     ${balance < 10 ? `<p class="low-balance">Solde insuffisant pour parier. Reviens demain pour ton bonus quotidien.</p>` : ""}
   `;
 
@@ -4536,11 +4935,11 @@ function renderDepositModalContent(overlay, modal) {
 
     <label class="modal-label">Montant déposé (émeraudes en jeu)</label>
     <div class="amount-row">
-      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">💎</span>
+      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
       <input type="number" id="depAmountInput" min="${DEPOSIT_MIN_AMOUNT}" value="${f.amount}" />
     </div>
-    <p class="dep-usd">≈ ${usdValue} $ · taux : 1 💎 = ${EMERALD_USD_RATE.toFixed(2)} $</p>
-    ${belowMin ? `<p class="dep-inline-error">Le minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎.</p>` : ""}
+    <p class="dep-usd">≈ ${usdValue} $ · taux : 1 <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> = ${EMERALD_USD_RATE.toFixed(2)} $</p>
+    ${belowMin ? `<p class="dep-inline-error">Le minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />.</p>` : ""}
     <div class="quick-row">
       ${quicks.map(q => `<button class="quick-btn" data-depquick="${q}">${q.toLocaleString("fr-FR")}</button>`).join("")}
     </div>
@@ -4563,7 +4962,7 @@ function renderDepositModalContent(overlay, modal) {
 
     ${amountNum >= DEPOSIT_MIN_AMOUNT && f.blob ? `
       <div class="dep-recap">
-        Récap : demande de dépôt de <b>${amountNum.toLocaleString("fr-FR")} 💎</b> (≈ ${usdValue} $), avec preuve jointe.
+        Récap : demande de dépôt de <b>${amountNum.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></b> (≈ ${usdValue} $), avec preuve jointe.
         Le staff valide généralement en moins de 12h.
       </div>
     ` : ""}
@@ -4571,7 +4970,7 @@ function renderDepositModalContent(overlay, modal) {
     <button class="confirm-btn btn-yes" id="depConfirmBtn" style="margin-top:16px;" ${canSubmit ? "" : "disabled style='opacity:0.55;'"}>
       ${state.depositBusy ? "Envoi…" : "Envoyer la demande de dépôt"}
     </button>
-    <p class="price-note">Montant minimum : ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎. Le crédit n'est pas automatique : un membre du staff doit valider la preuve.</p>
+    <p class="price-note">Montant minimum : ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />. Le crédit n'est pas automatique : un membre du staff doit valider la preuve.</p>
   `;
 
   overlay.classList.add("open");
@@ -4622,9 +5021,9 @@ function renderWithdrawModalContent(overlay, modal) {
     </div>
     <p class="modal-title">Indique le montant à retirer. Ton solde ParaBet est débité tout de suite ; le staff te remet les émeraudes en jeu après vérification, puis valide la demande.</p>
     ${wageringBarHtml(state.account)}
-    <label class="modal-label">Montant à retirer · ${balance} 💎 disponibles</label>
+    <label class="modal-label">Montant à retirer · ${balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> disponibles</label>
     <div class="amount-row">
-      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">💎</span>
+      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
       <input type="number" id="wdAmountInput" min="${WITHDRAW_MIN_AMOUNT}" max="${maxAmount}" value="${f.amount}" ${wageringBlocked ? "disabled" : ""} />
     </div>
     <div class="quick-row">
@@ -4635,7 +5034,7 @@ function renderWithdrawModalContent(overlay, modal) {
     <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || wageringBlocked || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
       ${state.withdrawBusy ? "Envoi…" : wageringBlocked ? "Objectif de mise non atteint" : "Envoyer la demande de retrait"}
     </button>
-    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} 💎. Le pseudo indiqué doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
+    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />. Le pseudo indiqué doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
     ${!wageringBlocked && balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
   `;
 
@@ -4665,10 +5064,10 @@ function renderReferralModalContent(overlay, modal) {
       <span class="modal-kicker" style="color:var(--green);">Programme de parrainage</span>
       <button class="modal-close" id="refModalClose">✕</button>
     </div>
-    <p class="modal-title">Invite tes amis avec ton code : tu reçois ${r.bonusReferrer} 💎 pour chaque inscription, et ton filleul reçoit ${r.bonusReferee} 💎 en bonus de bienvenue.</p>
+    <p class="modal-title">Invite tes amis avec ton code : tu reçois ${r.bonusReferrer} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> pour chaque inscription, et ton filleul reçoit ${r.bonusReferee} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> en bonus de bienvenue.</p>
     <label class="modal-label">Ton code</label>
     <div class="amount-row">
-      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">🤝</span>
+      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">${findiumIcon(18)}</span>
       <input type="text" id="refCodeField" value="${esc(r.code)}" readonly style="font-family:var(--font-mono); font-weight:700; letter-spacing:0.06em;" />
     </div>
     <label class="modal-label" style="margin-top:14px; display:block;">Lien à partager</label>
@@ -4676,7 +5075,7 @@ function renderReferralModalContent(overlay, modal) {
       <input type="text" id="refLinkField" value="${esc(link)}" readonly style="font-size:12px;" />
     </div>
     <button class="confirm-btn btn-yes" id="refCopyBtn" style="margin-top:16px;">📋 Copier le lien</button>
-    <p class="price-note">${r.count} filleul(s) · ${r.totalEarned} 💎 gagnés grâce au parrainage</p>
+    <p class="price-note">${r.count} filleul(s) · ${r.totalEarned} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> gagnés grâce au parrainage</p>
     ${r.referred.length > 0 ? `
       <div class="feed-box" style="height:auto; max-height:160px; margin-top:10px;">
         ${r.referred.map(f => `<p class="feed-line"><span style="color:var(--text);">${esc(f.pseudo)}</span> — inscrit le ${new Date(f.ts).toLocaleDateString("fr-FR")}</p>`).join("")}
@@ -4754,7 +5153,7 @@ function renderAdmin() {
         <div class="logo">${ingotIcon(32)} ${logoWordmark()} <span class="admin-tag" style="margin-left:6px;">Admin</span></div>
         <div style="flex:1;"></div>
         <button class="text-btn" id="backBtn">← Retour au marché</button>
-        <button class="text-btn" id="logoutBtn">Déconnexion</button>
+        <button class="text-btn" id="logoutBtn">${logoutIcon(16)} Déconnexion</button>
       </div>
     </div>
 
@@ -4767,11 +5166,11 @@ function renderAdmin() {
               <div>
                 <div class="admin-row-title">${esc(a.pseudo)}${a.isAdmin ? ` <span class="admin-tag" style="margin-left:4px;">Staff</span>` : ""}</div>
                 <div class="admin-row-meta">
-                  ${a.balance} 💎 · ${a.betCount} pari${a.betCount === 1 ? "" : "s"} marché pour ${a.totalWagered} 💎 misés
-                  · ${a.casinoBetCount} partie${a.casinoBetCount === 1 ? "" : "s"} casino pour ${a.casinoTotalWagered} 💎 misés (<span style="color:${a.casinoNet >= 0 ? "var(--green)" : "var(--red)"};">${a.casinoNet >= 0 ? "+" : ""}${a.casinoNet} 💎</span>)
+                  ${a.balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · ${a.betCount} pari${a.betCount === 1 ? "" : "s"} marché pour ${a.totalWagered} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés
+                  · ${a.casinoBetCount} partie${a.casinoBetCount === 1 ? "" : "s"} casino pour ${a.casinoTotalWagered} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés (<span style="color:${a.casinoNet >= 0 ? "var(--green)" : "var(--red)"};">${a.casinoNet >= 0 ? "+" : ""}${a.casinoNet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>)
                   · inscrit le ${new Date(a.createdAt).toLocaleDateString("fr-FR")}
                   ${a.referredByPseudo ? ` · parrainé par ${esc(a.referredByPseudo)}` : ""}
-                  ${a.referralEarnings > 0 ? ` · ${a.referralEarnings} 💎 gagnés en parrainage` : ""}
+                  ${a.referralEarnings > 0 ? ` · ${a.referralEarnings} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> gagnés en parrainage` : ""}
                 </div>
               </div>
               <div class="admin-actions">
@@ -4790,7 +5189,7 @@ function renderAdmin() {
                 ${!state.adminAccountBets[a.id] ? `<p class="admin-row-meta">Chargement…</p>` : state.adminAccountBets[a.id].length === 0 ? `<p class="admin-row-meta">Ce joueur n'a encore misé sur aucun marché.</p>` : state.adminAccountBets[a.id].map(b => `
                   <p class="feed-line">
                     <span style="color:${b.side === "yes" ? "var(--green)" : "var(--red)"}; font-weight:700;">${b.side === "yes" ? "Oui" : "Non"}</span>
-                    — ${esc(b.title)} · ${b.amount} 💎 à ${b.price}% · ${new Date(b.ts).toLocaleString("fr-FR")}
+                    — ${esc(b.title)} · ${b.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> à ${b.price}% · ${new Date(b.ts).toLocaleString("fr-FR")}
                     ${b.marketStatus === "resolved" ? (b.refunded ? ` · <span style="color:var(--amber);">remboursé (pari après la fin du marché)</span>` : b.marketResolution === b.side ? ` · <span style="color:var(--green);">gagné</span>` : ` · <span style="color:var(--red);">perdu</span>`) : ` · en cours`}
                   </p>
                 `).join("")}
@@ -4801,8 +5200,8 @@ function renderAdmin() {
                 ${!state.adminAccountCasinoBets[a.id] ? `<p class="admin-row-meta">Chargement…</p>` : state.adminAccountCasinoBets[a.id].length === 0 ? `<p class="admin-row-meta">Ce joueur n'a encore joué à aucun jeu du casino.</p>` : state.adminAccountCasinoBets[a.id].map(c => `
                   <p class="feed-line">
                     <span style="font-weight:700;">${CASINO_GAME_LABEL[c.game] || c.game}</span>
-                    — ${c.bet} 💎 misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
-                    (${c.net >= 0 ? "+" : ""}${c.net} 💎) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
+                    — ${c.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
+                    (${c.net >= 0 ? "+" : ""}${c.net} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
                   </p>
                 `).join("")}
               </div>
@@ -4840,8 +5239,8 @@ function renderAdmin() {
             ${state.adminCasinoBets.map(c => `
               <p class="feed-line">
                 <strong>${esc(c.pseudo)}</strong> — <span style="font-weight:700;">${CASINO_GAME_LABEL[c.game] || c.game}</span>
-                · ${c.bet} 💎 misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
-                (${c.net >= 0 ? "+" : ""}${c.net} 💎) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
+                · ${c.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
+                (${c.net >= 0 ? "+" : ""}${c.net} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
               </p>
             `).join("")}
           </div>
@@ -4881,7 +5280,7 @@ function renderAdmin() {
           <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
             <div>
               <div class="admin-row-title">${esc(m.title)}</div>
-              <div class="admin-row-meta">${CAT_META[m.category].label} · ${m.yes}% Oui · ${m.volume} 💎 de volume · ferme ${esc(m.closes)}</div>
+              <div class="admin-row-meta">${CAT_META[m.category].label} · ${m.yes}% Oui · ${m.volume} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> de volume · ferme ${esc(m.closes)}</div>
             </div>
             <div class="admin-actions">
               <input type="number" min="2" max="98" value="${m.yes}" data-pct-input="${m.id}" style="width:64px;" />
@@ -4906,7 +5305,7 @@ function renderAdmin() {
           <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
             <div>
               <div class="admin-row-title">${esc(m.title)}</div>
-              <div class="admin-row-meta">${CAT_META[m.category].label} · ${m.yes}% Oui · ${m.volume} 💎 de volume · paris bloqués</div>
+              <div class="admin-row-meta">${CAT_META[m.category].label} · ${m.yes}% Oui · ${m.volume} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> de volume · paris bloqués</div>
             </div>
             <div class="admin-actions">
               <input type="number" min="2" max="98" value="${m.yes}" data-pct-input="${m.id}" style="width:64px;" />
@@ -4948,7 +5347,7 @@ function renderAdmin() {
               <img src="${d.screenshot}" data-viewshot="${d.id}" title="Cliquer pour agrandir"
                    style="width:88px; height:88px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; flex-shrink:0;" />
               <div>
-                <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} 💎</div>
+                <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
                 <div class="admin-row-meta">Demandé le ${new Date(d.ts).toLocaleString("fr-FR")}</div>
               </div>
             </div>
@@ -4965,7 +5364,7 @@ function renderAdmin() {
         ${pastDeposits.length === 0 ? `<p class="admin-row-meta">Aucun dépôt traité pour l'instant.</p>` : pastDeposits.slice(0, 40).map(d => `
           <div class="admin-row">
             <div>
-              <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} 💎</div>
+              <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
               <div class="admin-row-meta">${d.status === "approved" ? "Approuvé" : "Refusé"} · ${new Date(d.ts).toLocaleString("fr-FR")}</div>
             </div>
             <div class="admin-actions">
@@ -4983,7 +5382,7 @@ function renderAdmin() {
         ${pendingWithdrawals.length === 0 ? `<p class="admin-row-meta">Aucune demande de retrait en attente.</p>` : pendingWithdrawals.map(w => `
           <div class="admin-row">
             <div>
-              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} 💎</div>
+              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
               <div class="admin-row-meta">Pseudo Paladium à payer : <strong>${esc(w.minecraftPseudo || "—")}</strong></div>
               <div class="admin-row-meta">Demandé le ${new Date(w.ts).toLocaleString("fr-FR")}</div>
             </div>
@@ -5000,7 +5399,7 @@ function renderAdmin() {
         ${pastWithdrawals.length === 0 ? `<p class="admin-row-meta">Aucun retrait traité pour l'instant.</p>` : pastWithdrawals.slice(0, 40).map(w => `
           <div class="admin-row">
             <div>
-              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} 💎</div>
+              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
               <div class="admin-row-meta">Pseudo Paladium : ${esc(w.minecraftPseudo || "—")}</div>
               <div class="admin-row-meta">${w.status === "approved" ? "Payé" : "Refusé"} · ${new Date(w.ts).toLocaleString("fr-FR")}</div>
             </div>
@@ -5080,7 +5479,7 @@ function renderAdmin() {
     const id = b.dataset.setBalance;
     const input = document.querySelector(`[data-balance-input="${id}"]`);
     const value = input ? input.value : "";
-    if (!confirm(`Fixer le solde de ce joueur à ${value} 💎 ?`)) return;
+    if (!confirm(`Fixer le solde de ce joueur à ${value} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> ?`)) return;
     adminSetBalance(id, "balance", value);
   }));
   document.querySelectorAll("[data-adjust-balance]").forEach(b => b.addEventListener("click", () => {
