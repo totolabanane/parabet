@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   referral_code     VARCHAR(12) UNIQUE,
   referred_by       INT DEFAULT NULL,
   referral_earnings INT NOT NULL DEFAULT 0,
+  referral_bonus_referrer INT NOT NULL DEFAULT 0,
+  referral_bonus_referee  INT NOT NULL DEFAULT 0,
+  referral_validated_at   TIMESTAMP DEFAULT NULL,
   wagering_required INT NOT NULL DEFAULT 0,
   wagering_progress INT NOT NULL DEFAULT 0,
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -99,3 +102,18 @@ CREATE INDEX idx_deposits_account ON deposits(account_id);
 CREATE INDEX idx_withdrawals_status ON withdrawals(status);
 CREATE INDEX idx_withdrawals_account ON withdrawals(account_id);
 CREATE INDEX idx_accounts_referred_by ON accounts(referred_by);
+
+-- Offres du moment, configurées par le staff (1er dépôt doublé / parrainage
+-- boosté). Une seule offre par type est appliquée à la fois.
+CREATE TABLE offers (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  type           VARCHAR(20) NOT NULL,
+  title          VARCHAR(140) DEFAULT NULL,
+  max_bonus      INT DEFAULT NULL,
+  referrer_bonus INT DEFAULT NULL,
+  referee_bonus  INT DEFAULT NULL,
+  ends_at        DATETIME DEFAULT NULL,
+  active         TINYINT NOT NULL DEFAULT 1,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+CREATE INDEX idx_offers_type_active ON offers(type, active);

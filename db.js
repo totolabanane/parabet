@@ -38,6 +38,13 @@ async function init() {
     "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_code TEXT",
     "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referred_by INTEGER",
     "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_earnings INTEGER NOT NULL DEFAULT 0",
+    // Parrainage validé au 1er dépôt : montants de bonus "verrouillés" au moment
+    // de l'inscription (au cas où l'offre boostée change/expire avant que le
+    // filleul dépose), et horodatage de validation (rempli quand le 1er dépôt
+    // du filleul est approuvé par le staff — voir approveDeposit()).
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_bonus_referrer INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_bonus_referee INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS referral_validated_at TIMESTAMP DEFAULT NULL",
     "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS minecraft_pseudo TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP",
     "ALTER TABLE bets ADD COLUMN IF NOT EXISTS refunded INTEGER NOT NULL DEFAULT 0",
@@ -47,6 +54,13 @@ async function init() {
     // retrait n'est autorisé que quand wagering_progress >= wagering_required.
     "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS wagering_required INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS wagering_progress INTEGER NOT NULL DEFAULT 0",
+    // Dépôts/retraits : montant $ au moment de la demande, taxe appliquée (retraits),
+    // et raison de refus donnée par le staff (affichée au joueur).
+    "ALTER TABLE deposits ADD COLUMN IF NOT EXISTS amount_usd NUMERIC(12,2)",
+    "ALTER TABLE deposits ADD COLUMN IF NOT EXISTS reject_reason TEXT",
+    "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS amount_usd NUMERIC(12,2)",
+    "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS tax_percent NUMERIC(5,2)",
+    "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS reject_reason TEXT",
   ]) {
     await pool.query(stmt);
   }

@@ -78,6 +78,52 @@ function actionResultHtml(message, ok = true) {
 <body><div class="card"><div class="icon">${ok ? "✅" : "⚠️"}</div><p>${message}</p></div></body></html>`;
 }
 
+// Petite page HTML avec un champ texte, affichée quand le staff clique sur le
+// lien "❌ Refuser" depuis Discord : on exige toujours une raison (affichée
+// ensuite au joueur), donc pas de refus en un clic direct depuis l'embed.
+function rejectReasonFormHtml(kind, id, token) {
+  const label = kind === "deposit" ? "ce dépôt" : "ce retrait";
+  return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ParaBet</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #0d0e18; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; }
+  .card { background: #14152280; border: 1px solid #ffffff1a; border-radius: 16px; padding: 32px 24px; max-width: 420px; width: 100%; text-align: center; }
+  .icon { font-size: 40px; margin-bottom: 12px; }
+  p { font-size: 15px; line-height: 1.5; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 90px; margin-top: 12px; border-radius: 10px; border: 1px solid #ffffff33; background: #0d0e18; color: #fff; padding: 10px; font-size: 14px; resize: vertical; }
+  button { margin-top: 14px; background: #ff5c5c; color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .err { color: #ff8a8a; font-size: 13px; margin-top: 8px; min-height: 16px; }
+</style></head>
+<body><div class="card">
+  <div class="icon">⚠️</div>
+  <p>Indique la raison du refus de ${label} — elle sera affichée au joueur.</p>
+  <textarea id="reason" maxlength="300" placeholder="Ex : capture d'écran illisible / montant incohérent…"></textarea>
+  <div class="err" id="err"></div>
+  <button id="submitBtn">🚫 Refuser avec cette raison</button>
+</div>
+<script>
+  document.getElementById("submitBtn").addEventListener("click", async () => {
+    const reason = document.getElementById("reason").value.trim();
+    const errEl = document.getElementById("err");
+    if (!reason) { errEl.textContent = "La raison est obligatoire."; return; }
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true; errEl.textContent = "";
+    try {
+      const r = await fetch(${JSON.stringify(`/api/admin/${kind}s/${id}/reject-with-token`)}, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ${JSON.stringify(token)}, reason }),
+      });
+      document.open(); document.write(await r.text()); document.close();
+    } catch (e) {
+      btn.disabled = false; errEl.textContent = "Erreur réseau, réessaie.";
+    }
+  });
+</script>
+</body></html>`;
+}
+
 // Envoie un embed vers le webhook Discord configuré dans .env (DISCORD_WEBHOOK_URL).
 // Ne bloque jamais la requête HTTP en cours : les erreurs sont juste loguées.
 async function notifyDiscord({ title, color, fields, imageUrl, thumbnailUrl }) {
@@ -205,8 +251,10 @@ function depositRowToJson(d) {
     id: d.id,
     pseudo: d.pseudo,
     amount: d.amount,
+    amountUsd: d.amount_usd != null ? Number(d.amount_usd) : null,
     screenshot: `/uploads/${d.screenshot_file}`,
     status: d.status,
+    rejectReason: d.reject_reason || null,
     ts: new Date(d.created_at).getTime(),
   };
 }
@@ -217,7 +265,10 @@ function withdrawalRowToJson(w) {
     pseudo: w.pseudo,
     minecraftPseudo: w.minecraft_pseudo,
     amount: w.amount,
+    amountUsd: w.amount_usd != null ? Number(w.amount_usd) : null,
+    taxPercent: w.tax_percent != null ? Number(w.tax_percent) : null,
     status: w.status,
+    rejectReason: w.reject_reason || null,
     ts: new Date(w.created_at).getTime(),
   };
 }
@@ -301,24 +352,30 @@ app.post("/api/register", async (req, res) => {
       referrer = rrows[0] || null;
     }
 
+    // Offre "parrainage boosté" active ? On utilise ses montants à la place
+    // des valeurs par défaut (.env) tant qu'elle est active et non expirée.
+    const referralOffer = referrer ? await getActiveOffer("referral_boost") : null;
+    const refereeBonus = referralOffer ? Number(referralOffer.referee_bonus) : REF_BONUS_REFEREE;
+    const referrerBonus = referralOffer ? Number(referralOffer.referrer_bonus) : REF_BONUS_REFERRER;
+
     const passwordHash = await bcrypt.hash(password, 10);
     const isAdmin = ADMIN_CODE && code.trim() === ADMIN_CODE ? 1 : 0;
     const referralCode = await generateUniqueReferralCode();
-    const startBalance = START_BAL + (referrer ? REF_BONUS_REFEREE : 0);
+    // Le parrainage n'est plus crédité à l'inscription : le filleul doit d'abord
+    // faire valider son 1er dépôt par le staff (voir approveDeposit()). On se
+    // contente ici de "verrouiller" les montants de bonus (utile si une offre
+    // boostée expire entre-temps) sur le compte du filleul.
+    const startBalance = START_BAL;
 
     const [result] = await pool.query(
-      "INSERT INTO accounts (pseudo, pseudo_lower, password_hash, balance, is_admin, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [pseudo, pseudoLower, passwordHash, startBalance, isAdmin, referralCode, referrer ? referrer.id : null]
+      "INSERT INTO accounts (pseudo, pseudo_lower, password_hash, balance, is_admin, referral_code, referred_by, referral_bonus_referrer, referral_bonus_referee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [pseudo, pseudoLower, passwordHash, startBalance, isAdmin, referralCode, referrer ? referrer.id : null, referrer ? referrerBonus : 0, referrer ? refereeBonus : 0]
     );
 
     if (referrer) {
       await pool.query(
-        "UPDATE accounts SET balance = balance + ?, referral_earnings = referral_earnings + ? WHERE id = ?",
-        [REF_BONUS_REFERRER, REF_BONUS_REFERRER, referrer.id]
-      );
-      await pool.query(
         "INSERT INTO feed (pseudo, side, amount, title) VALUES ('Staff', 'yes', 0, ?)",
-        [`🤝 ${referrer.pseudo} a parrainé ${pseudo} : +${REF_BONUS_REFERRER} 💎`]
+        [`🤝 ${pseudo} a rejoint ParaBet grâce au code de ${referrer.pseudo} — parrainage en attente du 1er dépôt`]
       );
     }
 
@@ -403,8 +460,14 @@ app.get("/api/markets", authRequired, async (req, res) => {
   res.json(rows.map(marketRowToJson));
 });
 
+// L'historique public n'affiche pas les ajustements de solde faits manuellement
+// par le staff (ex: correction d'une erreur) — ce n'est pas une activité de jeu
+// et ça n'a rien à faire dans le fil public. Ces lignes restent en base (utile
+// pour l'audit admin) mais sont filtrées ici avant l'envoi au client.
 app.get("/api/feed", authRequired, async (req, res) => {
-  const [rows] = await pool.query("SELECT * FROM feed ORDER BY created_at DESC LIMIT 25");
+  const [rows] = await pool.query(
+    "SELECT * FROM feed WHERE title NOT LIKE '🛠️ Ajustement staff%' ORDER BY created_at DESC LIMIT 25"
+  );
   res.json(
     rows.reverse().map(f => ({ pseudo: f.pseudo, side: f.side, amount: f.amount, title: f.title, ts: new Date(f.created_at).getTime() }))
   );
@@ -496,12 +559,23 @@ app.post("/api/bets", authRequired, async (req, res) => {
 
 app.post("/api/deposits", authRequired, upload.single("screenshot"), async (req, res) => {
   try {
-    const amount = clamp(Math.round(Number(req.body.amount) || 0), DEP_MIN, 1000000);
-    if (!req.file) return res.status(400).json({ error: "Ajoute une capture d'écran prouvant le dépôt en jeu." });
+    // Le joueur choisit son montant en $ ; le nombre de 💎 est calculé côté
+    // serveur avec le taux courant (source de vérité, jamais fait confiance au client).
+    const amountUsd = Math.round((Math.max(0, Number(req.body.amountUsd) || 0)) * 100) / 100;
+    const amount = Math.round(usdToDiamonds(amountUsd));
+    const minUsd = Math.ceil(DEP_MIN * appSettings.usdPerDiamond * 100) / 100;
+
+    if (amount < DEP_MIN) {
+      return res.status(400).json({ error: `Le montant minimum est de ${minUsd.toFixed(2)} $ (${DEP_MIN} 💎).` });
+    }
+    if (amount > 100000000) {
+      return res.status(400).json({ error: "Montant trop élevé." });
+    }
+    if (!req.file) return res.status(400).json({ error: "Ajoute une capture d'écran prouvant le paiement en jeu." });
 
     const [result] = await pool.query(
-      "INSERT INTO deposits (account_id, amount, screenshot_file, status) VALUES (?, ?, ?, 'pending')",
-      [req.user.id, amount, req.file.filename]
+      "INSERT INTO deposits (account_id, amount, amount_usd, screenshot_file, status) VALUES (?, ?, ?, ?, 'pending')",
+      [req.user.id, amount, amountUsd, req.file.filename]
     );
     res.json({ ok: true });
 
@@ -513,7 +587,8 @@ app.post("/api/deposits", authRequired, upload.single("screenshot"), async (req,
       color: 0x2ecc71,
       fields: [
         { name: "Joueur", value: req.user.pseudo || String(req.user.id), inline: true },
-        { name: "Montant", value: `${amount} 💎`, inline: true },
+        { name: "Montant", value: `${amount} 💎 (${amountUsd.toFixed(2)} $)`, inline: true },
+        { name: "Commande envoyée", value: `/pay ${appSettings.depositPayPseudo} ${amountUsd}`, inline: true },
         { name: "Actions", value: `[✅ Valider](${approveUrl})  ·  [❌ Refuser](${rejectUrl})` },
       ],
       imageUrl: buildPublicUrl(req, `/uploads/${req.file.filename}`),
@@ -571,22 +646,29 @@ app.post("/api/withdrawals", authRequired, async (req, res) => {
       });
     }
 
+    const amountUsd = diamondsToNetUsd(amount);
+    const taxPercent = appSettings.withdrawTaxPercent;
+
     await conn.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [amount, account.id]);
-    await conn.query(
-      "INSERT INTO withdrawals (account_id, amount, minecraft_pseudo, status) VALUES (?, ?, ?, 'pending')",
-      [account.id, amount, minecraftPseudo]
+    const [wResult] = await conn.query(
+      "INSERT INTO withdrawals (account_id, amount, amount_usd, tax_percent, minecraft_pseudo, status) VALUES (?, ?, ?, ?, ?, 'pending')",
+      [account.id, amount, amountUsd, taxPercent, minecraftPseudo]
     );
 
     await conn.commit();
     res.json({ ok: true, balance: account.balance - amount });
 
+    const withdrawalId = wResult.insertId;
+    const wApproveUrl = withdrawalId ? adminActionLink(req, `/api/admin/withdrawals/${withdrawalId}/approve`, "withdrawal:approve", withdrawalId) : null;
+    const wRejectUrl = withdrawalId ? adminActionLink(req, `/api/admin/withdrawals/${withdrawalId}/reject`, "withdrawal:reject", withdrawalId) : null;
     notifyDiscord({
       title: "💸 Nouvelle demande de retrait",
       color: 0xe67e22,
       fields: [
         { name: "Joueur", value: req.user.pseudo || String(req.user.id), inline: true },
-        { name: "Montant", value: `${amount} 💎`, inline: true },
+        { name: "Montant", value: `${amount} 💎 (${amountUsd.toFixed(2)} $, taxe ${taxPercent}%)`, inline: true },
         { name: "Pseudo Minecraft", value: minecraftPseudo, inline: true },
+        ...(wApproveUrl ? [{ name: "Actions", value: `[✅ Marquer payé](${wApproveUrl})  ·  [❌ Refuser](${wRejectUrl})` }] : []),
       ],
     });
   } catch (e) {
@@ -615,7 +697,7 @@ app.get("/api/referrals", authRequired, async (req, res) => {
   const referralCode = await ensureReferralCode(account);
 
   const [referred] = await pool.query(
-    "SELECT pseudo, created_at FROM accounts WHERE referred_by = ? ORDER BY created_at DESC",
+    "SELECT pseudo, created_at, referral_validated_at FROM accounts WHERE referred_by = ? ORDER BY created_at DESC",
     [req.user.id]
   );
 
@@ -625,8 +707,238 @@ app.get("/api/referrals", authRequired, async (req, res) => {
     bonusReferee: REF_BONUS_REFEREE,
     totalEarned: account.referral_earnings,
     count: referred.length,
-    referred: referred.map(r => ({ pseudo: r.pseudo, ts: new Date(r.created_at).getTime() })),
+    validatedCount: referred.filter(r => !!r.referral_validated_at).length,
+    referred: referred.map(r => ({
+      pseudo: r.pseudo,
+      ts: new Date(r.created_at).getTime(),
+      validated: !!r.referral_validated_at,
+    })),
   });
+});
+
+/* ================= PARAMÈTRES : DÉPÔTS & RETRAITS (réglables depuis l'admin) ================= */
+// Taux $ <-> 💎, taxe de retrait et pseudo à qui envoyer la commande /pay,
+// stockés en base (table settings, clé/valeur) et gardés en cache mémoire.
+
+const SETTINGS_DEFAULTS = {
+  usdPerDiamond: 0.80,       // 1 💎 = X $
+  withdrawTaxPercent: 10,    // taxe prélevée sur les retraits, en %
+  depositPayPseudo: "totolabanane", // pseudo en jeu à qui envoyer /pay
+};
+let appSettings = { ...SETTINGS_DEFAULTS };
+
+async function loadSettings() {
+  const [rows] = await pool.query("SELECT key, value FROM settings");
+  const map = {};
+  for (const r of rows) map[r.key] = r.value;
+  appSettings = {
+    usdPerDiamond: map.usdPerDiamond != null && Number(map.usdPerDiamond) > 0 ? Number(map.usdPerDiamond) : SETTINGS_DEFAULTS.usdPerDiamond,
+    withdrawTaxPercent: map.withdrawTaxPercent != null ? Number(map.withdrawTaxPercent) : SETTINGS_DEFAULTS.withdrawTaxPercent,
+    depositPayPseudo: map.depositPayPseudo || SETTINGS_DEFAULTS.depositPayPseudo,
+  };
+}
+loadSettings().catch(e => console.error("Erreur chargement des paramètres :", e));
+
+async function setSetting(key, value) {
+  await pool.query(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+     RETURNING key`,
+    [key, String(value)]
+  );
+  await loadSettings();
+}
+
+// Vue complète envoyée au front (settings réglables + minimums fixés par .env).
+function publicSettings() {
+  return {
+    ...appSettings,
+    depositMinAmount: DEP_MIN,
+    withdrawMinAmount: WD_MIN,
+  };
+}
+
+function diamondsPerDollar() { return 1 / appSettings.usdPerDiamond; }
+function usdToDiamonds(usd) { return Math.round((Number(usd) || 0) * diamondsPerDollar()); }
+function diamondsToNetUsd(diamonds) {
+  const gross = (Number(diamonds) || 0) * appSettings.usdPerDiamond;
+  return Math.round(gross * (1 - appSettings.withdrawTaxPercent / 100) * 100) / 100;
+}
+
+app.get("/api/settings", authRequired, async (req, res) => {
+  res.json(publicSettings());
+});
+
+app.get("/api/admin/settings", authRequired, adminRequired, async (req, res) => {
+  res.json(publicSettings());
+});
+
+app.post("/api/admin/settings", authRequired, adminRequired, async (req, res) => {
+  const { usdPerDiamond, withdrawTaxPercent, depositPayPseudo } = req.body || {};
+
+  if (usdPerDiamond !== undefined) {
+    const v = Number(usdPerDiamond);
+    if (!Number.isFinite(v) || v <= 0) return res.status(400).json({ error: "Taux invalide (doit être un nombre > 0)." });
+    await setSetting("usdPerDiamond", v);
+  }
+  if (withdrawTaxPercent !== undefined) {
+    const v = Number(withdrawTaxPercent);
+    if (!Number.isFinite(v) || v < 0 || v > 99) return res.status(400).json({ error: "Taxe invalide (entre 0 et 99)." });
+    await setSetting("withdrawTaxPercent", v);
+  }
+  if (depositPayPseudo !== undefined) {
+    const v = String(depositPayPseudo).trim();
+    if (!v || v.length > 20) return res.status(400).json({ error: "Pseudo invalide (1 à 20 caractères)." });
+    await setSetting("depositPayPseudo", v);
+  }
+
+  res.json(publicSettings());
+});
+
+/* ================= OFFRES DU MOMENT (réglables depuis l'admin) ================= */
+// Deux types : "deposit_boost" (1er dépôt doublé, jusqu'à max_bonus 💎) et
+// "referral_boost" (montants de parrainage boostés). Le staff peut créer,
+// activer/désactiver, changer la date de fin et supprimer des offres depuis
+// l'admin. Une seule offre par type compte comme "active" côté logique
+// métier : la plus récente parmi celles active=1 et non expirée.
+
+function offerRowToJson(o) {
+  const endsAt = o.ends_at || null;
+  const expired = !!(endsAt && new Date(endsAt).getTime() <= Date.now());
+  return {
+    id: o.id,
+    type: o.type,
+    title: o.title || "",
+    maxBonus: o.max_bonus != null ? Number(o.max_bonus) : null,
+    referrerBonus: o.referrer_bonus != null ? Number(o.referrer_bonus) : null,
+    refereeBonus: o.referee_bonus != null ? Number(o.referee_bonus) : null,
+    endsAt,
+    active: !!o.active,
+    expired,
+    createdAt: o.created_at,
+  };
+}
+
+// Renvoie l'offre active et non expirée la plus récente pour un type donné
+// (ou null). Utilisée à la fois pour l'affichage public et pour la logique
+// métier (doublement de dépôt, bonus de parrainage).
+async function getActiveOffer(type) {
+  const [rows] = await pool.query(
+    `SELECT * FROM offers WHERE type = ? AND active = 1 AND (ends_at IS NULL OR ends_at > NOW()::timestamp)
+     ORDER BY created_at DESC LIMIT 1`,
+    [type]
+  );
+  return rows[0] || null;
+}
+
+app.get("/api/offers", authRequired, async (req, res) => {
+  try {
+    const [depositOffer, referralOffer] = await Promise.all([
+      getActiveOffer("deposit_boost"),
+      getActiveOffer("referral_boost"),
+    ]);
+    const offers = [depositOffer, referralOffer].filter(Boolean).map(offerRowToJson);
+    res.json(offers);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du chargement des offres." });
+  }
+});
+
+app.get("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM offers ORDER BY created_at DESC");
+    res.json(rows.map(offerRowToJson));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du chargement des offres." });
+  }
+});
+
+app.post("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
+  try {
+    let { type, title, endsAt, maxBonus, referrerBonus, refereeBonus } = req.body || {};
+    type = String(type || "");
+    if (!["deposit_boost", "referral_boost"].includes(type))
+      return res.status(400).json({ error: "Type d'offre invalide." });
+
+    title = title ? String(title).trim().slice(0, 140) : null;
+    const endsAtVal = endsAt ? new Date(endsAt) : null;
+    if (endsAt && (!endsAtVal || Number.isNaN(endsAtVal.getTime())))
+      return res.status(400).json({ error: "Date de fin invalide." });
+
+    let maxBonusVal = null, referrerBonusVal = null, refereeBonusVal = null;
+    if (type === "deposit_boost") {
+      maxBonusVal = Number(maxBonus);
+      if (!Number.isFinite(maxBonusVal) || maxBonusVal <= 0)
+        return res.status(400).json({ error: "Bonus max invalide (doit être un nombre > 0)." });
+    } else {
+      referrerBonusVal = Number(referrerBonus);
+      refereeBonusVal = Number(refereeBonus);
+      if (!Number.isFinite(referrerBonusVal) || referrerBonusVal < 0 || !Number.isFinite(refereeBonusVal) || refereeBonusVal < 0)
+        return res.status(400).json({ error: "Bonus parrain/filleul invalides (doivent être >= 0)." });
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO offers (type, title, max_bonus, referrer_bonus, referee_bonus, ends_at, active)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [type, title, maxBonusVal, referrerBonusVal, refereeBonusVal, endsAtVal]
+    );
+    const [rows] = await pool.query("SELECT * FROM offers WHERE id = ?", [result.insertId]);
+    res.json(offerRowToJson(rows[0]));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors de la création de l'offre." });
+  }
+});
+
+app.post("/api/admin/offers/:id", authRequired, adminRequired, async (req, res) => {
+  try {
+    const { active, endsAt, title, maxBonus, referrerBonus, refereeBonus } = req.body || {};
+    const [rows] = await pool.query("SELECT * FROM offers WHERE id = ?", [req.params.id]);
+    const offer = rows[0];
+    if (!offer) return res.status(404).json({ error: "Offre introuvable." });
+
+    if (active !== undefined) {
+      await pool.query("UPDATE offers SET active = ? WHERE id = ?", [active ? 1 : 0, offer.id]);
+    }
+    if (endsAt !== undefined) {
+      const endsAtVal = endsAt ? new Date(endsAt) : null;
+      if (endsAt && (!endsAtVal || Number.isNaN(endsAtVal.getTime())))
+        return res.status(400).json({ error: "Date de fin invalide." });
+      await pool.query("UPDATE offers SET ends_at = ? WHERE id = ?", [endsAtVal, offer.id]);
+    }
+    if (title !== undefined) {
+      await pool.query("UPDATE offers SET title = ? WHERE id = ?", [title ? String(title).trim().slice(0, 140) : null, offer.id]);
+    }
+    if (maxBonus !== undefined) {
+      const v = Number(maxBonus);
+      if (!Number.isFinite(v) || v <= 0) return res.status(400).json({ error: "Bonus max invalide." });
+      await pool.query("UPDATE offers SET max_bonus = ? WHERE id = ?", [v, offer.id]);
+    }
+    if (referrerBonus !== undefined) {
+      const v = Number(referrerBonus);
+      if (!Number.isFinite(v) || v < 0) return res.status(400).json({ error: "Bonus parrain invalide." });
+      await pool.query("UPDATE offers SET referrer_bonus = ? WHERE id = ?", [v, offer.id]);
+    }
+    if (refereeBonus !== undefined) {
+      const v = Number(refereeBonus);
+      if (!Number.isFinite(v) || v < 0) return res.status(400).json({ error: "Bonus filleul invalide." });
+      await pool.query("UPDATE offers SET referee_bonus = ? WHERE id = ?", [v, offer.id]);
+    }
+
+    const [updated] = await pool.query("SELECT * FROM offers WHERE id = ?", [offer.id]);
+    res.json(offerRowToJson(updated[0]));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors de la mise à jour de l'offre." });
+  }
+});
+
+app.delete("/api/admin/offers/:id", authRequired, adminRequired, async (req, res) => {
+  const [result] = await pool.query("DELETE FROM offers WHERE id = ?", [req.params.id]);
+  if (!result.affectedRows) return res.status(404).json({ error: "Offre introuvable." });
+  res.json({ ok: true });
 });
 
 /* ================= CASINO : LIMITES DE MISE (réglables depuis l'admin) ================= */
@@ -1554,13 +1866,53 @@ app.post("/api/casino/dice/play", authRequired, async (req, res) => {
 
 // Mini-jeu Paladium : le joueur choisit un Unclaim Finder (vert / jaune /
 // rouge). Le serveur tire un pourcentage aléatoire pour chacun des trois ;
-// celui qui obtient le plus gros pourcentage l'emporte. Si le choix du
-// joueur correspond au gagnant, la mise est multipliée par 3 (1 chance sur
-// 3 de gagner, comme un vrai tirage à trois issues égales — aucune marge
-// maison cachée ici, c'est un x3 "brut" comme demandé).
-const UNCLAIMFINDER_MULTIPLIER = 3;
+// celui qui obtient le plus gros pourcentage l'emporte (à l'affichage, ces
+// pourcentages sont arrondis à l'entier, mais le tirage lui-même garde 2
+// décimales en interne pour départager les cas quasi-égaux).
+//
+// Le gain n'est plus un x3 "brut" fixe : c'est un x2.95 de base, avec un
+// bonus/malus selon le pourcentage du gagnant (celui-ci = le pourcentage du
+// joueur quand il gagne, puisqu'il faut avoir choisi le bon Finder) :
+//   - pourcentage gagnant < 25%  → malus, x2
+//   - pourcentage gagnant > 95%  → bonus, x4
+//   - sinon (25%–95%)            → x2.95 (le cas normal, ~1/3 de chance)
+const UNCLAIMFINDER_BASE_MULTIPLIER = 2.95;
+const UNCLAIMFINDER_LOW_MULTIPLIER = 2;
+const UNCLAIMFINDER_HIGH_MULTIPLIER = 4;
+const UNCLAIMFINDER_LOW_THRESHOLD = 25; // strictement en dessous
+const UNCLAIMFINDER_HIGH_THRESHOLD = 95; // strictement au dessus
 const UNCLAIMFINDER_COLORS = ["vert", "jaune", "rouge"];
-const unclaimFinderHistory = new Map(); // accountId -> [{ percentages, winner, choice, win, bet, payout, ts }, ...]
+const unclaimFinderHistory = new Map(); // accountId -> [{ percentages, winner, choice, win, bet, payout, multiplier, ts }, ...]
+
+function ufRollPercentage() {
+  return Math.round(crypto.randomInt(100, 10000) / 100 * 100) / 100; // 1.00 → 99.99
+}
+
+// Tire les 3 pourcentages et désigne le plus haut comme gagnant. En cas
+// d'égalité parfaite (très rare, tirage à 2 décimales), on ne retire QUE les
+// couleurs ex-aequo jusqu'à ce qu'une seule ressorte en tête — pour ne pas
+// avantager systématiquement une couleur par rapport à une autre.
+function ufRollAndPickWinner() {
+  const percentages = {};
+  for (const c of UNCLAIMFINDER_COLORS) percentages[c] = ufRollPercentage();
+  let best = Math.max(...UNCLAIMFINDER_COLORS.map(c => percentages[c]));
+  let tied = UNCLAIMFINDER_COLORS.filter(c => percentages[c] === best);
+  while (tied.length > 1) {
+    for (const c of tied) percentages[c] = ufRollPercentage();
+    best = Math.max(...UNCLAIMFINDER_COLORS.map(c => percentages[c]));
+    tied = UNCLAIMFINDER_COLORS.filter(c => percentages[c] === best);
+  }
+  return { percentages, winner: tied[0] };
+}
+
+// Le bonus/malus est calculé sur le pourcentage ARRONDI du gagnant, pour que
+// ce que le joueur voit à l'écran corresponde exactement au multiplicateur
+// appliqué (pas de décimale cachée qui change la tranche en coulisses).
+function ufMultiplierFor(winnerPercentRounded) {
+  if (winnerPercentRounded < UNCLAIMFINDER_LOW_THRESHOLD) return UNCLAIMFINDER_LOW_MULTIPLIER;
+  if (winnerPercentRounded > UNCLAIMFINDER_HIGH_THRESHOLD) return UNCLAIMFINDER_HIGH_MULTIPLIER;
+  return UNCLAIMFINDER_BASE_MULTIPLIER;
+}
 
 app.get("/api/casino/unclaimfinder/state", authRequired, (req, res) => {
   const history = unclaimFinderHistory.get(req.user.id) || [];
@@ -1585,16 +1937,21 @@ app.post("/api/casino/unclaimfinder/play", authRequired, async (req, res) => {
     await addWageringProgress(pool, req.user.id, bet);
 
     // Un pourcentage indépendant par Unclaim Finder ; le plus haut gagne.
-    const percentages = {};
-    for (const c of UNCLAIMFINDER_COLORS) percentages[c] = Math.round(crypto.randomInt(100, 10000) / 100 * 100) / 100; // 1.00 → 99.99
-    const winner = UNCLAIMFINDER_COLORS.reduce((best, c) => (percentages[c] > percentages[best] ? c : best), UNCLAIMFINDER_COLORS[0]);
+    const { percentages, winner } = ufRollAndPickWinner();
     const win = choice === winner;
-    const payout = win ? Math.round(bet * UNCLAIMFINDER_MULTIPLIER) : 0;
+    const winnerPercentRounded = Math.round(percentages[winner]);
+    const multiplier = ufMultiplierFor(winnerPercentRounded);
+    const payout = win ? Math.round(bet * multiplier) : 0;
     if (payout > 0) {
       await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
     }
 
-    const entry = { percentages, winner, choice, win, bet, payout, ts: Date.now() };
+    // Pourcentages arrondis pour l'affichage (et pour tout ce qu'on renvoie/stocke) ;
+    // le tirage brut à 2 décimales n'a servi qu'à départager en interne.
+    const percentagesRounded = {};
+    for (const c of UNCLAIMFINDER_COLORS) percentagesRounded[c] = Math.round(percentages[c]);
+
+    const entry = { percentages: percentagesRounded, winner, choice, win, bet, payout, multiplier, ts: Date.now() };
     const list = [entry, ...(unclaimFinderHistory.get(req.user.id) || [])].slice(0, 20);
     unclaimFinderHistory.set(req.user.id, list);
 
@@ -1605,7 +1962,7 @@ app.post("/api/casino/unclaimfinder/play", authRequired, async (req, res) => {
     );
     await pool.query(
       "INSERT INTO casino_bets (account_id, game, bet, payout, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
-      [req.user.id, "unclaimfinder", bet, payout, win ? "win" : "lose", `Choisi ${choice} · gagnant ${winner} (${percentages[winner]}%)`]
+      [req.user.id, "unclaimfinder", bet, payout, win ? "win" : "lose", `Choisi ${choice} · gagnant ${winner} (${winnerPercentRounded}%, x${multiplier})`]
     );
 
     const [after] = await pool.query("SELECT balance, wagering_required, wagering_progress FROM accounts WHERE id = ?", [req.user.id]);
@@ -1613,7 +1970,7 @@ app.post("/api/casino/unclaimfinder/play", authRequired, async (req, res) => {
       balance: after[0].balance,
       wageringRequired: after[0].wagering_required,
       wageringProgress: after[0].wagering_progress,
-      percentages, winner, choice, win, bet, payout, history: list,
+      percentages: percentagesRounded, winner, choice, win, bet, payout, multiplier, history: list,
     });
   } catch (e) {
     console.error(e);
@@ -2164,7 +2521,7 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
   const [rows] = await pool.query(`
     SELECT
       a.id, a.pseudo, a.balance, a.is_admin, a.created_at,
-      a.referral_code, a.referral_earnings,
+      a.referral_code, a.referral_earnings, a.referral_validated_at,
       a.wagering_required, a.wagering_progress,
       ref.pseudo AS referred_by_pseudo,
       COALESCE(bs.bet_count, 0) AS bet_count,
@@ -2193,6 +2550,7 @@ app.get("/api/admin/accounts", authRequired, adminRequired, async (req, res) => 
     referralCode: a.referral_code,
     referredByPseudo: a.referred_by_pseudo || null,
     referralEarnings: a.referral_earnings,
+    referralValidated: a.referred_by_pseudo ? !!a.referral_validated_at : null,
     wageringRequired: a.wagering_required,
     wageringProgress: a.wagering_progress,
     betCount: a.bet_count,
@@ -2272,6 +2630,22 @@ app.get("/api/admin/accounts/:id/casino-bets", authRequired, adminRequired, asyn
     result: c.result,
     detail: c.detail,
     ts: new Date(c.created_at).getTime(),
+  })));
+});
+
+// Liste des filleuls d'un joueur (vue admin) : qui il a parrainé, et si
+// chaque parrainage a été validé (1er dépôt approuvé) ou est encore en attente.
+app.get("/api/admin/accounts/:id/referrals", authRequired, adminRequired, async (req, res) => {
+  const [rows] = await pool.query(
+    `SELECT pseudo, created_at, referral_validated_at, referral_bonus_referee
+     FROM accounts WHERE referred_by = ? ORDER BY created_at DESC`,
+    [req.params.id]
+  );
+  res.json(rows.map(r => ({
+    pseudo: r.pseudo,
+    ts: new Date(r.created_at).getTime(),
+    validated: !!r.referral_validated_at,
+    refereeBonus: r.referral_bonus_referee,
   })));
 });
 
@@ -2463,6 +2837,10 @@ app.get("/api/admin/deposits", authRequired, adminRequired, async (req, res) => 
   res.json(rows.map(depositRowToJson));
 });
 
+// (referralValidated / referrerPseudo / referrerBonusGiven / refereeBonusGiven
+// sont renvoyés par approveDeposit() en plus de amount/bonus/pseudo, pour que
+// les points d'entrée appelants — panel admin et lien Discord — puissent
+// mentionner un parrainage tout juste validé.)
 async function approveDeposit(depositId) {
   const conn = await pool.getConnection();
   try {
@@ -2474,21 +2852,72 @@ async function approveDeposit(depositId) {
       return { ok: false, error: "Ce dépôt n'est plus en attente." };
     }
 
+    // Offre "1er dépôt doublé" active ? On regarde si le joueur a déjà un
+    // dépôt approuvé avant celui-ci — si non, c'est son tout premier, et le
+    // bonus (plafonné à max_bonus) est ajouté automatiquement, sans action
+    // manuelle du staff.
+    const [priorApproved] = await conn.query(
+      "SELECT COUNT(*) AS n FROM deposits WHERE account_id = ? AND status = 'approved'",
+      [dep.account_id]
+    );
+    const isFirstDeposit = Number(priorApproved[0].n) === 0;
+    const depositOffer = isFirstDeposit ? await getActiveOffer("deposit_boost") : null;
+    const bonus = depositOffer ? Math.min(dep.amount, Number(depositOffer.max_bonus)) : 0;
+    const totalCredit = dep.amount + bonus;
+
     await conn.query(
       "UPDATE accounts SET balance = balance + ?, wagering_required = wagering_required + ? WHERE id = ?",
-      [dep.amount, dep.amount, dep.account_id]
+      [totalCredit, dep.amount, dep.account_id]
     );
     await conn.query("UPDATE deposits SET status = 'approved', reviewed_at = NOW() WHERE id = ?", [dep.id]);
 
-    const [arows] = await conn.query("SELECT pseudo FROM accounts WHERE id = ?", [dep.account_id]);
-    const pseudo = arows[0] ? arows[0].pseudo : "?";
-    await conn.query(
-      "INSERT INTO feed (pseudo, side, amount, title) VALUES ('Staff', 'yes', 0, ?)",
-      [`🏦 Dépôt validé pour ${pseudo} : +${dep.amount} 💎`]
+    const [arows] = await conn.query(
+      "SELECT pseudo, referred_by, referral_bonus_referrer, referral_bonus_referee, referral_validated_at FROM accounts WHERE id = ?",
+      [dep.account_id]
     );
+    const acc = arows[0] || {};
+    const pseudo = acc.pseudo || "?";
+
+    // Parrainage : validé au tout premier dépôt approuvé du filleul (et une
+    // seule fois — referral_validated_at sert de garde-fou). Le parrain et
+    // le filleul touchent alors chacun le bonus verrouillé à l'inscription.
+    let referralValidated = false;
+    let referrerPseudo = null;
+    let referrerBonusGiven = 0;
+    let refereeBonusGiven = 0;
+    if (isFirstDeposit && acc.referred_by && !acc.referral_validated_at) {
+      referrerBonusGiven = Number(acc.referral_bonus_referrer) || 0;
+      refereeBonusGiven = Number(acc.referral_bonus_referee) || 0;
+
+      await conn.query("UPDATE accounts SET referral_validated_at = NOW() WHERE id = ?", [dep.account_id]);
+      if (refereeBonusGiven > 0) {
+        await conn.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [refereeBonusGiven, dep.account_id]);
+      }
+      const [rrows] = await conn.query("SELECT pseudo FROM accounts WHERE id = ?", [acc.referred_by]);
+      referrerPseudo = rrows[0] ? rrows[0].pseudo : null;
+      if (referrerBonusGiven > 0) {
+        await conn.query(
+          "UPDATE accounts SET balance = balance + ?, referral_earnings = referral_earnings + ? WHERE id = ?",
+          [referrerBonusGiven, referrerBonusGiven, acc.referred_by]
+        );
+      }
+      referralValidated = true;
+    }
+
+    const feedLines = [
+      bonus > 0
+        ? `🏦 Dépôt validé pour ${pseudo} : +${dep.amount} 💎 + 🎁 ${bonus} 💎 offerts (1er dépôt doublé)`
+        : `🏦 Dépôt validé pour ${pseudo} : +${dep.amount} 💎`,
+    ];
+    if (referralValidated && referrerPseudo) {
+      feedLines.push(`🤝 Parrainage validé : ${referrerPseudo} +${referrerBonusGiven} 💎, ${pseudo} +${refereeBonusGiven} 💎`);
+    }
+    for (const line of feedLines) {
+      await conn.query("INSERT INTO feed (pseudo, side, amount, title) VALUES ('Staff', 'yes', 0, ?)", [line]);
+    }
 
     await conn.commit();
-    return { ok: true, amount: dep.amount, pseudo };
+    return { ok: true, amount: dep.amount, bonus, pseudo, referralValidated, referrerPseudo, referrerBonusGiven, refereeBonusGiven };
   } catch (e) {
     await conn.rollback();
     console.error(e);
@@ -2498,10 +2927,12 @@ async function approveDeposit(depositId) {
   }
 }
 
-async function rejectDeposit(depositId) {
+// Un refus exige toujours une raison, enregistrée et montrée au joueur
+// (voir rejectReason dans depositRowToJson) pour qu'il comprenne pourquoi.
+async function rejectDeposit(depositId, reason) {
   const [result] = await pool.query(
-    "UPDATE deposits SET status = 'rejected', reviewed_at = NOW() WHERE id = ? AND status = 'pending'",
-    [depositId]
+    "UPDATE deposits SET status = 'rejected', reject_reason = ?, reviewed_at = NOW() WHERE id = ? AND status = 'pending'",
+    [reason, depositId]
   );
   return result.affectedRows > 0;
 }
@@ -2520,20 +2951,39 @@ app.get("/api/admin/deposits/:id/approve", async (req, res) => {
   }
   const result = await approveDeposit(req.params.id);
   if (!result.ok) return res.send(actionResultHtml(`⚠️ ${result.error}`, false));
-  res.send(actionResultHtml(`Dépôt validé : <b>+${result.amount} 💎</b> pour <b>${result.pseudo}</b>.`));
+  const refLine = result.referralValidated
+    ? `<br />🤝 Parrainage validé : <b>${result.referrerPseudo}</b> +${result.referrerBonusGiven} 💎, <b>${result.pseudo}</b> +${result.refereeBonusGiven} 💎.`
+    : "";
+  res.send(actionResultHtml(`Dépôt validé : <b>+${result.amount} 💎</b> pour <b>${result.pseudo}</b>.${refLine}`));
 });
 
+// Refus depuis le panel admin (staff connecté) : la raison est envoyée dans le corps.
 app.post("/api/admin/deposits/:id/reject", authRequired, adminRequired, async (req, res) => {
-  const rejected = await rejectDeposit(req.params.id);
+  const reason = String(req.body?.reason || "").trim();
+  if (!reason) return res.status(400).json({ error: "Indique une raison de refus." });
+  const rejected = await rejectDeposit(req.params.id, reason.slice(0, 300));
   if (!rejected) return res.status(400).json({ error: "Ce dépôt n'est plus en attente." });
   res.json({ ok: true });
 });
 
+// Depuis Discord : le lien "❌ Refuser" ouvre une petite page où le staff
+// tape la raison, plutôt qu'un refus en un clic (voir rejectReasonFormHtml).
 app.get("/api/admin/deposits/:id/reject", async (req, res) => {
   if (!verifyAdminAction("deposit:reject", req.params.id, req.query.token)) {
     return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
   }
-  const rejected = await rejectDeposit(req.params.id);
+  res.send(rejectReasonFormHtml("deposit", req.params.id, req.query.token));
+});
+
+// Soumission du formulaire ci-dessus : toujours authentifié par le token signé.
+app.post("/api/admin/deposits/:id/reject-with-token", async (req, res) => {
+  const { token, reason } = req.body || {};
+  if (!verifyAdminAction("deposit:reject", req.params.id, token)) {
+    return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
+  }
+  const cleanReason = String(reason || "").trim();
+  if (!cleanReason) return res.send(actionResultHtml("⚠️ La raison est obligatoire.", false));
+  const rejected = await rejectDeposit(req.params.id, cleanReason.slice(0, 300));
   if (!rejected) return res.send(actionResultHtml("⚠️ Ce dépôt n'est plus en attente.", false));
   res.send(actionResultHtml("🚫 Dépôt refusé."));
 });
@@ -2561,15 +3011,15 @@ app.get("/api/admin/withdrawals", authRequired, adminRequired, async (req, res) 
 
 // Approuver = le staff confirme avoir payé les émeraudes en jeu. Le solde a
 // déjà été débité à la demande, donc rien à faire côté solde ici.
-app.post("/api/admin/withdrawals/:id/approve", authRequired, adminRequired, async (req, res) => {
+async function approveWithdrawal(withdrawalId) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [wrows] = await conn.query("SELECT * FROM withdrawals WHERE id = ? FOR UPDATE", [req.params.id]);
+    const [wrows] = await conn.query("SELECT * FROM withdrawals WHERE id = ? FOR UPDATE", [withdrawalId]);
     const wd = wrows[0];
     if (!wd || wd.status !== "pending") {
       await conn.rollback();
-      return res.status(400).json({ error: "Ce retrait n'est plus en attente." });
+      return { ok: false, error: "Ce retrait n'est plus en attente." };
     }
 
     await conn.query("UPDATE withdrawals SET status = 'approved', reviewed_at = NOW() WHERE id = ?", [wd.id]);
@@ -2582,40 +3032,88 @@ app.post("/api/admin/withdrawals/:id/approve", authRequired, adminRequired, asyn
     );
 
     await conn.commit();
-    res.json({ ok: true });
+    return { ok: true, amount: wd.amount, pseudo };
   } catch (e) {
     await conn.rollback();
     console.error(e);
-    res.status(500).json({ error: "Erreur serveur lors de l'approbation." });
+    return { ok: false, error: "Erreur serveur lors de l'approbation." };
   } finally {
     conn.release();
   }
+}
+
+app.post("/api/admin/withdrawals/:id/approve", authRequired, adminRequired, async (req, res) => {
+  const result = await approveWithdrawal(req.params.id);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ ok: true });
 });
 
-// Refuser = on recrédite le solde du joueur, puisqu'il avait été réservé à la demande.
-app.post("/api/admin/withdrawals/:id/reject", authRequired, adminRequired, async (req, res) => {
+// Validation depuis le lien Discord : pas de session requise, authentifié par le token signé.
+app.get("/api/admin/withdrawals/:id/approve", async (req, res) => {
+  if (!verifyAdminAction("withdrawal:approve", req.params.id, req.query.token)) {
+    return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
+  }
+  const result = await approveWithdrawal(req.params.id);
+  if (!result.ok) return res.send(actionResultHtml(`⚠️ ${result.error}`, false));
+  res.send(actionResultHtml(`Retrait marqué comme payé : <b>-${result.amount} 💎</b> pour <b>${result.pseudo}</b>.`));
+});
+
+// Refuser = on recrédite le solde du joueur (réservé à la demande) et on
+// enregistre la raison donnée par le staff, affichée ensuite au joueur.
+async function rejectWithdrawal(withdrawalId, reason) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [wrows] = await conn.query("SELECT * FROM withdrawals WHERE id = ? FOR UPDATE", [req.params.id]);
+    const [wrows] = await conn.query("SELECT * FROM withdrawals WHERE id = ? FOR UPDATE", [withdrawalId]);
     const wd = wrows[0];
     if (!wd || wd.status !== "pending") {
       await conn.rollback();
-      return res.status(400).json({ error: "Ce retrait n'est plus en attente." });
+      return { ok: false, error: "Ce retrait n'est plus en attente." };
     }
 
     await conn.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [wd.amount, wd.account_id]);
-    await conn.query("UPDATE withdrawals SET status = 'rejected', reviewed_at = NOW() WHERE id = ?", [wd.id]);
+    await conn.query(
+      "UPDATE withdrawals SET status = 'rejected', reject_reason = ?, reviewed_at = NOW() WHERE id = ?",
+      [reason, wd.id]
+    );
 
     await conn.commit();
-    res.json({ ok: true });
+    return { ok: true, amount: wd.amount };
   } catch (e) {
     await conn.rollback();
     console.error(e);
-    res.status(500).json({ error: "Erreur serveur lors du refus." });
+    return { ok: false, error: "Erreur serveur lors du refus." };
   } finally {
     conn.release();
   }
+}
+
+app.post("/api/admin/withdrawals/:id/reject", authRequired, adminRequired, async (req, res) => {
+  const reason = String(req.body?.reason || "").trim();
+  if (!reason) return res.status(400).json({ error: "Indique une raison de refus." });
+  const result = await rejectWithdrawal(req.params.id, reason.slice(0, 300));
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ ok: true });
+});
+
+// Lien Discord "❌ Refuser" : passe par la même petite page de saisie de raison.
+app.get("/api/admin/withdrawals/:id/reject", async (req, res) => {
+  if (!verifyAdminAction("withdrawal:reject", req.params.id, req.query.token)) {
+    return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
+  }
+  res.send(rejectReasonFormHtml("withdrawal", req.params.id, req.query.token));
+});
+
+app.post("/api/admin/withdrawals/:id/reject-with-token", async (req, res) => {
+  const { token, reason } = req.body || {};
+  if (!verifyAdminAction("withdrawal:reject", req.params.id, token)) {
+    return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
+  }
+  const cleanReason = String(reason || "").trim();
+  if (!cleanReason) return res.send(actionResultHtml("⚠️ La raison est obligatoire.", false));
+  const result = await rejectWithdrawal(req.params.id, cleanReason.slice(0, 300));
+  if (!result.ok) return res.send(actionResultHtml(`⚠️ ${result.error}`, false));
+  res.send(actionResultHtml("🚫 Retrait refusé, le solde a été recrédité."));
 });
 
 app.delete("/api/admin/withdrawals/:id", authRequired, adminRequired, async (req, res) => {

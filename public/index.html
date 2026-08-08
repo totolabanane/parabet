@@ -186,6 +186,18 @@
   .hero-actions .btn-yes, .hero-actions .btn-no { padding: 11px 16px; font-size: 13px; white-space: nowrap; }
   .hero-meta { position: relative; display: flex; gap: 16px; margin-top: 16px; font-size: 11.5px; color: var(--text-faint); flex-wrap: wrap; }
 
+  /* offres du moment */
+  .offers-strip { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 0; }
+  @media (min-width: 720px) { .offers-strip { flex-direction: row; } }
+  .offer-banner {
+    flex: 1; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 14px;
+    border: 1px solid var(--border); background: linear-gradient(175deg, var(--surface), rgba(139,92,246,0.07));
+  }
+  .offer-banner-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+  .offer-banner-title { font-family: var(--font-display); font-weight: 700; font-size: 13.5px; color: var(--text); margin-bottom: 3px; }
+  .offer-banner-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+  .offer-banner-meta { font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
+
   /* casino promo strip */
   .promo-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 40px 0 14px; gap: 10px; }
   .promo-head h2 { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
@@ -889,6 +901,9 @@
   .cf-result-label { text-align: center; margin: 14px 0 0; font-size: 13.5px; font-weight: 700; }
   .cf-result-label.win { color: var(--green); }
   .cf-result-label.lose { color: var(--red); }
+  .cf-result-tag { display: inline-block; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-dim); vertical-align: middle; }
+  .cf-result-tag.win { background: var(--green-bg); color: var(--green-hi); }
+  .cf-result-tag.lose { background: var(--red-bg); color: var(--red); }
 
   .cf-history-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 24px; }
   .cf-history-title { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
@@ -1009,10 +1024,11 @@
   .uf-side-btn.jaune.active { background: var(--amber-bg); color: var(--amber); border-color: rgba(238,182,84,0.45); }
   .uf-side-btn.rouge.active { background: var(--red-bg); color: var(--red); border-color: rgba(255,92,106,0.45); }
   .uf-side-icon { width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
-  /* L'image "Orange" du wiki a un fond blanc plein (pas de transparence) : plutôt
-     que d'essayer de la fondre dans le thème sombre (ça assombrit l'orange), on
-     lui donne une petite plaque claire, comme un slot d'objet Minecraft. */
-  .uf-icon-whitebg { background: #efe6d3; border-radius: 7px; padding: 3px; box-sizing: border-box; filter: none; }
+  /* L'image "Orange" du wiki a un fond blanc plein (pas de transparence, contrairement
+     au vert et au rouge) : impossible de la fondre proprement dans le thème sombre en
+     CSS pur. Plutôt qu'un carré blanc qui flotte tout seul comme un bug d'affichage, on
+     l'entoure d'un cadre assumé assorti à la couleur "Orange" du thème (slot d'objet). */
+  .uf-icon-badge { background: #f4efe3; border: 1.5px solid rgba(238,182,84,0.55); box-shadow: 0 0 0 1px rgba(0,0,0,0.25) inset; border-radius: 8px; padding: 2px; box-sizing: border-box; filter: none; }
 
   .uf-stage { display: flex; align-items: flex-end; justify-content: center; gap: 22px; padding: 30px 10px 6px; }
   .uf-stage-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -1198,6 +1214,18 @@
   .dep-inline-error { font-size: 11.5px; color: var(--red); margin-top: -6px; margin-bottom: 12px; }
   .dep-recap { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 14px; font-size: 12px; color: var(--text-dim); }
   .dep-recap b { color: var(--text); }
+
+  /* dépôt : boîte de commande copiable (étape 2) */
+  .dep-cmd-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface-2); border: 1.5px dashed var(--green); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 6px;
+  }
+  .dep-cmd-box code {
+    flex: 1; font-family: var(--font-mono); font-size: 14px; color: var(--green-hi, var(--green));
+    word-break: break-all; user-select: all;
+  }
+  .dep-cmd-box .mini-btn { flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -1230,9 +1258,20 @@ const CAT_META = {
   event:    { label: "Events",   emoji: "🎉", color: "#0fce75" },
 };
 
-const DEPOSIT_MIN_AMOUNT = 10000; // doit correspondre à DEPOSIT_MIN_AMOUNT côté serveur (.env)
-const WITHDRAW_MIN_AMOUNT = 15000; // doit correspondre à WITHDRAW_MIN_AMOUNT côté serveur (.env)
-const EMERALD_USD_RATE = 0.80; // doit correspondre au taux affiché dans la FAQ
+// Valeurs par défaut (avant chargement) — écrasées par /api/settings au boot,
+// qui reflète les valeurs réglées par le staff dans le panel admin.
+let DEPOSIT_MIN_AMOUNT = 10000;
+let WITHDRAW_MIN_AMOUNT = 15000;
+let EMERALD_USD_RATE = 0.80; // 1 💎 = X $ (dépôts et retraits)
+let WITHDRAW_TAX_PERCENT = 10; // taxe prélevée sur les retraits, en %
+let DEPOSIT_PAY_PSEUDO = "totolabanane"; // pseudo en jeu à qui envoyer le /pay
+
+function diamondsPerDollar() { return 1 / EMERALD_USD_RATE; }
+function usdToDiamonds(usd) { return Math.round((Number(usd) || 0) * diamondsPerDollar()); }
+function diamondsToNetUsd(diamonds) {
+  const gross = (Number(diamonds) || 0) * EMERALD_USD_RATE;
+  return Math.round(gross * (1 - WITHDRAW_TAX_PERCENT / 100) * 100) / 100;
+}
 
 // Contenu de la FAQ — à ajuster librement, ce n'est que du texte affiché.
 const FAQ_ITEMS = [
@@ -1250,11 +1289,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "Combien vaut 1 émeraude sur ParaBet ?",
-    a: "1 💎 = 0,80 $. C'est le taux utilisé pour les dépôts et les retraits.",
+    a: () => `1 💎 = ${EMERALD_USD_RATE.toFixed(2)} $. C'est le taux utilisé pour les dépôts et les retraits (une taxe de ${WITHDRAW_TAX_PERCENT}% s'applique en plus sur les retraits).`,
   },
   {
     q: "Comment faire un dépôt ?",
-    a: `Clique sur "💳 Déposer", indique le montant et joins une capture d'écran prouvant ton dépôt d'émeraudes en jeu. Le staff vérifie et valide manuellement — compte moins de 12h en général.`,
+    a: `Clique sur "💳 Déposer", indique le montant en $ que tu veux déposer, puis passe la commande /pay indiquée en jeu et joins une capture d'écran comme preuve. Le staff vérifie et valide manuellement — compte moins de 12h en général.`,
   },
   {
     q: "Quel est le montant minimum de dépôt ?",
@@ -1270,7 +1309,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Comment marche le parrainage ?",
-    a: `Chaque joueur a un code et un lien uniques (bouton "🤝 Parrainage"). Quand quelqu'un s'inscrit avec ton code, vous recevez chacun un bonus d'émeraudes.`,
+    a: `Chaque joueur a un code et un lien uniques (bouton "🤝 Parrainage"). Quand quelqu'un s'inscrit avec ton code, le parrainage est validé dès que ton filleul effectue et fait valider son 1er dépôt — vous recevez alors chacun un bonus d'émeraudes.`,
   },
   {
     q: "Y a-t-il des règles anti-triche ?",
@@ -1364,6 +1403,8 @@ const state = {
   adminAccountBets: {},  // cache: accountId -> liste de paris (admin)
   adminExpandedAccountCasinoId: null,
   adminAccountCasinoBets: {}, // cache: accountId -> liste de parties casino (admin)
+  adminExpandedAccountReferralsId: null,
+  adminAccountReferrals: {}, // cache: accountId -> liste des filleuls (admin)
   adminCasinoBets: [],   // toutes les parties casino récentes, tous joueurs (admin)
   adminCasinoLimits: {}, // { mines: {minBet, maxBet}, ... } — limites de mise réglables (admin)
   adminResolveTime: {},  // cache: marketId -> valeur de l'input datetime-local (heure de fin choisie)
@@ -1377,14 +1418,20 @@ const state = {
   busy: false,
 
   depositModalOpen: false,
-  depositForm: { amount: DEPOSIT_MIN_AMOUNT, dataUrl: null, blob: null, fileName: "" },
+  depositForm: { step: 1, amountUsd: 20, dataUrl: null, blob: null, fileName: "" },
   depositBusy: false,
 
   withdrawModalOpen: false,
   withdrawForm: { amount: 100, minecraftPseudo: "" },
   withdrawBusy: false,
 
-  referral: { code: "", bonusReferrer: 0, bonusReferee: 0, totalEarned: 0, count: 0, referred: [] },
+  adminSettings: { usdPerDiamond: EMERALD_USD_RATE, withdrawTaxPercent: WITHDRAW_TAX_PERCENT, depositPayPseudo: DEPOSIT_PAY_PSEUDO }, // paramètres $ / taxe (admin)
+
+  offers: [],             // offres du moment actuellement actives (affichées en haut de l'accueil)
+  adminOffers: [],        // toutes les offres, actives ou non (admin)
+  adminOfferForm: { type: "deposit_boost", title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75 },
+
+  referral: { code: "", bonusReferrer: 0, bonusReferee: 0, totalEarned: 0, count: 0, validatedCount: 0, referred: [] },
   referralModalOpen: false,
   faqModalOpen: false,
   legalModalOpen: false,
@@ -1553,6 +1600,15 @@ function nowLocalInputValue() {
   return d.toISOString().slice(0, 16);
 }
 
+// Convertit un timestamp (ms) en valeur affichable dans un <input type="datetime-local">.
+function msToLocalInputValue(ms) {
+  if (!ms) return "";
+  const d = new Date(ms);
+  d.setSeconds(0, 0);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
 // Retourne l'heure de fin choisie pour un marché (pré-remplie à "maintenant"
 // si le staff n'a encore rien modifié), et la mémorise dans le state.
 function getResolveTime(marketId) {
@@ -1641,7 +1697,7 @@ function compressImageFile(file) {
 /* ---------- boot ---------- */
 
 async function loadEverything() {
-  const [markets, feed, mybets, mycasinobets, mydeposits, mywithdrawals, referrals] = await Promise.all([
+  const [markets, feed, mybets, mycasinobets, mydeposits, mywithdrawals, referrals, settingsRes, offers] = await Promise.all([
     api("/api/markets"),
     api("/api/feed"),
     api("/api/mybets"),
@@ -1649,6 +1705,8 @@ async function loadEverything() {
     api("/api/mydeposits"),
     api("/api/mywithdrawals"),
     api("/api/referrals"),
+    api("/api/settings"),
+    api("/api/offers"),
   ]);
   state.markets = markets;
   state.feed = feed;
@@ -1657,6 +1715,19 @@ async function loadEverything() {
   state.deposits = mydeposits;
   state.withdrawals = mywithdrawals;
   state.referral = referrals;
+  state.offers = offers;
+  applySettings(settingsRes);
+}
+
+// Applique les paramètres $ / taxe reçus du serveur (source de vérité) aux
+// constantes globales utilisées pour tous les calculs côté front.
+function applySettings(s) {
+  if (!s) return;
+  if (Number.isFinite(s.usdPerDiamond) && s.usdPerDiamond > 0) EMERALD_USD_RATE = s.usdPerDiamond;
+  if (Number.isFinite(s.withdrawTaxPercent)) WITHDRAW_TAX_PERCENT = s.withdrawTaxPercent;
+  if (s.depositPayPseudo) DEPOSIT_PAY_PSEUDO = s.depositPayPseudo;
+  if (Number.isFinite(s.depositMinAmount)) DEPOSIT_MIN_AMOUNT = s.depositMinAmount;
+  if (Number.isFinite(s.withdrawMinAmount)) WITHDRAW_MIN_AMOUNT = s.withdrawMinAmount;
 }
 
 async function boot() {
@@ -1746,9 +1817,13 @@ async function claimBonus() {
 
 /* ---------- deposits (player side) ---------- */
 
+function depositMinUsd() {
+  return Math.ceil(DEPOSIT_MIN_AMOUNT * EMERALD_USD_RATE * 100) / 100;
+}
+
 function openDepositModal() {
   state.depositModalOpen = true;
-  state.depositForm = { amount: DEPOSIT_MIN_AMOUNT, dataUrl: null, blob: null, fileName: "" };
+  state.depositForm = { step: 1, amountUsd: Math.max(20, depositMinUsd()), dataUrl: null, blob: null, fileName: "" };
   renderModal();
 }
 function closeDepositModal() {
@@ -1775,17 +1850,48 @@ async function handleDepositFile(file) {
   }
 }
 
+// Étape 1 -> 2 : le joueur a choisi son montant en $, on lui montre la commande à passer en jeu.
+function goToDepositStep2() {
+  const f = state.depositForm;
+  const amountUsd = Number(f.amountUsd) || 0;
+  if (amountUsd < depositMinUsd()) {
+    showToast(`Le montant minimum est de ${depositMinUsd().toFixed(2)} $ (${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎).`);
+    return;
+  }
+  f.step = 2;
+  renderModal();
+}
+function backToDepositStep1() {
+  state.depositForm.step = 1;
+  renderModal();
+}
+
+function depositPayCommand() {
+  const amountUsd = Number(state.depositForm.amountUsd) || 0;
+  return `/pay ${DEPOSIT_PAY_PSEUDO} ${amountUsd}`;
+}
+
+async function copyDepositCommand() {
+  const cmd = depositPayCommand();
+  try {
+    await navigator.clipboard.writeText(cmd);
+    showToast("Commande copiée !");
+  } catch (e) {
+    showToast("Impossible de copier automatiquement — copie-la manuellement.");
+  }
+}
+
 async function submitDeposit() {
   if (state.depositBusy) return;
   const f = state.depositForm;
-  if (!f.blob) { showToast("Ajoute une capture d'écran prouvant le dépôt en jeu."); return; }
-  const amount = Math.round(Number(f.amount) || 0);
-  if (amount < DEPOSIT_MIN_AMOUNT) { showToast(`Le montant minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />.`); return; }
+  if (!f.blob) { showToast("Ajoute une capture d'écran prouvant le paiement en jeu."); return; }
+  const amountUsd = Number(f.amountUsd) || 0;
+  if (amountUsd < depositMinUsd()) { showToast(`Le montant minimum est de ${depositMinUsd().toFixed(2)} $.`); return; }
 
   state.depositBusy = true; renderModal();
   try {
     const form = new FormData();
-    form.append("amount", String(amount));
+    form.append("amountUsd", String(amountUsd));
     form.append("screenshot", f.blob, "preuve.jpg");
     await api("/api/deposits", { method: "POST", body: form });
     state.deposits = await api("/api/mydeposits");
@@ -1817,7 +1923,7 @@ async function submitWithdraw() {
   if (amount > balance) { showToast("Solde insuffisant pour ce retrait."); return; }
   const minecraftPseudo = String(state.withdrawForm.minecraftPseudo || "").trim();
   if (minecraftPseudo.length < 3 || minecraftPseudo.length > 20 || !/^[a-zA-Z0-9_]+$/.test(minecraftPseudo)) {
-    showToast("Indique ton pseudo Paladium (Minecraft) valide.");
+    showToast("Confirmez votre pseudo Paladium valide.");
     return;
   }
 
@@ -2021,6 +2127,100 @@ async function adminSetBalance(accountId, mode, value) {
   render();
 }
 
+async function loadAdminSettings() {
+  state.adminSettings = await api("/api/admin/settings");
+}
+
+async function adminSaveSettings(usdPerDiamond, withdrawTaxPercent, depositPayPseudo) {
+  state.adminBusy = true; render();
+  try {
+    state.adminSettings = await api("/api/admin/settings", {
+      method: "POST",
+      body: { usdPerDiamond, withdrawTaxPercent, depositPayPseudo },
+    });
+    applySettings({
+      usdPerDiamond: state.adminSettings.usdPerDiamond,
+      withdrawTaxPercent: state.adminSettings.withdrawTaxPercent,
+      depositPayPseudo: state.adminSettings.depositPayPseudo,
+    });
+    showToast("Paramètres enregistrés.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+/* ---------- offres du moment (admin) ---------- */
+
+async function loadAdminOffers() {
+  state.adminOffers = await api("/api/admin/offers");
+}
+
+// Recharge la liste publique des offres actives, utilisée pour le bandeau
+// d'accueil et le modal de parrainage — appelée après chaque modif admin.
+async function reloadOffers() {
+  state.offers = await api("/api/offers");
+}
+
+async function adminCreateOffer() {
+  const f = state.adminOfferForm;
+  const body = {
+    type: f.type,
+    title: f.title,
+    endsAt: f.endsAt ? new Date(f.endsAt).toISOString() : null,
+  };
+  if (f.type === "deposit_boost") body.maxBonus = f.maxBonus;
+  else { body.referrerBonus = f.referrerBonus; body.refereeBonus = f.refereeBonus; }
+
+  state.adminBusy = true; render();
+  try {
+    await api("/api/admin/offers", { method: "POST", body });
+    await Promise.all([loadAdminOffers(), reloadOffers()]);
+    state.adminOfferForm = { type: f.type, title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75 };
+    showToast("Offre créée et activée.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminUpdateOffer(id, body, successMsg) {
+  state.adminBusy = true; render();
+  try {
+    await api(`/api/admin/offers/${id}`, { method: "POST", body });
+    await Promise.all([loadAdminOffers(), reloadOffers()]);
+    if (successMsg) showToast(successMsg);
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminToggleOffer(id, active) {
+  await adminUpdateOffer(id, { active }, active ? "Offre activée." : "Offre désactivée.");
+}
+
+async function adminSetOfferEndsAt(id, endsAtLocal) {
+  const endsAt = endsAtLocal ? new Date(endsAtLocal).toISOString() : null;
+  await adminUpdateOffer(id, { endsAt }, "Date de fin mise à jour.");
+}
+
+async function adminDeleteOffer(id) {
+  state.adminBusy = true; render();
+  try {
+    await api(`/api/admin/offers/${id}`, { method: "DELETE" });
+    await Promise.all([loadAdminOffers(), reloadOffers()]);
+    showToast("Offre supprimée.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
 async function loadAdminDeposits() {
   state.deposits = await api("/api/admin/deposits");
 }
@@ -2038,10 +2238,10 @@ async function adminApproveDeposit(id) {
   render();
 }
 
-async function adminRejectDeposit(id) {
+async function adminRejectDeposit(id, reason) {
   state.adminBusy = true; render();
   try {
-    await api(`/api/admin/deposits/${id}/reject`, { method: "POST" });
+    await api(`/api/admin/deposits/${id}/reject`, { method: "POST", body: { reason } });
     await loadAdminDeposits();
     showToast("Dépôt refusé.");
   } catch (e) {
@@ -2081,10 +2281,10 @@ async function adminApproveWithdrawal(id) {
   render();
 }
 
-async function adminRejectWithdrawal(id) {
+async function adminRejectWithdrawal(id, reason) {
   state.adminBusy = true; render();
   try {
-    await api(`/api/admin/withdrawals/${id}/reject`, { method: "POST" });
+    await api(`/api/admin/withdrawals/${id}/reject`, { method: "POST", body: { reason } });
     await loadAdminWithdrawals();
     showToast("Retrait refusé, le solde du joueur a été recrédité.");
   } catch (e) {
@@ -2182,6 +2382,26 @@ async function toggleAccountBets(id) {
   }
 }
 
+async function toggleAccountReferrals(id) {
+  id = Number(id);
+  if (state.adminExpandedAccountReferralsId === id) {
+    state.adminExpandedAccountReferralsId = null;
+    render();
+    return;
+  }
+  state.adminExpandedAccountReferralsId = id;
+  render();
+  if (!state.adminAccountReferrals[id]) {
+    try {
+      state.adminAccountReferrals[id] = await api(`/api/admin/accounts/${id}/referrals`);
+    } catch (e) {
+      showToast(e.message);
+      state.adminAccountReferrals[id] = [];
+    }
+    render();
+  }
+}
+
 function viewScreenshotFull(url) {
   window.open(url, "_blank");
 }
@@ -2193,11 +2413,32 @@ function render() {
     document.getElementById("app").innerHTML = `<div class="loading-screen">Chargement de ParaBet…</div>`;
     return;
   }
-  if (state.view === "auth" || !state.account) { renderAuth(); return; }
-  if (state.view === "admin" && state.account.isAdmin) { renderAdmin(); return; }
-  if (state.view === "casino") { renderCasino(); return; }
-  if (state.view === "profile") { renderProfile(); return; }
+
+  // Préserve le focus et la position du curseur d'un champ de saisie de la
+  // page à travers les re-rendus (ex: à chaque frappe dans une mise) : sans
+  // ça, remplacer app.innerHTML recrée le champ et fait perdre la main à
+  // chaque caractère tapé, obligeant à recliquer dessus.
+  const app = document.getElementById("app");
+  const active = document.activeElement;
+  const preservedFocus = (active && app && app.contains(active) && active.id)
+    ? { id: active.id, start: active.selectionStart, end: active.selectionEnd }
+    : null;
+  function restoreAppFocus() {
+    if (!preservedFocus) return;
+    const el = document.getElementById(preservedFocus.id);
+    if (!el) return;
+    el.focus();
+    if (typeof el.setSelectionRange === "function" && preservedFocus.start != null) {
+      try { el.setSelectionRange(preservedFocus.start, preservedFocus.end); } catch (e) { /* ignore */ }
+    }
+  }
+
+  if (state.view === "auth" || !state.account) { renderAuth(); restoreAppFocus(); return; }
+  if (state.view === "admin" && state.account.isAdmin) { renderAdmin(); restoreAppFocus(); return; }
+  if (state.view === "casino") { renderCasino(); restoreAppFocus(); return; }
+  if (state.view === "profile") { renderProfile(); restoreAppFocus(); return; }
   renderApp();
+  restoreAppFocus();
 }
 
 /* ---------- rendering: auth ---------- */
@@ -2236,7 +2477,7 @@ function renderAuth() {
           <div class="field">
             <label>Code de parrainage (optionnel)</label>
             <input id="fRef" placeholder="ex: AB12CD" maxlength="20" value="${esc(state.referralCodeInput)}" style="text-transform:uppercase;" />
-            <p class="field-hint">Un ami t'a invité ? Renseigne son code : vous recevez tous les deux un bonus.</p>
+            <p class="field-hint">Un ami t'a invité ? Renseigne son code : vous recevez tous les deux un bonus dès ton 1er dépôt validé.</p>
           </div>
         ` : ""}
         <button class="auth-submit" id="authSubmit" ${state.authBusy ? "disabled" : ""}>
@@ -2321,6 +2562,7 @@ function renderApp() {
     </div>
 
     <div class="max-w" style="padding-top:20px;">
+      ${state.offers.length > 0 ? `<div class="offers-strip">${state.offers.map(offerBannerHtml).join("")}</div>` : ""}
       ${heroMarket ? heroMarketHtml(heroMarket) : ""}
 
       <div class="stats-grid">
@@ -2384,7 +2626,7 @@ function renderApp() {
   const legalFooterLink = document.getElementById("legalFooterLink");
   if (legalFooterLink) legalFooterLink.addEventListener("click", e => { e.preventDefault(); openLegalModal(); });
   const adminBtn = document.getElementById("adminBtn");
-  if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts(), loadAdminCasinoBets(), loadAdminCasinoLimits()]); render(); });
+  if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts(), loadAdminCasinoBets(), loadAdminCasinoLimits(), loadAdminSettings(), loadAdminOffers()]); render(); });
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { state.filter = b.dataset.filter; render(); }));
   document.querySelectorAll("[data-bet]").forEach(b => b.addEventListener("click", () => {
     const [marketId, side] = b.dataset.bet.split("|");
@@ -2410,6 +2652,36 @@ function renderApp() {
   document.querySelectorAll(".promo-card[data-lobby]").forEach(el => el.addEventListener("click", () => playCasinoGame(el.dataset.lobby)));
 
   renderModal();
+}
+
+function offerEndsLabel(o) {
+  if (!o.endsAt) return "⏳ Offre permanente";
+  return `⏳ Jusqu'au ${new Date(o.endsAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function offerBannerHtml(o) {
+  if (o.type === "deposit_boost") {
+    return `
+      <div class="offer-banner">
+        <div class="offer-banner-icon">🎁</div>
+        <div class="offer-banner-body">
+          <div class="offer-banner-title">${o.title ? esc(o.title) : "1er dépôt doublé"}</div>
+          <div class="offer-banner-desc">Ton tout premier dépôt est doublé automatiquement, jusqu'à ${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎 de bonus offerts.</div>
+          <div class="offer-banner-meta">${offerEndsLabel(o)}</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="offer-banner">
+      <div class="offer-banner-icon">🤝</div>
+      <div class="offer-banner-body">
+        <div class="offer-banner-title">${o.title ? esc(o.title) : "Parrainage boosté"}</div>
+        <div class="offer-banner-desc">+${(o.referrerBonus || 0).toLocaleString("fr-FR")} 💎 pour toi, +${(o.refereeBonus || 0).toLocaleString("fr-FR")} 💎 pour ton filleul dès son 1er dépôt validé.</div>
+        <div class="offer-banner-meta">${offerEndsLabel(o)}</div>
+      </div>
+    </div>
+  `;
 }
 
 function heroMarketHtml(m) {
@@ -2527,14 +2799,18 @@ function depositLineHtml(d) {
   const label = d.status === "pending" ? "En attente" : d.status === "approved" ? "Approuvé" : "Refusé";
   const color = d.status === "pending" ? "var(--amber)" : d.status === "approved" ? "var(--green)" : "var(--red)";
   const date = new Date(d.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · demandé le ${date}</p>`;
+  const usd = d.amountUsd != null ? ` (${d.amountUsd.toFixed(2)} $)` : "";
+  const reason = d.status === "rejected" && d.rejectReason ? `<br><span style="color:var(--text-faint); font-size:11px;">Motif : ${esc(d.rejectReason)}</span>` : "";
+  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${usd} · demandé le ${date}${reason}</p>`;
 }
 
 function withdrawalLineHtml(w) {
   const label = w.status === "pending" ? "En attente" : w.status === "approved" ? "Payé" : "Refusé";
   const color = w.status === "pending" ? "var(--amber)" : w.status === "approved" ? "var(--green)" : "var(--red)";
   const date = new Date(w.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · demandé le ${date}</p>`;
+  const usd = w.amountUsd != null ? ` (${w.amountUsd.toFixed(2)} $)` : "";
+  const reason = w.status === "rejected" && w.rejectReason ? `<br><span style="color:var(--text-faint); font-size:11px;">Motif : ${esc(w.rejectReason)}</span>` : "";
+  return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${usd} · demandé le ${date}${reason}</p>`;
 }
 
 /* ---------- profil joueur ---------- */
@@ -4604,17 +4880,29 @@ function renderPlinkoGame() {
 
 let UF_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
 let UF_MAX_BET_CLIENT = null; // idem — null = pas de plafond
-const UF_MULTIPLIER = 3;
+const UF_BASE_MULTIPLIER = 2.95;
+const UF_LOW_MULTIPLIER = 2;
+const UF_HIGH_MULTIPLIER = 4;
+const UF_LOW_THRESHOLD = 25;
+const UF_HIGH_THRESHOLD = 95;
 const UF_ICON_URL = {
   vert: "https://static.wikia.nocookie.net/paladiumpvp/images/8/87/Unclaim_Finder_Vert.png/revision/latest?cb=20210811171516&path-prefix=fr",
   jaune: "https://static.wikia.nocookie.net/paladiumpvp/images/d/df/Unclaim_Finder_Orange.png/revision/latest?cb=20210811171541&path-prefix=fr",
   rouge: "https://static.wikia.nocookie.net/paladiumpvp/images/a/a3/Unclaim_Finder_Rouge.png/revision/latest?cb=20210811171601&path-prefix=fr",
 };
-// L'image "Orange" du wiki a un fond blanc plein (pas de transparence) : on la
-// fait fondre dans le fond sombre du site avec un blend mode, plutôt que de
-// laisser un carré blanc moche autour de l'icône.
-const UF_ICON_WHITEBG = { vert: false, jaune: true, rouge: false };
+// L'image "Orange" du wiki a un fond blanc plein (pas de transparence, contrairement
+// aux deux autres) : impossible à faire disparaître en pur CSS sans repasser par
+// l'image elle-même. On lui donne donc un cadre assumé (bordure ambre assortie au
+// thème) plutôt qu'un carré blanc qui flotte tout seul comme une erreur d'affichage.
+const UF_ICON_BADGE = { vert: false, jaune: true, rouge: false };
 const UF_LABEL = { vert: "Vert", jaune: "Orange", rouge: "Rouge" };
+
+// Bonus/malus selon le pourcentage du gagnant (identique à la logique serveur).
+function ufMultiplierFor(winnerPercentRounded) {
+  if (winnerPercentRounded < UF_LOW_THRESHOLD) return UF_LOW_MULTIPLIER;
+  if (winnerPercentRounded > UF_HIGH_THRESHOLD) return UF_HIGH_MULTIPLIER;
+  return UF_BASE_MULTIPLIER;
+}
 
 async function openUnclaimFinder() {
   state.casinoGame = "unclaimfinder";
@@ -4688,12 +4976,19 @@ function renderUnclaimFinderGame() {
   const busy = state.ufBusy;
   const spinning = state.ufSpinning;
   const showingResult = g && !spinning && !busy;
-  const potential = Math.round((Number(state.ufBetAmount) || 0) * UF_MULTIPLIER);
+  // Avant le résultat, le vrai multiplicateur (2×/2.95×/4×) dépend du pourcentage du
+  // gagnant, donc inconnu : on affiche le gain "normal" (base 2.95×) à titre indicatif.
+  const potential = Math.round((Number(state.ufBetAmount) || 0) * UF_BASE_MULTIPLIER);
 
+  const resultMultTag = showingResult
+    ? (g.multiplier < UF_BASE_MULTIPLIER ? ` <span class="cf-result-tag lose">malus x${g.multiplier}</span>`
+      : g.multiplier > UF_BASE_MULTIPLIER ? ` <span class="cf-result-tag win">bonus x${g.multiplier}</span>`
+      : ` <span class="cf-result-tag">x${g.multiplier}</span>`)
+    : "";
   const resultLabel = showingResult
     ? (g.win
-        ? `<p class="cf-result-label win">🎉 ${UF_LABEL[g.winner]} gagnant — +${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`
-        : `<p class="cf-result-label lose">💥 ${UF_LABEL[g.winner]} gagnant — tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
+        ? `<p class="cf-result-label win">🎉 ${UF_LABEL[g.winner]} gagnant (${g.percentages[g.winner]}%) — +${g.payout - g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${resultMultTag}</p>`
+        : `<p class="cf-result-label lose">💥 ${UF_LABEL[g.winner]} gagnant (${g.percentages[g.winner]}%) — tu perds ${g.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></p>`)
     : "";
 
   app.innerHTML = `
@@ -4736,7 +5031,7 @@ function renderUnclaimFinderGame() {
           <div class="uf-side-row">
             ${["vert", "jaune", "rouge"].map(c => `
               <button class="uf-side-btn ${c} ${state.ufChoice === c ? "active" : ""}" data-uf-choice="${c}" ${busy || spinning ? "disabled" : ""}>
-                <img class="uf-side-icon ${UF_ICON_WHITEBG[c] ? "uf-icon-whitebg" : ""}" src="${UF_ICON_URL[c]}" alt="" /> ${UF_LABEL[c]}
+                <img class="uf-side-icon ${UF_ICON_BADGE[c] ? "uf-icon-badge" : ""}" src="${UF_ICON_URL[c]}" alt="" /> ${UF_LABEL[c]}
               </button>
             `).join("")}
           </div>
@@ -4746,13 +5041,13 @@ function renderUnclaimFinderGame() {
           </button>
 
           <div class="bj-panel-label" style="margin-top:14px;">
-            <span>Profit total (${UF_MULTIPLIER}×)</span>
+            <span>Profit total (~${UF_BASE_MULTIPLIER}×)</span>
           </div>
           <div class="mn-readout mn-readout-green">${busy || spinning ? potential : (showingResult ? g.payout : potential)} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
 
           ${state.ufError ? `<p class="auth-error">${esc(state.ufError)}</p>` : ""}
 
-          <p class="bj-rules">Choisis un Unclaim Finder. Celui qui trouve le plus gros pourcentage gagne : s'il correspond à ton choix, ta mise est multipliée par ${UF_MULTIPLIER}. <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
+          <p class="bj-rules">Choisis un Unclaim Finder. Celui qui trouve le plus gros pourcentage gagne : s'il correspond à ton choix, ta mise est multipliée par ${UF_BASE_MULTIPLIER}×. Mais le pourcentage du gagnant change la donne : en dessous de ${UF_LOW_THRESHOLD}% ce n'est plus que x${UF_LOW_MULTIPLIER} (malus), au dessus de ${UF_HIGH_THRESHOLD}% ça grimpe à x${UF_HIGH_MULTIPLIER} (bonus). <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, 100% pour le fun.</p>
         </div>
 
         <div class="bj-table" style="min-height:auto;">
@@ -4763,9 +5058,9 @@ function renderUnclaimFinderGame() {
               const isChosen = c === state.ufChoice;
               return `
                 <div class="uf-stage-item">
-                  <div class="uf-pct-badge ${isWinner ? "winner " + c : ""} ${spinning ? "spinning" : ""}">${pct != null ? pct.toFixed(2) + "%" : "--%"}</div>
+                  <div class="uf-pct-badge ${isWinner ? "winner " + c : ""} ${spinning ? "spinning" : ""}">${pct != null ? Math.round(pct) + "%" : "--%"}</div>
                   <div class="uf-finder ${isChosen ? "chosen" : ""} ${isWinner ? "winner " + c : ""} ${spinning ? "spinning" : ""}">
-                    <img class="${UF_ICON_WHITEBG[c] ? "uf-icon-whitebg" : ""}" src="${UF_ICON_URL[c]}" alt="${UF_LABEL[c]}" />
+                    <img class="${UF_ICON_BADGE[c] ? "uf-icon-badge" : ""}" src="${UF_ICON_URL[c]}" alt="${UF_LABEL[c]}" />
                   </div>
                 </div>
               `;
@@ -4780,7 +5075,7 @@ function renderUnclaimFinderGame() {
                 ? `<span class="cf-history-empty">Aucune recherche pour l'instant.</span>`
                 : state.ufHistory.slice(0, 20).map(h => `
                   <div class="cf-history-chip ${h.win ? h.winner : ""}" title="${UF_LABEL[h.winner]} gagnant (${h.win ? "gagné" : "perdu"})">
-                    <img class="${UF_ICON_WHITEBG[h.winner] ? "uf-icon-whitebg" : ""}" src="${UF_ICON_URL[h.winner]}" alt="" />
+                    <img class="${UF_ICON_BADGE[h.winner] ? "uf-icon-badge" : ""}" src="${UF_ICON_URL[h.winner]}" alt="" />
                   </div>
                 `).join("")}
             </div>
@@ -5711,11 +6006,30 @@ function renderRouletteGame() {
 function renderModal() {
   const overlay = document.getElementById("overlay");
   const modal = document.getElementById("modal");
-  if (state.depositModalOpen) { renderDepositModalContent(overlay, modal); return; }
-  if (state.withdrawModalOpen) { renderWithdrawModalContent(overlay, modal); return; }
-  if (state.referralModalOpen) { renderReferralModalContent(overlay, modal); return; }
-  if (state.faqModalOpen) { renderFaqModalContent(overlay, modal); return; }
-  if (state.legalModalOpen) { renderLegalModalContent(overlay, modal); return; }
+
+  // Préserve le focus et la position du curseur d'un champ de saisie de la
+  // modale à travers les re-rendus (ex: à chaque frappe dans un montant) :
+  // sans ça, modal.innerHTML recrée le champ et fait perdre la main à
+  // chaque caractère tapé, obligeant à recliquer dessus.
+  const active = document.activeElement;
+  const preservedFocus = (active && modal.contains(active) && active.id)
+    ? { id: active.id, start: active.selectionStart, end: active.selectionEnd }
+    : null;
+  function restoreFocus() {
+    if (!preservedFocus) return;
+    const el = document.getElementById(preservedFocus.id);
+    if (!el) return;
+    el.focus();
+    if (typeof el.setSelectionRange === "function" && preservedFocus.start != null) {
+      try { el.setSelectionRange(preservedFocus.start, preservedFocus.end); } catch (e) { /* ignore */ }
+    }
+  }
+
+  if (state.depositModalOpen) { renderDepositModalContent(overlay, modal); restoreFocus(); return; }
+  if (state.withdrawModalOpen) { renderWithdrawModalContent(overlay, modal); restoreFocus(); return; }
+  if (state.referralModalOpen) { renderReferralModalContent(overlay, modal); restoreFocus(); return; }
+  if (state.faqModalOpen) { renderFaqModalContent(overlay, modal); restoreFocus(); return; }
+  if (state.legalModalOpen) { renderLegalModalContent(overlay, modal); restoreFocus(); return; }
   if (!state.openBet) { overlay.classList.remove("open"); return; }
 
   const market = state.markets.find(m => m.id === state.openBet.marketId);
@@ -5761,35 +6075,86 @@ function renderModal() {
   }));
   const confirmBtn = document.getElementById("confirmBtn");
   if (confirmBtn) confirmBtn.addEventListener("click", placeBet);
+  restoreFocus();
 }
 
 function renderDepositModalContent(overlay, modal) {
   const f = state.depositForm;
-  const amountNum = Number(f.amount) || 0;
-  const belowMin = amountNum > 0 && amountNum < DEPOSIT_MIN_AMOUNT;
-  const usdValue = (amountNum * EMERALD_USD_RATE).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const quicks = [DEPOSIT_MIN_AMOUNT, 5000 + DEPOSIT_MIN_AMOUNT, 10000 + DEPOSIT_MIN_AMOUNT, 25000 + DEPOSIT_MIN_AMOUNT].filter((v, i, arr) => arr.indexOf(v) === i);
-  const canSubmit = !state.depositBusy && !!f.blob && amountNum >= DEPOSIT_MIN_AMOUNT;
+  if (f.step === 2) { renderDepositModalStep2(overlay, modal); return; }
+
+  const amountUsd = Number(f.amountUsd) || 0;
+  const minUsd = depositMinUsd();
+  const belowMin = amountUsd > 0 && amountUsd < minUsd;
+  const diamondsPreview = usdToDiamonds(amountUsd);
+  const quicks = [minUsd, 20, 50, 100].map(v => Math.max(v, minUsd)).filter((v, i, arr) => arr.indexOf(v) === i);
+  const canNext = amountUsd >= minUsd;
+  const hasApprovedDeposit = state.deposits.some(d => d.status === "approved");
+  const depositOffer = state.offers.find(o => o.type === "deposit_boost");
 
   modal.innerHTML = `
     <div class="modal-head">
-      <span class="modal-kicker" style="color:var(--green);">Déposer des émeraudes Paladium</span>
+      <span class="modal-kicker" style="color:var(--green);">Déposer — 1/2</span>
       <button class="modal-close" id="depModalClose">✕</button>
     </div>
-    <p class="modal-title">Effectuez un /pay totolabanane <montant> en jeu, indiquez le montant ci-dessous et joignez une capture d'écran du paiement comme preuve.</p>
+    <p class="modal-title">Indique combien tu veux déposer en $. On te montrera ensuite la commande exacte à passer en jeu.</p>
+    ${depositOffer && !hasApprovedDeposit ? `<p class="dep-usd" style="color:var(--green-hi); font-weight:700;">🎁 Offre en cours : ton 1er dépôt est doublé, jusqu'à ${(depositOffer.maxBonus || 0).toLocaleString("fr-FR")} 💎 de bonus offerts !</p>` : ""}
 
-    <label class="modal-label">Montant déposé (émeraudes en jeu)</label>
+    <label class="modal-label">Montant à déposer ($)</label>
     <div class="amount-row">
-      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
-      <input type="number" id="depAmountInput" min="${DEPOSIT_MIN_AMOUNT}" value="${f.amount}" />
+      <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">$</span>
+      <input type="number" id="depAmountInput" min="${minUsd}" step="0.01" value="${f.amountUsd}" />
     </div>
-    <p class="dep-usd">≈ ${usdValue} $ · taux : 1 <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> = ${EMERALD_USD_RATE.toFixed(2)} $</p>
-    ${belowMin ? `<p class="dep-inline-error">Le minimum est de ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />.</p>` : ""}
+    <p class="dep-usd">= ${diamondsPreview.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · taux : 1 <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> = ${EMERALD_USD_RATE.toFixed(2)} $</p>
+    ${belowMin ? `<p class="dep-inline-error">Le minimum est de ${minUsd.toFixed(2)} $ (${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} 💎).</p>` : ""}
     <div class="quick-row">
-      ${quicks.map(q => `<button class="quick-btn" data-depquick="${q}">${q.toLocaleString("fr-FR")}</button>`).join("")}
+      ${quicks.map(q => `<button class="quick-btn" data-depquick="${q}">${q.toFixed(2)} $</button>`).join("")}
     </div>
 
-    <label class="modal-label">Capture d'écran de la preuve (transaction / coffre / chat)</label>
+    <button class="confirm-btn btn-yes" id="depNextBtn" style="margin-top:16px;" ${canNext ? "" : "disabled style='opacity:0.55;'"}>
+      Suivant →
+    </button>
+    <p class="price-note">Montant minimum : ${minUsd.toFixed(2)} $ (${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />).</p>
+  `;
+
+  overlay.classList.add("open");
+  overlay.onclick = (e) => { if (e.target === overlay) closeDepositModal(); };
+  document.getElementById("depModalClose").addEventListener("click", closeDepositModal);
+
+  document.getElementById("depAmountInput").addEventListener("input", e => {
+    state.depositForm.amountUsd = e.target.value;
+    renderModal();
+  });
+  document.querySelectorAll("[data-depquick]").forEach(b => b.addEventListener("click", () => {
+    state.depositForm.amountUsd = Number(b.dataset.depquick);
+    renderModal();
+  }));
+
+  const nextBtn = document.getElementById("depNextBtn");
+  if (nextBtn) nextBtn.addEventListener("click", goToDepositStep2);
+}
+
+function renderDepositModalStep2(overlay, modal) {
+  const f = state.depositForm;
+  const amountUsd = Number(f.amountUsd) || 0;
+  const diamonds = usdToDiamonds(amountUsd);
+  const cmd = depositPayCommand();
+  const canSubmit = !state.depositBusy && !!f.blob;
+
+  modal.innerHTML = `
+    <div class="modal-head">
+      <span class="modal-kicker" style="color:var(--green);">Déposer — 2/2</span>
+      <button class="modal-close" id="depModalClose">✕</button>
+    </div>
+    <p class="modal-title">Effectue ce paiement en jeu, puis joins une capture d'écran comme preuve.</p>
+
+    <label class="modal-label">Commande à exécuter en jeu</label>
+    <div class="dep-cmd-box">
+      <code id="depCmdText">${esc(cmd)}</code>
+      <button class="mini-btn" id="depCopyBtn" type="button">📋 Copier</button>
+    </div>
+    <p class="dep-usd">Ce paiement te créditera <b>${diamonds.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></b> une fois validé par le staff.</p>
+
+    <label class="modal-label" style="margin-top:14px;">Capture d'écran de la preuve (chat / transaction)</label>
     ${!f.dataUrl ? `
       <div class="dep-drop" id="depDrop">
         <div class="dep-drop-icon">📎</div>
@@ -5805,31 +6170,20 @@ function renderDepositModalContent(overlay, modal) {
       <p class="dep-preview-name">📎 ${esc(f.fileName)}</p>
     `}
 
-    ${amountNum >= DEPOSIT_MIN_AMOUNT && f.blob ? `
-      <div class="dep-recap">
-        Récap : demande de dépôt de <b>${amountNum.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></b> (≈ ${usdValue} $), avec preuve jointe.
-        Le staff valide généralement en moins de 12h.
-      </div>
-    ` : ""}
-
-    <button class="confirm-btn btn-yes" id="depConfirmBtn" style="margin-top:16px;" ${canSubmit ? "" : "disabled style='opacity:0.55;'"}>
-      ${state.depositBusy ? "Envoi…" : "Envoyer la demande de dépôt"}
-    </button>
-    <p class="price-note">Montant minimum : ${DEPOSIT_MIN_AMOUNT.toLocaleString("fr-FR")} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />. Le crédit n'est pas automatique : un membre du staff doit valider la preuve.</p>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="mini-btn" id="depBackBtn" type="button">← Retour</button>
+      <button class="confirm-btn btn-yes" id="depConfirmBtn" style="flex:1;" ${canSubmit ? "" : "disabled style='opacity:0.55;'"}>
+        ${state.depositBusy ? "Envoi…" : "Envoyer la demande de dépôt"}
+      </button>
+    </div>
+    <p class="price-note">Le crédit n'est pas automatique : un membre du staff doit valider la preuve.</p>
   `;
 
   overlay.classList.add("open");
   overlay.onclick = (e) => { if (e.target === overlay) closeDepositModal(); };
   document.getElementById("depModalClose").addEventListener("click", closeDepositModal);
-
-  document.getElementById("depAmountInput").addEventListener("input", e => {
-    state.depositForm.amount = e.target.value;
-    renderModal();
-  });
-  document.querySelectorAll("[data-depquick]").forEach(b => b.addEventListener("click", () => {
-    state.depositForm.amount = Number(b.dataset.depquick);
-    renderModal();
-  }));
+  document.getElementById("depBackBtn").addEventListener("click", backToDepositStep1);
+  document.getElementById("depCopyBtn").addEventListener("click", copyDepositCommand);
 
   const removeBtn = document.getElementById("depRemoveShot");
   if (removeBtn) removeBtn.addEventListener("click", removeDepositScreenshot);
@@ -5858,28 +6212,32 @@ function renderWithdrawModalContent(overlay, modal) {
   const required = Number(state.account.wageringRequired) || 0;
   const progress = Math.min(Number(state.account.wageringProgress) || 0, required);
   const wageringBlocked = required > 0 && progress < required;
+  const amountNum = Number(f.amount) || 0;
+  const netUsd = diamondsToNetUsd(amountNum);
+  const pseudoOk = f.minecraftPseudo && f.minecraftPseudo.trim().length >= 3;
 
   modal.innerHTML = `
     <div class="modal-head">
       <span class="modal-kicker" style="color:var(--red);">Retirer des émeraudes</span>
       <button class="modal-close" id="wdModalClose">✕</button>
     </div>
-    <p class="modal-title">Indique le montant à retirer. Ton solde ParaBet est débité tout de suite ; le staff te remet les émeraudes en jeu après vérification, puis valide la demande.</p>
+    <p class="modal-title">Indique le montant à retirer. Ton solde ParaBet est débité tout de suite ; le staff te verse le montant en $ après vérification, puis valide la demande.</p>
     ${wageringBarHtml(state.account)}
     <label class="modal-label">Montant à retirer · ${balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> disponibles</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
       <input type="number" id="wdAmountInput" min="${WITHDRAW_MIN_AMOUNT}" max="${maxAmount}" value="${f.amount}" ${wageringBlocked ? "disabled" : ""} />
     </div>
+    <p class="dep-usd">Tu recevras environ <b>${netUsd.toFixed(2)} $</b> · taux : 1 <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> = ${EMERALD_USD_RATE.toFixed(2)} $ · taxe de retrait : ${WITHDRAW_TAX_PERCENT}%</p>
     <div class="quick-row">
       ${[WITHDRAW_MIN_AMOUNT, Math.round(balance / 2), balance].filter((v, i, arr) => v >= WITHDRAW_MIN_AMOUNT && arr.indexOf(v) === i).map(q => `<button class="quick-btn" data-wdquick="${q}" ${wageringBlocked ? "disabled" : ""}>${q === balance ? "Max" : q}</button>`).join("")}
     </div>
-    <label class="modal-label" style="margin-top:12px;">Pseudo Paladium (Minecraft)</label>
+    <label class="modal-label" style="margin-top:12px;">Confirmez votre pseudo Paladium</label>
     <input type="text" id="wdPseudoInput" class="modal-text-input" maxlength="20" placeholder="TonPseudoEnJeu" value="${esc(f.minecraftPseudo || "")}" autocomplete="off" ${wageringBlocked ? "disabled" : ""} />
-    <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || wageringBlocked || balance < WITHDRAW_MIN_AMOUNT ? "disabled style='opacity:0.55;'" : ""}>
+    <button class="confirm-btn btn-no" id="wdConfirmBtn" style="margin-top:16px;" ${state.withdrawBusy || wageringBlocked || balance < WITHDRAW_MIN_AMOUNT || !pseudoOk ? "disabled style='opacity:0.55;'" : ""}>
       ${state.withdrawBusy ? "Envoi…" : wageringBlocked ? "Objectif de mise non atteint" : "Envoyer la demande de retrait"}
     </button>
-    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />. Le pseudo indiqué doit correspondre au pseudo qui reçoit les émeraudes en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
+    <p class="price-note">Montant minimum : ${WITHDRAW_MIN_AMOUNT} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />. Le pseudo indiqué doit correspondre au pseudo qui reçoit le paiement en jeu. Le staff peut annuler cette demande en cas de doute (multi-compte, fraude, erreur) ; si elle est annulée ou refusée, le solde retiré t'est automatiquement recrédité.</p>
     ${!wageringBlocked && balance < WITHDRAW_MIN_AMOUNT ? `<p class="low-balance">Solde insuffisant pour demander un retrait.</p>` : ""}
   `;
 
@@ -5888,9 +6246,11 @@ function renderWithdrawModalContent(overlay, modal) {
   document.getElementById("wdModalClose").addEventListener("click", closeWithdrawModal);
   document.getElementById("wdAmountInput").addEventListener("input", e => {
     state.withdrawForm.amount = clamp(Math.round(Number(e.target.value) || WITHDRAW_MIN_AMOUNT), WITHDRAW_MIN_AMOUNT, maxAmount);
+    renderModal();
   });
   document.getElementById("wdPseudoInput").addEventListener("input", e => {
     state.withdrawForm.minecraftPseudo = e.target.value;
+    renderModal();
   });
   document.querySelectorAll("[data-wdquick]").forEach(b => b.addEventListener("click", () => {
     state.withdrawForm.amount = clamp(Number(b.dataset.wdquick), WITHDRAW_MIN_AMOUNT, maxAmount);
@@ -5909,7 +6269,7 @@ function renderReferralModalContent(overlay, modal) {
       <span class="modal-kicker" style="color:var(--green);">Programme de parrainage</span>
       <button class="modal-close" id="refModalClose">✕</button>
     </div>
-    <p class="modal-title">Invite tes amis avec ton code : tu reçois ${r.bonusReferrer} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> pour chaque inscription, et ton filleul reçoit ${r.bonusReferee} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> en bonus de bienvenue.</p>
+    <p class="modal-title">Invite tes amis avec ton code : tu reçois ${r.bonusReferrer} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />, et ton filleul reçoit ${r.bonusReferee} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />, dès que ton filleul effectue et fait valider son 1er dépôt.</p>
     <label class="modal-label">Ton code</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">${findiumIcon(18)}</span>
@@ -5920,10 +6280,18 @@ function renderReferralModalContent(overlay, modal) {
       <input type="text" id="refLinkField" value="${esc(link)}" readonly style="font-size:12px;" />
     </div>
     <button class="confirm-btn btn-yes" id="refCopyBtn" style="margin-top:16px;">📋 Copier le lien</button>
-    <p class="price-note">${r.count} filleul(s) · ${r.totalEarned} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> gagnés grâce au parrainage</p>
+    <p class="price-note">${r.count} filleul(s) · ${r.validatedCount || 0} validé(s) · ${r.totalEarned} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> gagnés grâce au parrainage</p>
     ${r.referred.length > 0 ? `
-      <div class="feed-box" style="height:auto; max-height:160px; margin-top:10px;">
-        ${r.referred.map(f => `<p class="feed-line"><span style="color:var(--text);">${esc(f.pseudo)}</span> — inscrit le ${new Date(f.ts).toLocaleDateString("fr-FR")}</p>`).join("")}
+      <label class="modal-label" style="margin-top:14px; display:block;">Avancement du parrainage</label>
+      <div class="feed-box" style="height:auto; max-height:200px; margin-top:6px;">
+        ${r.referred.map(f => `
+          <p class="feed-line">
+            <span style="color:var(--text);">${esc(f.pseudo)}</span> — inscrit le ${new Date(f.ts).toLocaleDateString("fr-FR")}
+            ${f.validated
+              ? ` · <span style="color:var(--green); font-weight:700;">✅ 1er dépôt validé</span>`
+              : ` · <span style="color:var(--amber); font-weight:700;">⏳ En attente du 1er dépôt</span>`}
+          </p>
+        `).join("")}
       </div>
     ` : `<p class="field-hint">Personne n'a encore utilisé ton code — partage ton lien !</p>`}
   `;
@@ -5947,7 +6315,7 @@ function renderFaqModalContent(overlay, modal) {
       ${FAQ_ITEMS.map((item, i) => `
         <details class="faq-item" ${i === 0 ? "open" : ""}>
           <summary class="faq-question">${esc(item.q)}</summary>
-          <p class="faq-answer">${esc(item.a)}</p>
+          <p class="faq-answer">${esc(typeof item.a === "function" ? item.a() : item.a)}</p>
         </details>
       `).join("")}
     </div>
@@ -6014,13 +6382,14 @@ function renderAdmin() {
                   ${a.balance} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> · ${a.betCount} pari${a.betCount === 1 ? "" : "s"} marché pour ${a.totalWagered} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés
                   · ${a.casinoBetCount} partie${a.casinoBetCount === 1 ? "" : "s"} casino pour ${a.casinoTotalWagered} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés (<span style="color:${a.casinoNet >= 0 ? "var(--green)" : "var(--red)"};">${a.casinoNet >= 0 ? "+" : ""}${a.casinoNet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>)
                   · inscrit le ${new Date(a.createdAt).toLocaleDateString("fr-FR")}
-                  ${a.referredByPseudo ? ` · parrainé par ${esc(a.referredByPseudo)}` : ""}
+                  ${a.referredByPseudo ? ` · parrainé par ${esc(a.referredByPseudo)} (${a.referralValidated ? "✅ validé" : "⏳ en attente du 1er dépôt"})` : ""}
                   ${a.referralEarnings > 0 ? ` · ${a.referralEarnings} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> gagnés en parrainage` : ""}
                 </div>
               </div>
               <div class="admin-actions">
                 <button class="mini-btn" data-toggle-account="${a.id}">${state.adminExpandedAccountId === a.id ? "Masquer" : "Voir les paris"}</button>
                 <button class="mini-btn" data-toggle-account-casino="${a.id}">${state.adminExpandedAccountCasinoId === a.id ? "Masquer" : "Voir le casino"}</button>
+                <button class="mini-btn" data-toggle-account-referrals="${a.id}">${state.adminExpandedAccountReferralsId === a.id ? "Masquer" : "Voir les filleuls"}</button>
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -6047,6 +6416,18 @@ function renderAdmin() {
                     <span style="font-weight:700;">${CASINO_GAME_LABEL[c.game] || c.game}</span>
                     — ${c.bet} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> misés · <span style="color:${CASINO_RESULT_COLOR[c.result] || "var(--text-faint)"}; font-weight:700;">${CASINO_RESULT_LABEL[c.result] || c.result}</span>
                     (${c.net >= 0 ? "+" : ""}${c.net} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />) · ${esc(c.detail || "")} · ${new Date(c.ts).toLocaleString("fr-FR")}
+                  </p>
+                `).join("")}
+              </div>
+            ` : ""}
+            ${state.adminExpandedAccountReferralsId === a.id ? `
+              <div class="feed-box" style="height:auto; max-height:220px;">
+                ${!state.adminAccountReferrals[a.id] ? `<p class="admin-row-meta">Chargement…</p>` : state.adminAccountReferrals[a.id].length === 0 ? `<p class="admin-row-meta">Ce joueur n'a encore parrainé personne.</p>` : state.adminAccountReferrals[a.id].map(f => `
+                  <p class="feed-line">
+                    <span style="color:var(--text);">${esc(f.pseudo)}</span> — inscrit le ${new Date(f.ts).toLocaleDateString("fr-FR")}
+                    ${f.validated
+                      ? ` · <span style="color:var(--green); font-weight:700;">✅ 1er dépôt validé</span>`
+                      : ` · <span style="color:var(--amber); font-weight:700;">⏳ En attente du 1er dépôt</span>`}
                   </p>
                 `).join("")}
               </div>
@@ -6090,6 +6471,75 @@ function renderAdmin() {
             `).join("")}
           </div>
         `}
+      </div>
+
+      <div class="admin-section">
+        <h3>🎁 Offre du moment</h3>
+        <p class="admin-row-meta" style="margin-bottom:10px;">Crée une offre limitée dans le temps, affichée en haut de la page d'accueil. Une seule offre par type est appliquée à la fois (la plus récente, active et non expirée).</p>
+
+        <div class="admin-grid">
+          <div class="field">
+            <label>Type d'offre</label>
+            <select id="offerTypeInput">
+              <option value="deposit_boost" ${state.adminOfferForm.type === "deposit_boost" ? "selected" : ""}>1er dépôt doublé</option>
+              <option value="referral_boost" ${state.adminOfferForm.type === "referral_boost" ? "selected" : ""}>Parrainage boosté</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Titre (optionnel)</label>
+            <input id="offerTitleInput" placeholder="ex: Weekend spécial" maxlength="140" value="${esc(state.adminOfferForm.title)}" />
+          </div>
+          ${state.adminOfferForm.type === "deposit_boost" ? `
+            <div class="field">
+              <label>Bonus max (💎)</label>
+              <input id="offerMaxBonusInput" type="number" min="1" value="${state.adminOfferForm.maxBonus}" />
+            </div>
+          ` : `
+            <div class="field">
+              <label>Bonus parrain (💎)</label>
+              <input id="offerReferrerBonusInput" type="number" min="0" value="${state.adminOfferForm.referrerBonus}" />
+            </div>
+            <div class="field">
+              <label>Bonus filleul (💎)</label>
+              <input id="offerRefereeBonusInput" type="number" min="0" value="${state.adminOfferForm.refereeBonus}" />
+            </div>
+          `}
+          <div class="field">
+            <label>Date de fin (optionnelle)</label>
+            <input id="offerEndsAtInput" type="datetime-local" value="${state.adminOfferForm.endsAt}" />
+          </div>
+        </div>
+        <button class="text-btn amber" id="createOfferBtn" ${state.adminBusy ? "disabled" : ""} style="margin-top:6px;">
+          ${state.adminBusy ? "..." : "+ Créer l'offre"}
+        </button>
+
+        <div style="margin-top:18px;">
+          ${state.adminOffers.length === 0 ? `<p class="admin-row-meta">Aucune offre créée pour l'instant.</p>` : state.adminOffers.map(o => `
+            <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div>
+                  <div class="admin-row-title">
+                    ${o.type === "deposit_boost" ? "🎁 1er dépôt doublé" : "🤝 Parrainage boosté"}${o.title ? ` — ${esc(o.title)}` : ""}
+                    ${o.active && !o.expired ? `<span class="admin-tag" style="margin-left:6px; background:var(--green-bg); color:var(--green);">En cours</span>` : o.expired ? `<span class="admin-tag" style="margin-left:6px;">Expirée</span>` : `<span class="admin-tag" style="margin-left:6px;">Désactivée</span>`}
+                  </div>
+                  <div class="admin-row-meta">
+                    ${o.type === "deposit_boost" ? `bonus max : ${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎` : `parrain : +${(o.referrerBonus || 0).toLocaleString("fr-FR")} 💎 · filleul : +${(o.refereeBonus || 0).toLocaleString("fr-FR")} 💎`}
+                    ${o.endsAt ? ` · se termine le ${new Date(o.endsAt).toLocaleString("fr-FR")}` : " · pas de date de fin"}
+                  </div>
+                </div>
+                <div class="admin-actions">
+                  <button class="mini-btn" data-toggle-offer="${o.id}|${o.active ? 0 : 1}">${o.active ? "Désactiver" : "Activer"}</button>
+                  <button class="mini-btn" data-delete-offer="${o.id}">Supprimer</button>
+                </div>
+              </div>
+              <div class="admin-actions" style="align-items:center;">
+                <label class="admin-row-meta" style="margin:0;">Nouvelle date de fin :</label>
+                <input type="datetime-local" data-offer-endsat="${o.id}" value="${msToLocalInputValue(o.endsAt)}" style="width:auto;" />
+                <button class="mini-btn" data-save-offer-endsat="${o.id}">Mettre à jour</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
       </div>
 
       <div class="admin-section">
@@ -6185,6 +6635,26 @@ function renderAdmin() {
       </div>
 
       <div class="admin-section">
+        <h3>Paramètres — dépôts &amp; retraits</h3>
+        <p class="admin-row-meta" style="margin-bottom:10px;">Le taux s'applique aux dépôts (calcul des 💎 reçus pour X $) et aux retraits (calcul des $ versés, moins la taxe).</p>
+        <div class="admin-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            1 💎 =
+            <input type="number" min="0.01" step="0.01" id="setRateInput" value="${state.adminSettings.usdPerDiamond ?? EMERALD_USD_RATE}" style="width:90px;" /> $
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Taxe de retrait
+            <input type="number" min="0" max="99" step="0.1" id="setTaxInput" value="${state.adminSettings.withdrawTaxPercent ?? WITHDRAW_TAX_PERCENT}" style="width:70px;" /> %
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Pseudo à payer (/pay)
+            <input type="text" maxlength="20" id="setPseudoInput" value="${esc(state.adminSettings.depositPayPseudo ?? DEPOSIT_PAY_PSEUDO)}" style="width:140px;" />
+          </label>
+          <button class="mini-btn" id="saveSettingsBtn" ${state.adminBusy ? "disabled" : ""}>Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
         <h3>Dépôts en attente (${pendingDeposits.length})</h3>
         ${pendingDeposits.length === 0 ? `<p class="admin-row-meta">Aucune demande de dépôt en attente.</p>` : pendingDeposits.map(d => `
           <div class="admin-row" style="align-items:flex-start;">
@@ -6192,7 +6662,7 @@ function renderAdmin() {
               <img src="${d.screenshot}" data-viewshot="${d.id}" title="Cliquer pour agrandir"
                    style="width:88px; height:88px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; flex-shrink:0;" />
               <div>
-                <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
+                <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${d.amountUsd != null ? ` (${d.amountUsd.toFixed(2)} $)` : ""}</div>
                 <div class="admin-row-meta">Demandé le ${new Date(d.ts).toLocaleString("fr-FR")}</div>
               </div>
             </div>
@@ -6209,8 +6679,9 @@ function renderAdmin() {
         ${pastDeposits.length === 0 ? `<p class="admin-row-meta">Aucun dépôt traité pour l'instant.</p>` : pastDeposits.slice(0, 40).map(d => `
           <div class="admin-row">
             <div>
-              <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
+              <div class="admin-row-title">${esc(d.pseudo)} — ${d.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${d.amountUsd != null ? ` (${d.amountUsd.toFixed(2)} $)` : ""}</div>
               <div class="admin-row-meta">${d.status === "approved" ? "Approuvé" : "Refusé"} · ${new Date(d.ts).toLocaleString("fr-FR")}</div>
+              ${d.status === "rejected" && d.rejectReason ? `<div class="admin-row-meta" style="color:var(--red);">Motif : ${esc(d.rejectReason)}</div>` : ""}
             </div>
             <div class="admin-actions">
               <button class="mini-btn" data-viewshot="${d.id}">Voir la preuve</button>
@@ -6227,7 +6698,7 @@ function renderAdmin() {
         ${pendingWithdrawals.length === 0 ? `<p class="admin-row-meta">Aucune demande de retrait en attente.</p>` : pendingWithdrawals.map(w => `
           <div class="admin-row">
             <div>
-              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
+              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${w.amountUsd != null ? ` → ${w.amountUsd.toFixed(2)} $${w.taxPercent != null ? ` (taxe ${w.taxPercent}%)` : ""}` : ""}</div>
               <div class="admin-row-meta">Pseudo Paladium à payer : <strong>${esc(w.minecraftPseudo || "—")}</strong></div>
               <div class="admin-row-meta">Demandé le ${new Date(w.ts).toLocaleString("fr-FR")}</div>
             </div>
@@ -6244,9 +6715,10 @@ function renderAdmin() {
         ${pastWithdrawals.length === 0 ? `<p class="admin-row-meta">Aucun retrait traité pour l'instant.</p>` : pastWithdrawals.slice(0, 40).map(w => `
           <div class="admin-row">
             <div>
-              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></div>
+              <div class="admin-row-title">${esc(w.pseudo)} — ${w.amount} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />${w.amountUsd != null ? ` → ${w.amountUsd.toFixed(2)} $` : ""}</div>
               <div class="admin-row-meta">Pseudo Paladium : ${esc(w.minecraftPseudo || "—")}</div>
               <div class="admin-row-meta">${w.status === "approved" ? "Payé" : "Refusé"} · ${new Date(w.ts).toLocaleString("fr-FR")}</div>
+              ${w.status === "rejected" && w.rejectReason ? `<div class="admin-row-meta" style="color:var(--red);">Motif : ${esc(w.rejectReason)}</div>` : ""}
             </div>
             <div class="admin-actions">
               <button class="mini-btn" data-delete-wd="${w.id}">Supprimer</button>
@@ -6255,7 +6727,7 @@ function renderAdmin() {
         `).join("")}
       </div>
 
-      <p class="disclaimer">Marquer un retrait "payé" confirme que tu as remis les émeraudes au joueur en jeu — le solde ParaBet a déjà été débité à la demande. Le refuser recrédite automatiquement le joueur.</p>
+      <p class="disclaimer">Marquer un retrait "payé" confirme que tu as remis le paiement au joueur en jeu — le solde ParaBet a déjà été débité à la demande. Le refuser recrédite automatiquement le joueur.</p>
     </div>
   `;
 
@@ -6292,13 +6764,47 @@ function renderAdmin() {
     const input = document.querySelector(`[data-pct-input="${b.dataset.setpct}"]`);
     adminSetPct(b.dataset.setpct, input ? input.value : "");
   }));
+  document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+    const rate = document.getElementById("setRateInput").value;
+    const tax = document.getElementById("setTaxInput").value;
+    const pseudo = document.getElementById("setPseudoInput").value;
+    adminSaveSettings(rate, tax, pseudo);
+  });
+  const offerTypeInput = document.getElementById("offerTypeInput");
+  if (offerTypeInput) offerTypeInput.addEventListener("change", e => { state.adminOfferForm.type = e.target.value; render(); });
+  const offerTitleInput = document.getElementById("offerTitleInput");
+  if (offerTitleInput) offerTitleInput.addEventListener("input", e => { state.adminOfferForm.title = e.target.value; });
+  const offerMaxBonusInput = document.getElementById("offerMaxBonusInput");
+  if (offerMaxBonusInput) offerMaxBonusInput.addEventListener("input", e => { state.adminOfferForm.maxBonus = e.target.value; });
+  const offerReferrerBonusInput = document.getElementById("offerReferrerBonusInput");
+  if (offerReferrerBonusInput) offerReferrerBonusInput.addEventListener("input", e => { state.adminOfferForm.referrerBonus = e.target.value; });
+  const offerRefereeBonusInput = document.getElementById("offerRefereeBonusInput");
+  if (offerRefereeBonusInput) offerRefereeBonusInput.addEventListener("input", e => { state.adminOfferForm.refereeBonus = e.target.value; });
+  const offerEndsAtInput = document.getElementById("offerEndsAtInput");
+  if (offerEndsAtInput) offerEndsAtInput.addEventListener("input", e => { state.adminOfferForm.endsAt = e.target.value; });
+  const createOfferBtn = document.getElementById("createOfferBtn");
+  if (createOfferBtn) createOfferBtn.addEventListener("click", adminCreateOffer);
+  document.querySelectorAll("[data-toggle-offer]").forEach(b => b.addEventListener("click", () => {
+    const [id, active] = b.dataset.toggleOffer.split("|");
+    adminToggleOffer(id, Number(active));
+  }));
+  document.querySelectorAll("[data-delete-offer]").forEach(b => b.addEventListener("click", () => {
+    if (confirm("Supprimer cette offre définitivement ?")) adminDeleteOffer(b.dataset.deleteOffer);
+  }));
+  document.querySelectorAll("[data-save-offer-endsat]").forEach(b => b.addEventListener("click", () => {
+    const input = document.querySelector(`[data-offer-endsat="${b.dataset.saveOfferEndsat}"]`);
+    adminSetOfferEndsAt(b.dataset.saveOfferEndsat, input ? input.value : "");
+  }));
   document.querySelectorAll("[data-approve-dep]").forEach(b => b.addEventListener("click", () => {
     if (confirm("Confirmer ce dépôt ? Le montant sera crédité immédiatement sur le compte du joueur.")) {
       adminApproveDeposit(b.dataset.approveDep);
     }
   }));
   document.querySelectorAll("[data-reject-dep]").forEach(b => b.addEventListener("click", () => {
-    if (confirm("Refuser cette demande de dépôt ?")) adminRejectDeposit(b.dataset.rejectDep);
+    const reason = prompt("Raison du refus de ce dépôt (affichée au joueur) :");
+    if (reason === null) return;
+    if (!reason.trim()) { showToast("Indique une raison de refus."); return; }
+    adminRejectDeposit(b.dataset.rejectDep, reason.trim());
   }));
   document.querySelectorAll("[data-delete-dep]").forEach(b => b.addEventListener("click", () => {
     if (confirm("Supprimer cet historique de dépôt ?")) adminDeleteDeposit(b.dataset.deleteDep);
@@ -6309,9 +6815,10 @@ function renderAdmin() {
     }
   }));
   document.querySelectorAll("[data-reject-wd]").forEach(b => b.addEventListener("click", () => {
-    if (confirm("Refuser cette demande de retrait ? Le solde du joueur sera recrédité.")) {
-      adminRejectWithdrawal(b.dataset.rejectWd);
-    }
+    const reason = prompt("Raison du refus de ce retrait (affichée au joueur, le solde sera recrédité) :");
+    if (reason === null) return;
+    if (!reason.trim()) { showToast("Indique une raison de refus."); return; }
+    adminRejectWithdrawal(b.dataset.rejectWd, reason.trim());
   }));
   document.querySelectorAll("[data-delete-wd]").forEach(b => b.addEventListener("click", () => {
     if (confirm("Supprimer cet historique de retrait ?")) adminDeleteWithdrawal(b.dataset.deleteWd);
@@ -6346,6 +6853,9 @@ function renderAdmin() {
   }));
   document.querySelectorAll("[data-toggle-account-casino]").forEach(el => el.addEventListener("click", () => {
     toggleAccountCasinoBets(el.dataset.toggleAccountCasino);
+  }));
+  document.querySelectorAll("[data-toggle-account-referrals]").forEach(el => el.addEventListener("click", () => {
+    toggleAccountReferrals(el.dataset.toggleAccountReferrals);
   }));
 }
 

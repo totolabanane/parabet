@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   referral_code     VARCHAR(12) UNIQUE,
   referred_by       INTEGER DEFAULT NULL,
   referral_earnings INTEGER NOT NULL DEFAULT 0,
+  referral_bonus_referrer INTEGER NOT NULL DEFAULT 0,
+  referral_bonus_referee  INTEGER NOT NULL DEFAULT 0,
+  referral_validated_at   TIMESTAMP DEFAULT NULL,
   wagering_required INTEGER NOT NULL DEFAULT 0,
   wagering_progress INTEGER NOT NULL DEFAULT 0,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -58,8 +61,10 @@ CREATE TABLE IF NOT EXISTS deposits (
   id              SERIAL PRIMARY KEY,
   account_id      INTEGER NOT NULL,
   amount          INTEGER NOT NULL,
+  amount_usd      NUMERIC(12,2) DEFAULT NULL,
   screenshot_file VARCHAR(255) NOT NULL,
   status          VARCHAR(10) NOT NULL DEFAULT 'pending',
+  reject_reason   TEXT DEFAULT NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   reviewed_at     TIMESTAMP DEFAULT NULL,
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
@@ -69,11 +74,21 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   id               SERIAL PRIMARY KEY,
   account_id       INTEGER NOT NULL,
   amount           INTEGER NOT NULL,
+  amount_usd       NUMERIC(12,2) DEFAULT NULL,
+  tax_percent      NUMERIC(5,2) DEFAULT NULL,
   minecraft_pseudo VARCHAR(32) NOT NULL DEFAULT '',
   status           VARCHAR(10) NOT NULL DEFAULT 'pending',
+  reject_reason    TEXT DEFAULT NULL,
   created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   reviewed_at      TIMESTAMP DEFAULT NULL,
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+);
+
+-- Paramètres généraux réglables depuis l'admin (taux $/💎, taxe de retrait,
+-- pseudo à qui envoyer le /pay pour les dépôts...). Clé/valeur générique.
+CREATE TABLE IF NOT EXISTS settings (
+  key   VARCHAR(50) PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS casino_bets (
@@ -94,6 +109,24 @@ CREATE TABLE IF NOT EXISTS casino_limits (
   min_bet INTEGER NOT NULL DEFAULT 10,
   max_bet INTEGER DEFAULT NULL
 );
+
+-- Offres du moment, configurées par le staff (1er dépôt doublé / parrainage
+-- boosté), affichées en bandeau sur l'accueil tant qu'elles sont actives et
+-- non expirées. Une seule offre par type est appliquée à la fois (la plus
+-- récente, active et non expirée).
+CREATE TABLE IF NOT EXISTS offers (
+  id              SERIAL PRIMARY KEY,
+  type            VARCHAR(20) NOT NULL,       -- 'deposit_boost' | 'referral_boost'
+  title           VARCHAR(140) DEFAULT NULL,
+  max_bonus       INTEGER DEFAULT NULL,       -- deposit_boost : bonus max en 💎
+  referrer_bonus  INTEGER DEFAULT NULL,       -- referral_boost : bonus parrain en 💎
+  referee_bonus   INTEGER DEFAULT NULL,       -- referral_boost : bonus filleul en 💎
+  ends_at         TIMESTAMP DEFAULT NULL,     -- NULL = offre permanente
+  active          INTEGER NOT NULL DEFAULT 1,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_offers_type_active ON offers(type, active);
 
 -- Index utiles
 CREATE INDEX IF NOT EXISTS idx_bets_market ON bets(market_id);

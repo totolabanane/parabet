@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   referral_code     TEXT UNIQUE,
   referred_by       INTEGER DEFAULT NULL,
   referral_earnings INTEGER NOT NULL DEFAULT 0,
+  referral_bonus_referrer INTEGER NOT NULL DEFAULT 0,
+  referral_bonus_referee  INTEGER NOT NULL DEFAULT 0,
+  referral_validated_at   TIMESTAMP DEFAULT NULL,
   wagering_required INTEGER NOT NULL DEFAULT 0,
   wagering_progress INTEGER NOT NULL DEFAULT 0,
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -97,3 +100,18 @@ CREATE INDEX IF NOT EXISTS idx_withdrawals_account ON withdrawals(account_id);
 -- NB: l'index sur accounts(referred_by) est créé dans db.js, après la
 -- migration qui ajoute la colonne (une base déjà existante n'a pas encore
 -- cette colonne au moment où ce fichier est exécuté).
+
+-- Offres du moment, configurées par le staff (1er dépôt doublé / parrainage
+-- boosté). Une seule offre par type est appliquée à la fois.
+CREATE TABLE IF NOT EXISTS offers (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  type           TEXT NOT NULL,
+  title          TEXT DEFAULT NULL,
+  max_bonus      INTEGER DEFAULT NULL,
+  referrer_bonus INTEGER DEFAULT NULL,
+  referee_bonus  INTEGER DEFAULT NULL,
+  ends_at        TEXT DEFAULT NULL,
+  active         INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_offers_type_active ON offers(type, active);
