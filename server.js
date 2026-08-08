@@ -42,6 +42,42 @@ function buildPublicUrl(req, relativePath) {
   return `${req.protocol}://${req.get("host")}${relativePath}`;
 }
 
+// Discord n'autorise les boutons cliquables (components) que sur les webhooks
+// liés à une application/bot — un simple webhook de salon ne peut pas déclencher
+// d'action au clic. On utilise donc des liens sécurisés (signés en HMAC avec
+// JWT_SECRET) glissés dans l'embed : cliquer dessus dans Discord ouvre le
+// navigateur et valide/refuse directement, sans avoir besoin d'être connecté.
+function signAdminAction(kind, id) {
+  return crypto.createHmac("sha256", JWT_SECRET).update(`${kind}:${id}`).digest("hex").slice(0, 32);
+}
+
+function verifyAdminAction(kind, id, token) {
+  if (!token || typeof token !== "string") return false;
+  const expected = signAdminAction(kind, id);
+  const a = Buffer.from(token);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function adminActionLink(req, path, kind, id) {
+  return buildPublicUrl(req, `${path}?token=${signAdminAction(kind, id)}`);
+}
+
+// Petite page HTML de confirmation affichée quand le staff clique sur un lien
+// de validation/refus depuis Discord.
+function actionResultHtml(message, ok = true) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ParaBet</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #0d0e18; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; text-align: center; }
+  .card { background: #14152280; border: 1px solid #ffffff1a; border-radius: 16px; padding: 32px 24px; max-width: 420px; }
+  .icon { font-size: 40px; margin-bottom: 12px; }
+  p { font-size: 16px; line-height: 1.5; }
+  a { color: #9c6bff; }
+</style></head>
+<body><div class="card"><div class="icon">${ok ? "✅" : "⚠️"}</div><p>${message}</p></div></body></html>`;
+}
+
 // Envoie un embed vers le webhook Discord configuré dans .env (DISCORD_WEBHOOK_URL).
 // Ne bloque jamais la requête HTTP en cours : les erreurs sont juste loguées.
 async function notifyDiscord({ title, color, fields, imageUrl, thumbnailUrl }) {
@@ -463,18 +499,22 @@ app.post("/api/deposits", authRequired, upload.single("screenshot"), async (req,
     const amount = clamp(Math.round(Number(req.body.amount) || 0), DEP_MIN, 1000000);
     if (!req.file) return res.status(400).json({ error: "Ajoute une capture d'écran prouvant le dépôt en jeu." });
 
-    await pool.query(
+    const [result] = await pool.query(
       "INSERT INTO deposits (account_id, amount, screenshot_file, status) VALUES (?, ?, ?, 'pending')",
       [req.user.id, amount, req.file.filename]
     );
     res.json({ ok: true });
 
+    const depositId = result.insertId;
+    const approveUrl = adminActionLink(req, `/api/admin/deposits/${depositId}/approve`, "deposit:approve", depositId);
+    const rejectUrl = adminActionLink(req, `/api/admin/deposits/${depositId}/reject`, "deposit:reject", depositId);
     notifyDiscord({
       title: "💰 Nouveau dépôt en attente",
       color: 0x2ecc71,
       fields: [
         { name: "Joueur", value: req.user.pseudo || String(req.user.id), inline: true },
         { name: "Montant", value: `${amount} 💎`, inline: true },
+        { name: "Actions", value: `[✅ Valider](${approveUrl})  ·  [❌ Refuser](${rejectUrl})` },
       ],
       imageUrl: buildPublicUrl(req, `/uploads/${req.file.filename}`),
     });
@@ -2209,15 +2249,15 @@ app.get("/api/admin/deposits", authRequired, adminRequired, async (req, res) => 
   res.json(rows.map(depositRowToJson));
 });
 
-app.post("/api/admin/deposits/:id/approve", authRequired, adminRequired, async (req, res) => {
+async function approveDeposit(depositId) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [drows] = await conn.query("SELECT * FROM deposits WHERE id = ? FOR UPDATE", [req.params.id]);
+    const [drows] = await conn.query("SELECT * FROM deposits WHERE id = ? FOR UPDATE", [depositId]);
     const dep = drows[0];
     if (!dep || dep.status !== "pending") {
       await conn.rollback();
-      return res.status(400).json({ error: "Ce dépôt n'est plus en attente." });
+      return { ok: false, error: "Ce dépôt n'est plus en attente." };
     }
 
     await conn.query(
@@ -2234,24 +2274,56 @@ app.post("/api/admin/deposits/:id/approve", authRequired, adminRequired, async (
     );
 
     await conn.commit();
-    res.json({ ok: true });
+    return { ok: true, amount: dep.amount, pseudo };
   } catch (e) {
     await conn.rollback();
     console.error(e);
-    res.status(500).json({ error: "Erreur serveur lors de l'approbation." });
+    return { ok: false, error: "Erreur serveur lors de l'approbation." };
   } finally {
     conn.release();
   }
+}
+
+async function rejectDeposit(depositId) {
+  const [result] = await pool.query(
+    "UPDATE deposits SET status = 'rejected', reviewed_at = NOW() WHERE id = ? AND status = 'pending'",
+    [depositId]
+  );
+  return result.affectedRows > 0;
+}
+
+app.post("/api/admin/deposits/:id/approve", authRequired, adminRequired, async (req, res) => {
+  const result = await approveDeposit(req.params.id);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ ok: true });
+});
+
+// Validation depuis le bouton/lien envoyé sur Discord : pas de session requise,
+// authentifié uniquement par le token signé (voir signAdminAction).
+app.get("/api/admin/deposits/:id/approve", async (req, res) => {
+  if (!verifyAdminAction("deposit:approve", req.params.id, req.query.token)) {
+    return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
+  }
+  const result = await approveDeposit(req.params.id);
+  if (!result.ok) return res.send(actionResultHtml(`⚠️ ${result.error}`, false));
+  res.send(actionResultHtml(`Dépôt validé : <b>+${result.amount} 💎</b> pour <b>${result.pseudo}</b>.`));
 });
 
 app.post("/api/admin/deposits/:id/reject", authRequired, adminRequired, async (req, res) => {
-  const [result] = await pool.query(
-    "UPDATE deposits SET status = 'rejected', reviewed_at = NOW() WHERE id = ? AND status = 'pending'",
-    [req.params.id]
-  );
-  if (!result.affectedRows) return res.status(400).json({ error: "Ce dépôt n'est plus en attente." });
+  const rejected = await rejectDeposit(req.params.id);
+  if (!rejected) return res.status(400).json({ error: "Ce dépôt n'est plus en attente." });
   res.json({ ok: true });
 });
+
+app.get("/api/admin/deposits/:id/reject", async (req, res) => {
+  if (!verifyAdminAction("deposit:reject", req.params.id, req.query.token)) {
+    return res.status(403).send(actionResultHtml("Lien invalide ou expiré.", false));
+  }
+  const rejected = await rejectDeposit(req.params.id);
+  if (!rejected) return res.send(actionResultHtml("⚠️ Ce dépôt n'est plus en attente.", false));
+  res.send(actionResultHtml("🚫 Dépôt refusé."));
+});
+
 
 app.delete("/api/admin/deposits/:id", authRequired, adminRequired, async (req, res) => {
   const [rows] = await pool.query("SELECT * FROM deposits WHERE id = ?", [req.params.id]);
