@@ -5,28 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ParaBet — le marché à pronostics de Paladium</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Press+Start+2P&family=VT323&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Press+Start+2P&family=VT323&display=swap');
 
   :root {
-    --bg: #0a0b0f;
-    --surface: #121319;
-    --surface-2: #191b23;
-    --border: #23252f;
-    --text: #eef0f4;
-    --text-dim: #8a8fa3;
-    --text-faint: #565b6e;
-    --green: #10cf7c;
-    --green-bg: rgba(16,207,124,0.12);
-    --red: #ff4d5e;
-    --red-bg: rgba(255,77,94,0.12);
-    --amber: #f2b73f;
-    --amber-bg: rgba(242,183,63,0.12);
+    --bg: #070912;
+    --bg-deep: #05060d;
+    --surface: #121a2c;
+    --surface-2: #1a2338;
+    --border: #263250;
+    --border-soft: rgba(154,175,215,0.14);
+    --text: #eef1fb;
+    --text-dim: #96a3c4;
+    --text-faint: #57628a;
+    --green: #8B5CF6;
+    --green-hi: #8FB6EE;
+    --green-bg: rgba(139,92,246,0.12);
+    --green-deep: #21324B;
+    --red: #ff5c6a;
+    --red-bg: rgba(255,92,106,0.12);
+    --amber: #eeb654;
+    --amber-bg: rgba(238,182,84,0.12);
+    --font-display: 'Space Grotesk', var(--font-body);
     --font-body: 'Inter', sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
   }
 
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+  body {
+    margin: 0; color: var(--text); font-family: var(--font-body); padding-bottom: 46px;
+    background:
+      radial-gradient(ellipse 900px 480px at 15% -8%, rgba(139,92,246,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 520px at 100% 0%, rgba(238,182,84,0.06), transparent 55%),
+      repeating-linear-gradient(115deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 68px),
+      var(--bg-deep);
+    background-attachment: fixed;
+  }
   a { color: inherit; }
   input, select { font-family: var(--font-body); }
   input::placeholder { color: var(--text-faint); }
@@ -34,6 +47,10 @@
   button:disabled { cursor: not-allowed; }
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 4px; }
+  :focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
 
   .max-w { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
 
@@ -41,96 +58,238 @@
   .topnav {
     position: sticky; top: 0; z-index: 20;
     border-bottom: 1px solid var(--border);
-    background: rgba(10,11,15,0.9);
-    backdrop-filter: blur(8px);
+    background: rgba(7,9,15,0.86);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 1px 0 rgba(139,92,246,0.06);
   }
   .topnav-row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; flex-wrap: wrap; }
-  .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 17.5px; letter-spacing: -0.01em; }
   .logo-badge {
-    width: 30px; height: 30px; background: var(--green); border-radius: 8px;
-    display: flex; align-items: center; justify-content: center; font-size: 15px;
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px;
+    background: linear-gradient(155deg, var(--green-hi), var(--green) 55%, var(--green-deep));
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    box-shadow: 0 0 0 1px rgba(139,92,246,0.25), 0 4px 14px rgba(139,92,246,0.28);
   }
+  .logo-ingot { display: block; flex-shrink: 0; filter: drop-shadow(0 3px 10px rgba(139,92,246,0.3)); }
+  .logo-word { display: inline-flex; }
+  .logo-word .lw-para { color: var(--text); }
+  .logo-word .lw-bet { color: var(--green-hi); }
   .search-box {
     flex: 1; min-width: 180px; display: flex; align-items: center; gap: 8px;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px;
+    transition: border-color 0.15s ease;
   }
+  .search-box:focus-within { border-color: rgba(139,92,246,0.45); }
   .search-box input { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; }
-  .wallet-chip { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+  .wallet-chip { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; }
   .wallet-chip .sep { width: 1px; height: 14px; background: var(--border); }
   .wallet-pseudo { font-size: 12px; color: var(--text-dim); }
-  .wallet-balance { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--green); }
-  .admin-tag { font-size: 10px; font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid rgba(242,183,63,0.35); border-radius: 4px; padding: 2px 5px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .wallet-balance { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--green-hi); }
+  .admin-tag { font-size: 10px; font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid rgba(238,182,84,0.35); border-radius: 4px; padding: 2px 5px; text-transform: uppercase; letter-spacing: 0.03em; }
   .icon-btn {
     width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim);
-    font-size: 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 9px; color: var(--text-dim);
+    font-size: 14px; transition: color 0.15s ease, border-color 0.15s ease;
   }
-  .icon-btn:hover { color: var(--text); }
-  .text-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-dim); font-size: 12.5px; font-weight: 600; }
-  .text-btn:hover { color: var(--text); border-color: #35384a; }
-  .text-btn.amber { color: var(--amber); border-color: rgba(242,183,63,0.35); }
+  .icon-btn:hover { color: var(--text); border-color: var(--border-soft); }
+  .text-btn { background: none; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; color: var(--text-dim); font-size: 12.5px; font-weight: 600; transition: color 0.15s ease, border-color 0.15s ease; }
+  .text-btn:hover { color: var(--text); border-color: #3a5245; }
+  .text-btn.amber { color: var(--amber); border-color: rgba(238,182,84,0.35); }
 
-  .tabs { display: flex; gap: 20px; overflow-x: auto; padding: 0 16px; }
+  /* nav toolbar — actions groupées au lieu d'une ligne de boutons collés */
+  .nav-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .nav-primary-actions { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .nav-primary-actions .text-btn { border: none; padding: 7px 12px; border-radius: 7px; }
+  .nav-primary-actions .text-btn:hover { background: var(--surface-2); }
+  .nav-primary-actions .text-btn.deposit { color: var(--green-hi); }
+  .nav-more-wrap { position: relative; }
+  .nav-more-menu {
+    position: absolute; top: calc(100% + 8px); right: 0; min-width: 208px; z-index: 30;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 6px;
+    box-shadow: 0 18px 44px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 1px;
+  }
+  .nav-more-menu[hidden] { display: none; }
+  .nav-more-menu button, .nav-more-menu a {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: none; border: none; border-radius: 8px; padding: 9px 10px;
+    color: var(--text); font-size: 13px; font-family: var(--font-body); text-decoration: none;
+  }
+  .nav-more-menu button:hover, .nav-more-menu a:hover { background: var(--surface); }
+  .nav-more-menu .nav-menu-divider { height: 1px; background: var(--border); margin: 4px 2px; }
+
+  .tabs { display: flex; gap: 22px; overflow-x: auto; padding: 0 16px; }
   .tab {
-    background: none; border: none; padding: 10px 0; color: var(--text-dim); font-weight: 600;
-    font-size: 13.5px; white-space: nowrap; border-bottom: 2px solid transparent;
+    background: none; border: none; padding: 11px 0; color: var(--text-dim); font-family: var(--font-display); font-weight: 600;
+    font-size: 13.5px; white-space: nowrap; border-bottom: 2px solid transparent; transition: color 0.15s ease;
   }
-  .tab.active { color: var(--text); border-bottom-color: var(--green); }
+  .tab.active { color: var(--text); border-bottom-color: var(--green); text-shadow: 0 0 18px rgba(139,92,246,0.35); }
 
-  .stats-row { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-dim); margin: 20px 0; }
+  .stats-row { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-dim); margin: 22px 0; padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); }
   .stats-row span { display: flex; align-items: center; gap: 6px; }
 
-  .grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 12px; }
+  /* stat chips */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 18px 0 26px; }
+  .stat-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; display: flex; align-items: center; gap: 11px; }
+  .stat-chip-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .stat-chip-value { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .stat-chip-label { font-size: 10.5px; color: var(--text-faint); margin-top: 1px; }
+
+  /* page "Mon profil" */
+  .profile-header {
+    display: flex; align-items: center; gap: 16px; padding: 22px; border-radius: 16px; border: 1px solid var(--border);
+    background: radial-gradient(ellipse 420px 240px at 100% -20%, rgba(139,92,246,0.16), transparent 65%), linear-gradient(175deg, var(--surface), #0d1424);
+    margin: 20px 0 8px;
+  }
+  .profile-avatar {
+    width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 800; font-size: 20px; color: #150c2a; letter-spacing: -0.02em;
+    background: linear-gradient(155deg, var(--green-hi), var(--green) 55%, var(--green-deep));
+    box-shadow: 0 4px 16px rgba(139,92,246,0.3);
+  }
+  .profile-name { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .profile-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .profile-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 20px 0 12px; }
+  .profile-filter-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 7px 13px; font-size: 12px; font-weight: 600; color: var(--text-dim); transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease; }
+  .profile-filter-chip:hover { border-color: #3a4568; color: var(--text); }
+  .profile-filter-chip.active { background: var(--green-bg); border-color: rgba(139,92,246,0.45); color: var(--green-hi); }
+  .profile-bet-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+  .profile-bet-row:last-child { border-bottom: none; }
+  .profile-bet-side { font-size: 10.5px; font-weight: 800; padding: 4px 8px; border-radius: 6px; flex-shrink: 0; }
+  .profile-bet-side.yes { background: var(--green-bg); color: var(--green-hi); }
+  .profile-bet-side.no { background: var(--red-bg); color: var(--red); }
+  .profile-bet-title { font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .profile-bet-meta { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  .profile-bet-result { font-family: var(--font-mono); font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0; text-align: right; }
+
+  /* hero — marché du moment */
+  .hero-banner {
+    position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--border);
+    padding: 26px 26px 22px; margin: 20px 0 8px;
+    background: radial-gradient(ellipse 520px 320px at 100% -10%, var(--hero-tint, rgba(139,92,246,0.16)), transparent 65%), linear-gradient(175deg, var(--surface), #0d1712);
+  }
+  .hero-banner::after {
+    content: ""; position: absolute; top: -60%; right: -8%; width: 260px; height: 260px;
+    background: var(--hero-tint, rgba(139,92,246,0.16)); filter: blur(60px); border-radius: 50%; pointer-events: none;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--hero-color, var(--green)); margin-bottom: 12px;
+  }
+  .hero-grid { position: relative; display: flex; flex-direction: column; gap: 16px; }
+  @media (min-width: 720px) { .hero-grid { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } }
+  .hero-title { font-family: var(--font-display); font-size: 21px; font-weight: 700; line-height: 1.28; letter-spacing: -0.01em; max-width: 560px; }
+  .hero-side { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
+  .hero-pct { font-family: var(--font-mono); font-size: 38px; font-weight: 800; line-height: 1; color: var(--hero-color, var(--green)); }
+  .hero-pct-label { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+  .hero-actions { display: flex; gap: 8px; }
+  .hero-actions .btn-yes, .hero-actions .btn-no { padding: 11px 16px; font-size: 13px; white-space: nowrap; }
+  .hero-meta { position: relative; display: flex; gap: 16px; margin-top: 16px; font-size: 11.5px; color: var(--text-faint); flex-wrap: wrap; }
+
+  /* casino promo strip */
+  .promo-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 40px 0 14px; gap: 10px; }
+  .promo-head h2 { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .promo-head .promo-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); animation: promoPulse 1.8s ease-in-out infinite; }
+  @keyframes promoPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .promo-head p { margin: 3px 0 0; font-size: 11.5px; color: var(--text-faint); }
+  .promo-see-all { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 7px 12px; color: var(--green-hi); font-size: 11.5px; font-weight: 700; white-space: nowrap; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease; }
+  .promo-see-all:hover { border-color: rgba(139,92,246,0.5); color: #fff; background: var(--surface-2); }
+  .promo-strip {
+    display: flex; gap: 14px; overflow-x: auto; padding: 4px 16px 10px; scroll-snap-type: x proximity;
+    margin: 0 -16px;
+  }
+  .promo-strip::-webkit-scrollbar { height: 6px; }
+  .promo-card {
+    scroll-snap-align: start; flex: 0 0 158px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border);
+    background: var(--surface); transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; cursor: pointer;
+  }
+  .promo-card:hover { transform: translateY(-4px) scale(1.015); border-color: rgba(139,92,246,0.55); box-shadow: 0 16px 36px -14px rgba(139,92,246,0.5); }
+  .promo-card.disabled { cursor: default; }
+  .promo-card.disabled:hover { transform: none; box-shadow: none; border-color: var(--border); }
+  .promo-card-art {
+    aspect-ratio: 1 / 1.08; position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
+    background-color: var(--surface-2); background-size: cover; background-position: center;
+  }
+  .promo-card-art::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(195deg, rgba(5,6,13,0) 38%, rgba(5,6,13,0.66) 100%);
+  }
+  .promo-card-icon-wrap {
+    position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 9px;
+    background: rgba(5,6,13,0.4); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center;
+    font-size: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+  }
+  .promo-card-kicker { position: relative; font-size: 9px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(255,255,255,0.72); }
+  .promo-card-icon { position: absolute; top: 10px; right: 10px; font-size: 26px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
+  .promo-card-title { position: relative; font-size: 13.5px; font-weight: 800; color: #fff; line-height: 1.2; margin-top: 2px; text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+  .promo-card-cta { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px 11px; font-size: 11px; color: var(--text-faint); border-top: 1px solid var(--border-soft); }
+  .promo-card-cta .pc-status { display: flex; align-items: center; gap: 6px; }
+  .promo-card-cta b { color: var(--green-hi); font-weight: 800; display: inline-flex; align-items: center; gap: 3px; transition: gap 0.15s ease; }
+  .promo-card:hover .promo-card-cta b { gap: 6px; }
+  .promo-card.disabled .promo-card-art { filter: grayscale(0.45) brightness(0.6); }
+  .promo-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); flex-shrink: 0; }
+  .promo-dot.off { background: var(--text-faint); box-shadow: none; }
+  .promo-dot.maintenance { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+  .grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 14px; }
   @media (min-width: 640px) { .grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 960px) { .grid { grid-template-columns: repeat(3, 1fr); } }
 
   .card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 16px; display: flex; flex-direction: column; gap: 12px;
-    transition: border-color 0.15s ease, transform 0.15s ease;
+    position: relative; background: linear-gradient(175deg, var(--surface), var(--surface) 60%, #0d1712);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 17px; display: flex; flex-direction: column; gap: 12px;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   }
-  .card:hover { border-color: #35384a; transform: translateY(-2px); }
+  .card::before {
+    content: ""; position: absolute; top: 0; left: 14px; right: 14px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-soft), transparent);
+  }
+  .card:hover { border-color: rgba(139,92,246,0.32); transform: translateY(-3px); box-shadow: 0 14px 28px -14px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.06); }
 
   .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .card-head-left { display: flex; align-items: flex-start; gap: 10px; }
-  .cat-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-  .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--text); }
+  .cat-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: inset 0 0 0 1px var(--border-soft); }
+  .card-title { font-family: var(--font-display); font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--text); letter-spacing: -0.005em; }
 
   .pct-row { display: flex; align-items: center; gap: 8px; }
-  .pct { font-family: var(--font-mono); font-size: 22px; font-weight: 800; }
+  .pct { font-family: var(--font-mono); font-size: 23px; font-weight: 800; letter-spacing: -0.02em; }
   .pct-label { font-size: 11.5px; color: var(--text-faint); }
 
-  .probbar { width: 100%; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; display: flex; }
+  .probbar { width: 100%; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px var(--border-soft); }
   .probbar > div { transition: width 0.5s cubic-bezier(0.22,1,0.36,1); }
 
-  .wager-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 4px 0 14px; }
-  .wager-box.done { border-color: rgba(16,207,124,0.35); }
+  .wager-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 4px 0 14px; }
+  .wager-box.done { border-color: rgba(139,92,246,0.35); }
   .wager-head { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--text-dim); margin-bottom: 8px; }
-  .wager-head strong { color: var(--text); font-family: var(--font-mono); }
-  .wager-bar { width: 100%; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
-  .wager-bar > div { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.5s cubic-bezier(0.22,1,0.36,1); }
-  .wager-bar.done > div { background: var(--green); }
+  .wager-head strong { color: var(--green-hi); font-family: var(--font-mono); }
+  .wager-bar { width: 100%; height: 8px; border-radius: 4px; background: var(--surface); overflow: hidden; }
+  .wager-bar > div { height: 100%; background: linear-gradient(90deg, var(--green-deep), var(--green)); border-radius: 4px; transition: width 0.5s cubic-bezier(0.22,1,0.36,1); }
+  .wager-bar.done > div { background: linear-gradient(90deg, var(--green-deep), var(--green)); }
   .wager-note { font-size: 11px; color: var(--text-faint); margin-top: 7px; line-height: 1.4; }
   .wager-note.done { color: var(--green); }
 
   .btn-row { display: flex; gap: 8px; margin-top: 2px; }
   .btn-yes, .btn-no {
-    flex: 1; padding: 8px 0; border-radius: 8px; font-size: 12.5px; font-weight: 700;
-    transition: background 0.12s ease, transform 0.06s ease;
+    flex: 1; padding: 9px 0; border-radius: 9px; font-size: 12.5px; font-weight: 700;
+    transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
   }
-  .btn-yes { background: var(--green-bg); color: var(--green); border: 1px solid rgba(16,207,124,0.35); }
-  .btn-yes:hover { background: var(--green); color: #06120c; }
-  .btn-no { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,77,94,0.35); }
-  .btn-no:hover { background: var(--red); color: #1a0608; }
+  .btn-yes { background: var(--green-bg); color: var(--green-hi); border: 1px solid rgba(139,92,246,0.35); }
+  .btn-yes:hover { background: var(--green); color: #150c2a; box-shadow: 0 4px 14px -4px rgba(139,92,246,0.5); }
+  .btn-no { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,92,106,0.35); }
+  .btn-no:hover { background: var(--red); color: #200609; box-shadow: 0 4px 14px -4px rgba(255,92,106,0.5); }
   .btn-yes:active, .btn-no:active { transform: scale(0.97); }
 
-  .resolved-badge { text-align: center; padding: 9px 0; border-radius: 8px; font-size: 12.5px; font-weight: 700; }
-  .resolved-badge.yes { background: var(--green-bg); color: var(--green); }
+  .resolved-badge { text-align: center; padding: 9px 0; border-radius: 9px; font-size: 12.5px; font-weight: 700; }
+  .resolved-badge.yes { background: var(--green-bg); color: var(--green-hi); }
   .resolved-badge.no { background: var(--red-bg); color: var(--red); }
 
   .card-foot { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-faint); }
 
-  .section-title { font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 40px 0 10px; display: flex; align-items: center; justify-content: space-between; }
+  .section-title {
+    font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em;
+    margin: 42px 0 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::before { content: "◆"; color: var(--green); font-size: 8px; }
   .feed-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; height: 160px; overflow-y: auto; }
   .feed-line { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
   .feed-empty { font-size: 12.5px; color: var(--text-faint); }
@@ -138,94 +297,119 @@
   .disclaimer { text-align: center; margin-top: 32px; font-size: 11.5px; color: var(--text-faint); padding-bottom: 60px; line-height: 1.6; }
 
   /* auth */
-  .auth-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
-  .auth-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; }
-  .auth-logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; margin-bottom: 4px; }
+  .auth-shell {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background: radial-gradient(ellipse 620px 420px at 50% 20%, rgba(139,92,246,0.10), transparent 65%);
+  }
+  .auth-card { width: 100%; max-width: 380px; background: linear-gradient(175deg, var(--surface), #0d1712); border: 1px solid var(--border); border-radius: 16px; padding: 30px; box-shadow: 0 30px 60px -30px rgba(0,0,0,0.6); }
+  .auth-logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 20px; margin-bottom: 4px; letter-spacing: -0.01em; }
   .auth-sub { font-size: 12.5px; color: var(--text-dim); margin: 0 0 22px; }
-  .auth-tabs { display: flex; background: var(--surface-2); border-radius: 8px; padding: 3px; margin-bottom: 20px; }
-  .auth-tab { flex: 1; padding: 8px 0; border: none; background: transparent; border-radius: 6px; color: var(--text-dim); font-weight: 600; font-size: 12.5px; }
-  .auth-tab.active { background: var(--surface); color: var(--text); }
+  .auth-tabs { display: flex; background: var(--surface-2); border-radius: 9px; padding: 3px; margin-bottom: 20px; }
+  .auth-tab { flex: 1; padding: 8px 0; border: none; background: transparent; border-radius: 7px; color: var(--text-dim); font-weight: 600; font-size: 12.5px; transition: color 0.15s ease; }
+  .auth-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border-soft); }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
   .field input {
-    width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text); font-size: 13.5px; padding: 10px 12px; outline: none;
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
+    color: var(--text); font-size: 13.5px; padding: 10px 12px; outline: none; transition: border-color 0.15s ease;
   }
-  .field input:focus { border-color: #414560; }
+  .field input:focus { border-color: rgba(139,92,246,0.45); }
   .field-hint { font-size: 11px; color: var(--text-faint); margin-top: 5px; }
-  .auth-error { background: var(--red-bg); border: 1px solid rgba(255,77,94,0.35); color: var(--red); font-size: 12px; border-radius: 8px; padding: 9px 11px; margin-bottom: 14px; }
-  .auth-submit { width: 100%; padding: 11px 0; border-radius: 8px; font-size: 13.5px; font-weight: 700; background: var(--green); color: #06120c; border: none; margin-top: 4px; }
+  .auth-error { background: var(--red-bg); border: 1px solid rgba(255,92,106,0.35); color: var(--red); font-size: 12px; border-radius: 9px; padding: 9px 11px; margin-bottom: 14px; }
+  .auth-submit { width: 100%; padding: 11px 0; border-radius: 9px; font-size: 13.5px; font-weight: 700; background: linear-gradient(155deg, var(--green-hi), var(--green)); color: #150c2a; border: none; margin-top: 4px; transition: box-shadow 0.15s ease; }
+  .auth-submit:hover:not(:disabled) { box-shadow: 0 6px 18px -6px rgba(139,92,246,0.5); }
   .auth-submit:disabled { opacity: 0.55; }
   .auth-note { font-size: 11px; color: var(--text-faint); margin-top: 16px; line-height: 1.6; text-align: center; }
 
   /* admin */
   .admin-wrap { padding-top: 20px; }
-  .admin-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
-  .admin-section h3 { margin: 0 0 14px; font-size: 13.5px; }
+  .admin-section { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 18px; margin-bottom: 20px; }
+  .admin-section h3 { margin: 0 0 14px; font-size: 13.5px; font-family: var(--font-display); }
   .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 640px) { .admin-grid { grid-template-columns: 1fr; } }
-  .admin-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border); padding: 12px 0; flex-wrap: wrap; }
+  .admin-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border-soft); padding: 12px 0; flex-wrap: wrap; }
   .admin-row:first-of-type { border-top: none; padding-top: 0; }
   .admin-row-title { font-size: 13px; font-weight: 600; flex: 1; min-width: 200px; }
   .admin-row-meta { font-size: 11px; color: var(--text-faint); }
   .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .mini-btn { padding: 6px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); }
-  .mini-btn.green { color: var(--green); border-color: rgba(16,207,124,0.35); }
-  .mini-btn.red { color: var(--red); border-color: rgba(255,77,94,0.35); }
-  .mini-btn.amber { color: var(--amber); border-color: rgba(242,183,63,0.35); }
+  .mini-btn { padding: 6px 10px; border-radius: 7px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); transition: color 0.15s ease, border-color 0.15s ease; }
+  .mini-btn.green { color: var(--green-hi); border-color: rgba(139,92,246,0.35); }
+  .mini-btn.red { color: var(--red); border-color: rgba(255,92,106,0.35); }
+  .mini-btn.amber { color: var(--amber); border-color: rgba(238,182,84,0.35); }
   .mini-btn:hover { color: var(--text); }
   .admin-row input[type="number"], .admin-row input[type="text"], .admin-row input[type="datetime-local"] {
-    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px;
     color: var(--text); font-size: 12px; padding: 6px 8px; outline: none; font-family: var(--font-body);
   }
-  .admin-row input[type="number"]:focus, .admin-row input[type="text"]:focus, .admin-row input[type="datetime-local"]:focus { border-color: #414560; }
-  select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13.5px; padding: 10px 12px; outline: none; }
+  .admin-row input[type="number"]:focus, .admin-row input[type="text"]:focus, .admin-row input[type="datetime-local"]:focus { border-color: rgba(139,92,246,0.45); }
+  select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; color: var(--text); font-size: 13.5px; padding: 10px 12px; outline: none; }
 
   /* modal */
   .overlay {
-    position: fixed; inset: 0; background: rgba(4,5,8,0.75); backdrop-filter: blur(3px);
+    position: fixed; inset: 0; background: rgba(2,5,4,0.78); backdrop-filter: blur(4px);
     display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50;
   }
   .overlay.open { display: flex; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto; }
+  .modal { background: linear-gradient(175deg, var(--surface), #0d1712); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 60px -24px rgba(0,0,0,0.65); }
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  .modal-kicker { font-size: 12px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+  .modal-kicker { font-size: 12px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
   .modal-close { background: none; border: none; color: var(--text-faint); font-size: 18px; line-height: 1; }
-  .modal-title { font-size: 14px; font-weight: 600; margin: 14px 0 18px; line-height: 1.4; color: var(--text); }
+  .modal-close:hover { color: var(--text); }
+  .modal-title { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; margin: 14px 0 18px; line-height: 1.4; color: var(--text); }
   .modal-label { font-size: 12px; color: var(--text-dim); }
   .amount-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; }
   .amount-row input {
-    flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
     color: var(--text); font-family: var(--font-mono); font-size: 15px; font-weight: 700; padding: 10px 12px; outline: none;
   }
   .quick-row { display: flex; gap: 8px; margin-bottom: 20px; }
-  .quick-btn { flex: 1; padding: 6px 0; font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text-dim); }
+  .quick-btn { flex: 1; padding: 6px 0; font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; color: var(--text-dim); transition: border-color 0.15s ease, color 0.15s ease; }
+  .quick-btn:hover { color: var(--green-hi); border-color: rgba(139,92,246,0.35); }
   .modal-text-input {
-    width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
     color: var(--text); font-size: 13.5px; padding: 10px 12px; outline: none; box-sizing: border-box;
     font-family: var(--font-body);
   }
-  .modal-text-input:focus { border-color: #414560; }
-  .confirm-btn { width: 100%; padding: 12px 0; border-radius: 8px; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .modal-text-input:focus { border-color: rgba(139,92,246,0.45); }
+  .confirm-btn { width: 100%; padding: 12px 0; border-radius: 9px; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .low-balance { font-size: 11.5px; color: var(--red); margin-top: 10px; }
   .price-note { font-size: 11px; color: var(--text-faint); margin-top: 10px; }
 
   .faq-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
-  .faq-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 4px 14px; }
-  .faq-item[open] { padding-bottom: 12px; }
+  .faq-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 4px 14px; }
+  .faq-item[open] { padding-bottom: 12px; border-color: var(--border-soft); }
   .faq-question { cursor: pointer; list-style: none; padding: 12px 0; font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
   .faq-question::-webkit-details-marker { display: none; }
-  .faq-question::after { content: "+"; color: var(--text-faint); font-size: 16px; font-weight: 400; margin-left: 10px; }
+  .faq-question::after { content: "+"; color: var(--green); font-size: 16px; font-weight: 400; margin-left: 10px; }
   .faq-item[open] .faq-question::after { content: "–"; }
   .faq-answer { font-size: 12.5px; line-height: 1.55; color: var(--text-dim); margin: 0; }
 
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px;
     padding: 10px 16px; font-size: 12.5px; z-index: 60; opacity: 0; transition: opacity 0.18s ease;
-    max-width: 90vw; text-align: center;
+    max-width: 90vw; text-align: center; box-shadow: 0 16px 32px -12px rgba(0,0,0,0.6);
   }
   .toast.show { opacity: 1; }
+
+  /* bandeau de prévention jeu responsable — permanent, en bas de l'écran */
+  .jis-banner {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
+    background: var(--amber); color: #241704; text-align: center;
+    padding: 8px 44px 8px 14px; font-size: 11.5px; line-height: 1.5;
+    border-top: 1px solid rgba(0,0,0,0.15);
+  }
+  .jis-banner b { font-weight: 800; }
+  .jis-banner a { color: #241704; text-decoration: underline; font-weight: 700; }
+  .jis-banner-close {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #241704; font-size: 16px; font-weight: 800;
+    cursor: pointer; padding: 6px 10px; line-height: 1; opacity: 0.7;
+  }
+  .jis-banner-close:hover { opacity: 1; }
+  body.jis-banner-hidden .jis-banner { display: none; }
+  @media (min-width: 640px) { .jis-banner { font-size: 12.5px; padding: 9px 48px 9px 16px; } }
+  @media (max-width: 639px) { body { padding-bottom: 74px; } }
 
   .loading-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; gap: 10px; color: var(--text-dim); font-size: 13px; }
 
@@ -370,7 +554,7 @@
   .lobby-card-kicker { font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); text-transform: uppercase; }
   .lobby-card-title { font-size: 15.5px; font-weight: 800; color: #fff; line-height: 1.2; margin-top: 2px; text-shadow: 0 2px 6px rgba(0,0,0,0.25); }
   .lobby-card.disabled .lobby-card-art { filter: grayscale(0.35) brightness(0.7); }
-  .lobby-card-art-poster { background-size: cover; background-position: center top; padding: 0; }
+  .lobby-card-art-poster { background-color: var(--surface-2); background-size: cover; background-position: center top; padding: 0; }
   .lobby-lock { position: absolute; top: 10px; left: 10px; font-size: 11px; background: rgba(0,0,0,0.5); border-radius: 6px; padding: 3px 7px; color: #fff; }
 
   .lobby-card-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); padding: 9px 12px; }
@@ -855,6 +1039,12 @@
 <div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
 
+<div class="jis-banner" id="jisBanner">
+  <b>Les jeux d'argent et de hasard peuvent être dangereux :</b> pertes d'argent, conflits familiaux, addiction…
+  Retrouvez nos conseils sur <a href="https://www.joueurs-info-service.fr" target="_blank" rel="noopener">joueurs-info-service.fr</a> (09 74 75 13 13 — appel non surtaxé)
+  <button class="jis-banner-close" id="jisBannerClose" title="Fermer" aria-label="Fermer le bandeau">✕</button>
+</div>
+
 <script>
 /* ---------- static data ---------- */
 
@@ -996,6 +1186,7 @@ const state = {
   markets: [],
   feed: [],
   mybets: [],
+  profileBetFilter: "all", // filtre de l'historique des paris sur la page "Mon profil" : all|open|won|lost
   deposits: [],          // mes dépôts (joueur) ou tous les dépôts (admin)
   withdrawals: [],       // mes retraits (joueur) ou tous les retraits (admin)
   adminAccounts: [],     // liste des joueurs inscrits (admin)
@@ -1004,7 +1195,10 @@ const state = {
   adminExpandedAccountCasinoId: null,
   adminAccountCasinoBets: {}, // cache: accountId -> liste de parties casino (admin)
   adminCasinoBets: [],   // toutes les parties casino récentes, tous joueurs (admin)
+  adminCasinoLimits: {}, // { mines: {minBet, maxBet}, ... } — limites de mise réglables (admin)
   adminResolveTime: {},  // cache: marketId -> valeur de l'input datetime-local (heure de fin choisie)
+
+  navMenuOpen: false,   // menu "plus d'options" de la barre du haut, ouvert/fermé
 
   filter: "all",
   query: "",
@@ -1053,6 +1247,7 @@ const state = {
   chickenHowto: false,   // affichage du panneau "Comment jouer ?"
 
   casinoMaintenance: {}, // { mines: true, ... } — statut renvoyé par /api/casino/status
+  casinoLimits: {},      // { mines: {minBet, maxBet}, ... } — idem, réglé depuis l'admin
 
   roulette: null,        // dernier résultat de Roulette renvoyé par le serveur (ou null)
   rouletteHistory: [],
@@ -1091,6 +1286,15 @@ const state = {
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+// Lingot d'endium — logo de la marque ParaBet
+const ENDIUM_INGOT_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/3/37/Lingot_d%27Endium.png/revision/latest?cb=20210730114025&path-prefix=fr";
+function ingotIcon(size) {
+  return `<img class="logo-ingot" src="${ENDIUM_INGOT_URL}" alt="Lingot d'Endium" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;image-rendering:pixelated;" />`;
+}
+function logoWordmark() {
+  return `<span class="logo-word"><span class="lw-para">PARA</span><span class="lw-bet">BET</span></span>`;
+}
 
 // Barre de progression de l'exigence de mise ("wagering requirement") : tant
 // qu'un joueur n'a pas remisé l'équivalent de ses dépôts approuvés, il ne
@@ -1691,7 +1895,28 @@ async function loadAdminCasinoBets() {
   state.adminCasinoBets = await api("/api/admin/casino-bets");
 }
 
+async function loadAdminCasinoLimits() {
+  state.adminCasinoLimits = await api("/api/admin/casino-limits");
+}
+
+async function adminSetCasinoLimit(game, minBet, maxBet) {
+  state.adminBusy = true; render();
+  try {
+    state.adminCasinoLimits = await api("/api/admin/casino-limits", {
+      method: "POST",
+      body: { game, minBet, maxBet: maxBet === "" || maxBet == null ? null : maxBet },
+    });
+    state.casinoLimits = state.adminCasinoLimits;
+    applyCasinoLimitsToClientConstants();
+    showToast(`Limites mises à jour pour ${CASINO_GAME_LABEL[game] || game} 👍`);
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false; render();
+}
+
 const CASINO_GAME_LABEL = { blackjack: "🃏 Blackjack", mines: "💣 Mines", flip: "🪙 Flip", roulette: "🎡 Roulette", slots: "🎰 Slots", chicken: "🐔 Chicken Road", aviator: "✈️ Aviator" };
+const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "roulette", "slots", "aviator"]; // doit correspondre à CASINO_GAMES_LIST côté serveur
 const CASINO_RESULT_LABEL = { win: "Gagné", lose: "Perdu", push: "Égalité", cashout: "Encaissé" };
 const CASINO_RESULT_COLOR = { win: "var(--green)", cashout: "var(--green)", lose: "var(--red)", push: "var(--text-faint)" };
 
@@ -1749,6 +1974,7 @@ function render() {
   if (state.view === "auth" || !state.account) { renderAuth(); return; }
   if (state.view === "admin" && state.account.isAdmin) { renderAdmin(); return; }
   if (state.view === "casino") { renderCasino(); return; }
+  if (state.view === "profile") { renderProfile(); return; }
   renderApp();
 }
 
@@ -1760,7 +1986,7 @@ function renderAuth() {
   app.innerHTML = `
     <div class="auth-shell">
       <div class="auth-card">
-        <div class="auth-logo"><div class="logo-badge">💎</div> ParaBet</div>
+        <div class="auth-logo">${ingotIcon(34)} ${logoWordmark()}</div>
         <p class="auth-sub">Le marché à pronostics du serveur Paladium.</p>
         <div class="auth-tabs">
           <button class="auth-tab ${isLogin ? "active" : ""}" id="tabLogin">Connexion</button>
@@ -1826,6 +2052,7 @@ function renderApp() {
   const app = document.getElementById("app");
   const totalVolume = state.markets.reduce((s, m) => s + m.volume, 0);
   const markets = visibleMarkets();
+  const heroMarket = state.markets.filter(m => m.status === "open").sort((a, b) => b.volume - a.volume)[0];
   const bonusReady = state.account.lastBonusDate !== todayStr();
   const myDeposits = state.deposits.slice(0, 10);
   const myWithdrawals = state.withdrawals.slice(0, 10);
@@ -1833,12 +2060,12 @@ function renderApp() {
   app.innerHTML = `
     <div class="topnav">
       <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
-        <div class="logo"><div class="logo-badge">💎</div> ParaBet</div>
+        <div class="logo">${ingotIcon(32)} ${logoWordmark()}</div>
         <div class="search-box">
           <span>🔎</span>
           <input id="searchInput" placeholder="Rechercher un marché…" value="${esc(state.query)}" />
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="nav-toolbar">
           <div class="wallet-chip">
             <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
             ${state.account.isAdmin ? `<span class="admin-tag">Staff</span>` : ""}
@@ -1847,15 +2074,24 @@ function renderApp() {
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
           <button class="icon-btn" id="bonusBtn" title="Bonus quotidien" ${bonusReady ? "" : "style='opacity:0.4;'"}>🎁</button>
-          <button class="text-btn" id="casinoBtn">🎰 Casino</button>
-          <button class="text-btn" id="depositBtn">💳 Déposer</button>
-          <button class="text-btn" id="withdrawBtn">🏧 Retirer</button>
-          <button class="text-btn" id="referralBtn">🤝 Parrainage</button>
-          <button class="text-btn" id="faqBtn">❓ FAQ</button>
-          <button class="text-btn" id="legalBtn">📜 CGU</button>
-          <a class="text-btn" id="discordBtn" href="https://discord.gg/Me8UjM7Uug" target="_blank" rel="noopener noreferrer" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">💬 Discord</a>
-          ${state.account.isAdmin ? `<button class="text-btn amber" id="adminBtn">Admin</button>` : ""}
-          <button class="text-btn" id="logoutBtn">Déconnexion</button>
+          <div class="nav-primary-actions">
+            <button class="text-btn" id="casinoBtn">🎰 Casino</button>
+            <button class="text-btn deposit" id="depositBtn">💳 Déposer</button>
+            <button class="text-btn" id="withdrawBtn">🏧 Retirer</button>
+          </div>
+          <div class="nav-more-wrap">
+            <button class="icon-btn" id="moreMenuBtn" title="Plus d'options" aria-haspopup="true" aria-expanded="${state.navMenuOpen ? "true" : "false"}">⋯</button>
+            <div class="nav-more-menu" id="moreMenu" ${state.navMenuOpen ? "" : "hidden"}>
+              <button id="profileBtn">👤 Mon profil</button>
+              <button id="referralBtn">🤝 Parrainage</button>
+              <button id="faqBtn">❓ FAQ</button>
+              <button id="legalBtn">📜 CGU</button>
+              <a id="discordBtn" href="https://discord.gg/Me8UjM7Uug" target="_blank" rel="noopener noreferrer">💬 Discord</a>
+              ${state.account.isAdmin ? `<div class="nav-menu-divider"></div><button id="adminBtn" style="color:var(--amber);">🛠️ Espace admin</button>` : ""}
+              <div class="nav-menu-divider"></div>
+              <button id="logoutBtn">🚪 Déconnexion</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tabs max-w" style="padding-left:0;padding-right:0;">
@@ -1864,15 +2100,27 @@ function renderApp() {
     </div>
 
     <div class="max-w" style="padding-top:20px;">
-      <div class="stats-row">
-        <span>📈 ${totalVolume.toLocaleString("fr-FR")} 💎 de volume total</span>
-        <span>${state.markets.length} marchés</span>
+      ${heroMarket ? heroMarketHtml(heroMarket) : ""}
+
+      <div class="stats-grid">
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green);">📈</div><div><div class="stat-chip-value">${totalVolume.toLocaleString("fr-FR")} 💎</div><div class="stat-chip-label">Volume total</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--amber-bg); color:var(--amber);">📊</div><div><div class="stat-chip-value">${state.markets.length}</div><div class="stat-chip-label">Marchés ouverts</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">💎</div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Ton solde</div></div></div>
       </div>
 
       ${markets.length === 0
         ? `<div class="card" style="text-align:center; color: var(--text-dim);">Aucun marché ne correspond à ta recherche.</div>`
         : `<div class="grid">${markets.map(cardHtml).join("")}</div>`
       }
+
+      <div class="promo-head">
+        <div>
+          <h2>🎰 Casino ParaBet <span class="promo-live-dot" title="En direct"></span></h2>
+          <p>Blackjack, Mines, Chicken Road… joue en direct avec tes émeraudes.</p>
+        </div>
+        <button class="promo-see-all" id="casinoPromoAll">Voir tout →</button>
+      </div>
+      <div class="promo-strip">${CASINO_GAMES.map(promoCardHtml).join("")}</div>
 
       ${wageringBarHtml(state.account)}
 
@@ -1908,20 +2156,102 @@ function renderApp() {
   document.getElementById("casinoBtn").addEventListener("click", openCasino);
   document.getElementById("depositBtn").addEventListener("click", openDepositModal);
   document.getElementById("withdrawBtn").addEventListener("click", openWithdrawModal);
+  document.getElementById("profileBtn").addEventListener("click", () => { state.view = "profile"; render(); });
   document.getElementById("referralBtn").addEventListener("click", openReferralModal);
   document.getElementById("faqBtn").addEventListener("click", openFaqModal);
   document.getElementById("legalBtn").addEventListener("click", openLegalModal);
   const legalFooterLink = document.getElementById("legalFooterLink");
   if (legalFooterLink) legalFooterLink.addEventListener("click", e => { e.preventDefault(); openLegalModal(); });
   const adminBtn = document.getElementById("adminBtn");
-  if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts(), loadAdminCasinoBets()]); render(); });
+  if (adminBtn) adminBtn.addEventListener("click", async () => { state.view = "admin"; await Promise.all([loadAdminDeposits(), loadAdminWithdrawals(), loadAdminAccounts(), loadAdminCasinoBets(), loadAdminCasinoLimits()]); render(); });
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { state.filter = b.dataset.filter; render(); }));
   document.querySelectorAll("[data-bet]").forEach(b => b.addEventListener("click", () => {
     const [marketId, side] = b.dataset.bet.split("|");
     openBetModal(marketId, side);
   }));
+  const moreMenuBtn = document.getElementById("moreMenuBtn");
+  if (moreMenuBtn) moreMenuBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.navMenuOpen = !state.navMenuOpen;
+    render();
+  });
+  const moreMenu = document.getElementById("moreMenu");
+  if (moreMenu && state.navMenuOpen) {
+    moreMenu.addEventListener("click", e => e.stopPropagation());
+    document.addEventListener("click", function closeNavMenu() {
+      state.navMenuOpen = false;
+      render();
+      document.removeEventListener("click", closeNavMenu);
+    }, { once: true });
+  }
+  const casinoPromoAll = document.getElementById("casinoPromoAll");
+  if (casinoPromoAll) casinoPromoAll.addEventListener("click", openCasino);
+  document.querySelectorAll(".promo-card[data-lobby]").forEach(el => el.addEventListener("click", () => playCasinoGame(el.dataset.lobby)));
 
   renderModal();
+}
+
+function heroMarketHtml(m) {
+  const meta = CAT_META[m.category];
+  return `
+    <div class="hero-banner" style="--hero-tint:${meta.color}29; --hero-color:${meta.color};">
+      <div class="hero-eyebrow">🔥 Marché du moment · ${meta.emoji} ${meta.label}</div>
+      <div class="hero-grid">
+        <div class="hero-title">${esc(m.title)}</div>
+        <div class="hero-side">
+          <div>
+            <div class="hero-pct">${m.yes}%</div>
+            <div class="hero-pct-label">de chances</div>
+          </div>
+          <div class="hero-actions">
+            <button class="btn-yes" data-bet="${m.id}|yes">Oui · ${m.yes}¢</button>
+            <button class="btn-no" data-bet="${m.id}|no">Non · ${100 - m.yes}¢</button>
+          </div>
+        </div>
+      </div>
+      <div class="hero-meta">
+        <span>💎 ${m.volume.toLocaleString("fr-FR")} de volume</span>
+        <span>⏳ Ferme ${esc(m.closes)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function promoCardHtml(g) {
+  const status = casinoGameStatus(g);
+  const art = g.poster
+    ? `background-image:url('${g.poster}');`
+    : `background:${g.gradient};`;
+  return `
+    <div class="promo-card ${status.clickable ? "" : "disabled"}" data-lobby="${g.id}">
+      <div class="promo-card-art" style="${art}">
+        ${g.icon ? `<span class="promo-card-icon-wrap">${g.icon}</span>` : ""}
+        <span class="promo-card-kicker">${esc(g.kicker || "Casino")}</span>
+        <span class="promo-card-title">${esc(g.title)}</span>
+      </div>
+      <div class="promo-card-cta">
+        <span class="pc-status"><span class="promo-dot ${status.dotClass}"></span>${status.clickable ? "Disponible" : status.label}</span>
+        ${status.clickable ? `<b>Jouer →</b>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function playCasinoGame(id) {
+  const g = CASINO_GAMES.find(x => x.id === id);
+  const status = casinoGameStatus(g);
+  if (!status.clickable) {
+    showToast(!g.enabled ? `${g.title} arrive bientôt sur ParaBet 👀` : `${g.title} est en maintenance, reviens plus tard 🔧`);
+    return;
+  }
+  state.view = "casino";
+  if (g.id === "blackjack") openBlackjack();
+  else if (g.id === "mines") openMines();
+  else if (g.id === "flip") openFlip();
+  else if (g.id === "roulette") openRoulette();
+  else if (g.id === "slots") openSlots();
+  else if (g.id === "chicken") openChicken();
+  else if (g.id === "aviator") openAviator();
 }
 
 function cardHtml(m) {
@@ -1983,18 +2313,142 @@ function withdrawalLineHtml(w) {
   return `<p class="feed-line"><span style="color:${color}; font-weight:700;">${label}</span> — ${w.amount} 💎 · demandé le ${date}</p>`;
 }
 
+/* ---------- profil joueur ---------- */
+
+function computeProfileStats() {
+  const bets = state.mybets || [];
+  let totalWagered = 0, wins = 0, losses = 0, pending = 0, refunded = 0, netProfit = 0, biggestWin = 0;
+  bets.forEach(b => {
+    totalWagered += b.amount;
+    if (b.marketStatus !== "resolved") { pending++; return; }
+    if (b.refunded) { refunded++; return; }
+    if (b.marketResolution === b.side) {
+      const payout = Math.round(b.amount * 100 / Math.max(1, b.price));
+      const profit = payout - b.amount;
+      wins++; netProfit += profit;
+      if (profit > biggestWin) biggestWin = profit;
+    } else {
+      losses++; netProfit -= b.amount;
+    }
+  });
+  const settled = wins + losses;
+  const winRate = settled ? Math.round((wins / settled) * 100) : 0;
+  return { totalBets: bets.length, totalWagered, wins, losses, pending, refunded, netProfit, biggestWin, winRate };
+}
+
+function profileFilteredBets() {
+  const bets = [...(state.mybets || [])].sort((a, b) => b.ts - a.ts);
+  const f = state.profileBetFilter || "all";
+  if (f === "open") return bets.filter(b => b.marketStatus !== "resolved");
+  if (f === "won") return bets.filter(b => b.marketStatus === "resolved" && !b.refunded && b.marketResolution === b.side);
+  if (f === "lost") return bets.filter(b => b.marketStatus === "resolved" && !b.refunded && b.marketResolution !== b.side);
+  return bets;
+}
+
+function profileBetRowHtml(b) {
+  let resultText, resultColor;
+  if (b.marketStatus !== "resolved") {
+    resultText = "En cours"; resultColor = "var(--amber)";
+  } else if (b.refunded) {
+    resultText = "Remboursé"; resultColor = "var(--amber)";
+  } else if (b.marketResolution === b.side) {
+    const payout = Math.round(b.amount * 100 / Math.max(1, b.price));
+    resultText = `+${payout - b.amount} 💎`; resultColor = "var(--green-hi)";
+  } else {
+    resultText = `-${b.amount} 💎`; resultColor = "var(--red)";
+  }
+  const date = new Date(b.ts).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return `
+    <div class="profile-bet-row">
+      <span class="profile-bet-side ${b.side}">${b.side === "yes" ? "Oui" : "Non"}</span>
+      <div style="flex:1; min-width:0;">
+        <div class="profile-bet-title">${esc(b.title)}</div>
+        <div class="profile-bet-meta">${b.amount} 💎 à ${b.price}% · ${date}</div>
+      </div>
+      <span class="profile-bet-result" style="color:${resultColor};">${resultText}</span>
+    </div>
+  `;
+}
+
+function renderProfile() {
+  const app = document.getElementById("app");
+  const s = computeProfileStats();
+  const bets = profileFilteredBets();
+  const f = state.profileBetFilter || "all";
+  const initials = esc(state.account.pseudo.slice(0, 2).toUpperCase());
+
+  app.innerHTML = `
+    <div class="topnav">
+      <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
+        <div class="logo">${ingotIcon(32)} ${logoWordmark()}</div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="wallet-chip">
+            <span class="wallet-pseudo">${esc(state.account.pseudo)}</span>
+            <span class="sep"></span>
+            <span>💎</span>
+            <span class="wallet-balance">${state.account.balance}</span>
+          </div>
+          <button class="text-btn" id="profileBackBtn">← Retour</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w" style="padding-top:20px;">
+      <div class="profile-header">
+        <div class="profile-avatar">${initials}</div>
+        <div>
+          <div class="profile-name">${esc(state.account.pseudo)} ${state.account.isAdmin ? `<span class="admin-tag">Staff</span>` : ""}</div>
+          <div class="profile-sub">Membre de la communauté Paladium</div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">💎</div><div><div class="stat-chip-value">${state.account.balance.toLocaleString("fr-FR")}</div><div class="stat-chip-label">Solde actuel</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">📊</div><div><div class="stat-chip-value">${s.totalBets}</div><div class="stat-chip-label">Paris placés</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">🎯</div><div><div class="stat-chip-value">${s.winRate}%</div><div class="stat-chip-label">Taux de réussite</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:${s.netProfit >= 0 ? "var(--green-bg)" : "var(--red-bg)"}; color:${s.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${s.netProfit >= 0 ? "📈" : "📉"}</div><div><div class="stat-chip-value" style="color:${s.netProfit >= 0 ? "var(--green-hi)" : "var(--red)"};">${s.netProfit >= 0 ? "+" : ""}${s.netProfit.toLocaleString("fr-FR")} 💎</div><div class="stat-chip-label">Gain net</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--amber-bg); color:var(--amber);">⏳</div><div><div class="stat-chip-value">${s.pending}</div><div class="stat-chip-label">Paris en cours</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:rgba(91,155,255,0.14); color:#5b9bff;">💰</div><div><div class="stat-chip-value">${s.totalWagered.toLocaleString("fr-FR")} 💎</div><div class="stat-chip-label">Total misé</div></div></div>
+        <div class="stat-chip"><div class="stat-chip-icon" style="background:var(--green-bg); color:var(--green-hi);">🤝</div><div><div class="stat-chip-value">${(state.referral.count || 0)}</div><div class="stat-chip-label">Filleuls</div></div></div>
+      </div>
+
+      <div class="promo-head" style="margin-top:6px;">
+        <div>
+          <h2>Historique des paris</h2>
+          <p>${s.wins} gagné${s.wins > 1 ? "s" : ""} · ${s.losses} perdu${s.losses > 1 ? "s" : ""} · ${s.refunded} remboursé${s.refunded > 1 ? "s" : ""}${s.biggestWin > 0 ? ` · meilleur gain +${s.biggestWin} 💎` : ""}</p>
+        </div>
+      </div>
+      <div class="profile-filter-row">
+        <button class="profile-filter-chip ${f === "all" ? "active" : ""}" data-pf="all">Tous (${state.mybets.length})</button>
+        <button class="profile-filter-chip ${f === "open" ? "active" : ""}" data-pf="open">En cours (${s.pending})</button>
+        <button class="profile-filter-chip ${f === "won" ? "active" : ""}" data-pf="won">Gagnés (${s.wins})</button>
+        <button class="profile-filter-chip ${f === "lost" ? "active" : ""}" data-pf="lost">Perdus (${s.losses})</button>
+      </div>
+      <div class="feed-box" style="height:auto; max-height:420px;">
+        ${bets.length === 0 ? `<p class="feed-empty">Aucun pari ici pour l'instant.</p>` : bets.map(profileBetRowHtml).join("")}
+      </div>
+
+      <p class="disclaimer" style="margin-top:24px;">💎 Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement.</p>
+    </div>
+  `;
+
+  document.getElementById("profileBackBtn").addEventListener("click", () => { state.view = "app"; render(); });
+  document.querySelectorAll("[data-pf]").forEach(b => b.addEventListener("click", () => { state.profileBetFilter = b.dataset.pf; render(); }));
+}
+
 /* ---------- casino : lobby ---------- */
 
 const CASINO_GAMES = [
-  { id: "blackjack", title: "Blackjack", poster: "/casino/blackjack-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#a4172c)", enabled: true },
-  { id: "dice",      title: "Dice",      poster: "/casino/dice-poster.png", gradient: "linear-gradient(165deg,#9c6bff,#5b21b6)", enabled: false },
-  { id: "mines",     title: "Mines",     poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
-  { id: "hilo",      title: "Hilo",      poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
-  { id: "flip",      title: "Flip",      poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
-  { id: "roulette",  title: "Roulette",  poster: "/casino/roulette-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
-  { id: "slots",     title: "Slots",     icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
-  { id: "chicken",   title: "Chicken Road", poster: "/casino/chicken-poster.png", gradient: "linear-gradient(165deg,#8fe07a,#1f6b2e)", enabled: true },
-  { id: "aviator",   title: "Aviator",   poster: "/casino/poster-aviator.png", gradient: "linear-gradient(165deg,#5b6bff,#1a1030)", enabled: true },
+  { id: "blackjack", title: "Blackjack", kicker: "Table", poster: "/casino/blackjack-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#a4172c)", enabled: true },
+  { id: "dice",      title: "Dice",      kicker: "Instant", poster: "/casino/dice-poster.png", gradient: "linear-gradient(165deg,#9c6bff,#5b21b6)", enabled: false },
+  { id: "mines",     title: "Mines",     kicker: "Instant", poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
+  { id: "hilo",      title: "Hilo",      kicker: "Instant", poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
+  { id: "flip",      title: "Flip",      kicker: "Pile ou face", poster: "/casino/flip-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
+  { id: "roulette",  title: "Roulette",  kicker: "Table", poster: "/casino/roulette-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#7a1f1f)", enabled: true },
+  { id: "slots",     title: "Slots",     kicker: "Machine à sous", icon: "🎰", gradient: "linear-gradient(165deg,#ffd166,#7a1fa2)", enabled: true },
+  { id: "chicken",   title: "Chicken Road", kicker: "Crash", poster: "/casino/chicken-poster.png", gradient: "linear-gradient(165deg,#8fe07a,#1f6b2e)", enabled: true },
+  { id: "aviator",   title: "Aviator",   kicker: "Crash", icon: "✈️", gradient: "linear-gradient(165deg,#5b6bff,#1a1030)", enabled: true },
 ];
 
 // Statut effectif d'un jeu pour le lobby : combine le flag `enabled` (jeu pas
@@ -2014,8 +2468,25 @@ async function openCasino() {
   try {
     const s = await api("/api/casino/status");
     state.casinoMaintenance = s.maintenance || {};
-  } catch (e) { /* si le statut ne charge pas, on part sans maintenance connue */ }
+    state.casinoLimits = s.limits || {};
+    applyCasinoLimitsToClientConstants();
+  } catch (e) { /* si le statut ne charge pas, on part avec les valeurs par défaut (min 10, pas de max) */ }
   render();
+}
+
+// Synchronise les constantes _MIN_BET_CLIENT / _MAX_BET_CLIENT (utilisées un
+// peu partout dans chaque jeu pour valider/afficher les mises côté client)
+// avec les limites réglées depuis l'admin. La validation qui compte reste
+// toujours côté serveur — ça n'est qu'un confort d'affichage/UX.
+function applyCasinoLimitsToClientConstants() {
+  const L = state.casinoLimits || {};
+  if (L.blackjack) { BJ_MIN_BET_CLIENT = L.blackjack.minBet; BJ_MAX_BET_CLIENT = L.blackjack.maxBet; }
+  if (L.mines)     { MINES_MIN_BET_CLIENT = L.mines.minBet; MINES_MAX_BET_CLIENT = L.mines.maxBet; }
+  if (L.chicken)   { CHICKEN_MIN_BET_CLIENT = L.chicken.minBet; CHICKEN_MAX_BET_CLIENT = L.chicken.maxBet; }
+  if (L.flip)      { FLIP_MIN_BET_CLIENT = L.flip.minBet; FLIP_MAX_BET_CLIENT = L.flip.maxBet; }
+  if (L.slots)     { SLOTS_MIN_BET_CLIENT = L.slots.minBet; SLOTS_MAX_BET_CLIENT = L.slots.maxBet; }
+  if (L.aviator)   { AVIATOR_MIN_BET_CLIENT = L.aviator.minBet; AVIATOR_MAX_BET_CLIENT = L.aviator.maxBet; }
+  if (L.roulette)  { ROULETTE_MIN_BET_CLIENT = L.roulette.minBet; ROULETTE_MAX_BET_CLIENT = L.roulette.maxBet; }
 }
 
 function backToCasinoLobby() {
@@ -2085,21 +2556,7 @@ function renderCasinoLobby() {
   `;
 
   document.getElementById("casinoBackBtn").addEventListener("click", async () => { state.view = "app"; await loadEverything(); render(); });
-  document.querySelectorAll("[data-lobby]").forEach(el => el.addEventListener("click", () => {
-    const g = CASINO_GAMES.find(x => x.id === el.dataset.lobby);
-    const status = casinoGameStatus(g);
-    if (!status.clickable) {
-      showToast(!g.enabled ? `${g.title} arrive bientôt sur ParaBet 👀` : `${g.title} est en maintenance, reviens plus tard 🔧`);
-      return;
-    }
-    if (g.id === "blackjack") openBlackjack();
-    else if (g.id === "mines") openMines();
-    else if (g.id === "flip") openFlip();
-    else if (g.id === "roulette") openRoulette();
-    else if (g.id === "slots") openSlots();
-    else if (g.id === "chicken") openChicken();
-    else if (g.id === "aviator") openAviator();
-  }));
+  document.querySelectorAll("[data-lobby]").forEach(el => el.addEventListener("click", () => playCasinoGame(el.dataset.lobby)));
 }
 
 /* ---------- casino : blackjack ---------- */
@@ -2203,14 +2660,15 @@ async function bjAction(path, body) {
 }
 
 function bjStart() {
-  const amount = clamp(Math.round(Number(state.bjBetAmount) || 0), BJ_MIN_BET_CLIENT, state.account.balance || BJ_MIN_BET_CLIENT);
+  const amount = clamp(Math.round(Number(state.bjBetAmount) || 0), BJ_MIN_BET_CLIENT, Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity) || BJ_MIN_BET_CLIENT);
   bjAction("start", { amount });
 }
 function bjHit() { bjAction("hit"); }
 function bjStand() { bjAction("stand"); }
 function bjDouble() { bjAction("double"); }
 
-const BJ_MIN_BET_CLIENT = 10; // doit correspondre à BJ_MIN_BET côté serveur
+let BJ_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let BJ_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 
 function renderCasino() {
   if (state.casinoGame === "blackjack") { renderBlackjackGame(); return; }
@@ -2268,7 +2726,7 @@ function renderBlackjackGame() {
             <span class="bj-panel-label-sub">💎 fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="bjBetInput" min="${BJ_MIN_BET_CLIENT}" max="${state.account.balance}"
+            <input type="number" id="bjBetInput" min="${BJ_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.bjBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="bj-mini-btn" id="bjHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="bjDblBetBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -2327,17 +2785,17 @@ function renderBlackjackGame() {
   const betInput = document.getElementById("bjBetInput");
   if (betInput) betInput.addEventListener("input", e => { state.bjBetAmount = e.target.value; });
   document.querySelectorAll("[data-bjquick]").forEach(b => b.addEventListener("click", () => {
-    state.bjBetAmount = clamp(Number(b.dataset.bjquick), BJ_MIN_BET_CLIENT, state.account.balance);
+    state.bjBetAmount = clamp(Number(b.dataset.bjquick), BJ_MIN_BET_CLIENT, Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity));
     render();
   }));
   const halfBtn = document.getElementById("bjHalfBtn");
   if (halfBtn) halfBtn.addEventListener("click", () => {
-    state.bjBetAmount = clamp(Math.round((Number(state.bjBetAmount) || 0) / 2), BJ_MIN_BET_CLIENT, state.account.balance);
+    state.bjBetAmount = clamp(Math.round((Number(state.bjBetAmount) || 0) / 2), BJ_MIN_BET_CLIENT, Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity));
     render();
   });
   const dblBetBtn = document.getElementById("bjDblBetBtn");
   if (dblBetBtn) dblBetBtn.addEventListener("click", () => {
-    state.bjBetAmount = clamp(Math.round((Number(state.bjBetAmount) || 0) * 2), BJ_MIN_BET_CLIENT, state.account.balance);
+    state.bjBetAmount = clamp(Math.round((Number(state.bjBetAmount) || 0) * 2), BJ_MIN_BET_CLIENT, Math.min(state.account.balance, BJ_MAX_BET_CLIENT ?? Infinity));
     render();
   });
 
@@ -2355,7 +2813,8 @@ function renderBlackjackGame() {
 
 /* ---------- casino : mines ---------- */
 
-const MINES_MIN_BET_CLIENT = 10; // doit correspondre à MINES_MIN_BET côté serveur
+let MINES_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let MINES_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 const MINES_GRID_SIZE_CLIENT = 25;
 // Images "reskin Minecraft" fournies pour les gemmes et les bombes (100% pour le fun, aucun argent réel).
 const MINES_GEM_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/6/6c/P%C3%A9pite_d%27Endium.png/revision/latest?cb=20210730114131&path-prefix=fr";
@@ -2402,7 +2861,7 @@ async function minesAction(path, body) {
 }
 
 function minesStart() {
-  const amount = clamp(Math.round(Number(state.minesBetAmount) || 0), MINES_MIN_BET_CLIENT, state.account.balance || MINES_MIN_BET_CLIENT);
+  const amount = clamp(Math.round(Number(state.minesBetAmount) || 0), MINES_MIN_BET_CLIENT, Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity) || MINES_MIN_BET_CLIENT);
   minesAction("start", { amount, mines: state.minesCount });
 }
 function minesReveal(tile) { minesAction("reveal", { tile }); }
@@ -2489,7 +2948,7 @@ function renderMinesGame() {
             <span class="bj-panel-label-sub">💎 fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="mnBetInput" min="${MINES_MIN_BET_CLIENT}" max="${state.account.balance}"
+            <input type="number" id="mnBetInput" min="${MINES_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.minesBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="bj-mini-btn" id="mnHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="mnDblBetBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -2539,12 +2998,12 @@ function renderMinesGame() {
 
   const halfBtn = document.getElementById("mnHalfBtn");
   if (halfBtn) halfBtn.addEventListener("click", () => {
-    state.minesBetAmount = clamp(Math.round((Number(state.minesBetAmount) || 0) / 2), MINES_MIN_BET_CLIENT, state.account.balance);
+    state.minesBetAmount = clamp(Math.round((Number(state.minesBetAmount) || 0) / 2), MINES_MIN_BET_CLIENT, Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity));
     render();
   });
   const dblBtn = document.getElementById("mnDblBetBtn");
   if (dblBtn) dblBtn.addEventListener("click", () => {
-    state.minesBetAmount = clamp(Math.round((Number(state.minesBetAmount) || 0) * 2), MINES_MIN_BET_CLIENT, state.account.balance);
+    state.minesBetAmount = clamp(Math.round((Number(state.minesBetAmount) || 0) * 2), MINES_MIN_BET_CLIENT, Math.min(state.account.balance, MINES_MAX_BET_CLIENT ?? Infinity));
     render();
   });
 
@@ -2602,7 +3061,8 @@ const CHICKEN_TREE_SVG = `
   <rect x="6" y="14" width="2" height="10" fill="#8a6440"/>
 </svg>`;
 
-const CHICKEN_MIN_BET_CLIENT = 10; // doit correspondre à CHICKEN_MIN_BET côté serveur
+let CHICKEN_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let CHICKEN_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 // base / croissance du risque par ligne, doit correspondre à CHICKEN_DIFFICULTIES côté serveur
 // (dupliqué ici uniquement pour l'affichage informatif "chance de se faire renverser")
 const CHICKEN_DIFFICULTIES_CLIENT = [
@@ -2700,7 +3160,7 @@ async function chickenAction(path, body) {
 }
 
 function chickenStart() {
-  const amount = clamp(Math.round(Number(state.chickenBetAmount) || 0), CHICKEN_MIN_BET_CLIENT, state.account.balance || CHICKEN_MIN_BET_CLIENT);
+  const amount = clamp(Math.round(Number(state.chickenBetAmount) || 0), CHICKEN_MIN_BET_CLIENT, Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity) || CHICKEN_MIN_BET_CLIENT);
   state.chickenAnim = 0;
   chickenAction("start", { amount, difficulty: state.chickenDifficulty });
 }
@@ -2828,7 +3288,7 @@ function renderChickenGame() {
           <div class="ckr-box-label">Montant du pari · 💎 fictif</div>
           <div class="ckr-bet-row">
             <button class="ckr-minmax-btn" id="ckMinBtn" ${betLocked ? "disabled" : ""}>MIN</button>
-            <input type="number" id="ckBetInput" min="${CHICKEN_MIN_BET_CLIENT}" max="${state.account.balance}"
+            <input type="number" id="ckBetInput" min="${CHICKEN_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.chickenBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="ckr-minmax-btn" id="ckMaxBtn" ${betLocked ? "disabled" : ""}>MAX</button>
           </div>
@@ -2882,10 +3342,10 @@ function renderChickenGame() {
   const minBtn = document.getElementById("ckMinBtn");
   if (minBtn) minBtn.addEventListener("click", () => { state.chickenBetAmount = CHICKEN_MIN_BET_CLIENT; render(); });
   const maxBtn = document.getElementById("ckMaxBtn");
-  if (maxBtn) maxBtn.addEventListener("click", () => { state.chickenBetAmount = Math.max(CHICKEN_MIN_BET_CLIENT, state.account.balance); render(); });
+  if (maxBtn) maxBtn.addEventListener("click", () => { state.chickenBetAmount = Math.max(CHICKEN_MIN_BET_CLIENT, Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity)); render(); });
 
   document.querySelectorAll("[data-chip]").forEach(btn => btn.addEventListener("click", () => {
-    state.chickenBetAmount = clamp(Number(btn.dataset.chip), CHICKEN_MIN_BET_CLIENT, state.account.balance || CHICKEN_MIN_BET_CLIENT);
+    state.chickenBetAmount = clamp(Number(btn.dataset.chip), CHICKEN_MIN_BET_CLIENT, Math.min(state.account.balance, CHICKEN_MAX_BET_CLIENT ?? Infinity) || CHICKEN_MIN_BET_CLIENT);
     render();
   }));
 
@@ -2930,7 +3390,8 @@ function renderChickenGame() {
 
 /* ---------- casino : flip ---------- */
 
-const FLIP_MIN_BET_CLIENT = 10; // doit correspondre à FLIP_MIN_BET côté serveur
+let FLIP_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let FLIP_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 const FLIP_FACE_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/1/17/Lingot_de_Paladium.png/revision/latest?cb=20210729175433&path-prefix=fr";
 const FLIP_PILE_URL = "https://static.wikia.nocookie.net/paladiumpvp/images/9/99/Lingot_de_Paladium_Vert.png/revision/latest?cb=20210731200814&path-prefix=fr";
 
@@ -2955,7 +3416,7 @@ function flipChooseSide(side) {
 
 function flipStart() {
   if (state.flipBusy || state.flipSpinning) return;
-  const amount = clamp(Math.round(Number(state.flipBetAmount) || 0), FLIP_MIN_BET_CLIENT, state.account.balance || FLIP_MIN_BET_CLIENT);
+  const amount = clamp(Math.round(Number(state.flipBetAmount) || 0), FLIP_MIN_BET_CLIENT, Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity) || FLIP_MIN_BET_CLIENT);
   state.flipBetAmount = amount;
   state.flipBusy = true; state.flipError = ""; render();
 
@@ -3030,7 +3491,7 @@ function renderFlipGame() {
             <span class="bj-panel-label-sub">💎 fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="cfBetInput" min="${FLIP_MIN_BET_CLIENT}" max="${state.account.balance}"
+            <input type="number" id="cfBetInput" min="${FLIP_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.flipBetAmount}" ${busy || spinning ? "disabled" : ""} />
             <button class="bj-mini-btn" id="cfHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="cfDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -3095,12 +3556,12 @@ function renderFlipGame() {
   if (betInput) betInput.addEventListener("input", e => { state.flipBetAmount = e.target.value; render(); });
   const halfBtn = document.getElementById("cfHalfBtn");
   if (halfBtn) halfBtn.addEventListener("click", () => {
-    state.flipBetAmount = clamp(Math.round((Number(state.flipBetAmount) || 0) / 2), FLIP_MIN_BET_CLIENT, state.account.balance);
+    state.flipBetAmount = clamp(Math.round((Number(state.flipBetAmount) || 0) / 2), FLIP_MIN_BET_CLIENT, Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity));
     render();
   });
   const dblBtn = document.getElementById("cfDblBetBtn");
   if (dblBtn) dblBtn.addEventListener("click", () => {
-    state.flipBetAmount = clamp(Math.round((Number(state.flipBetAmount) || 0) * 2), FLIP_MIN_BET_CLIENT, state.account.balance);
+    state.flipBetAmount = clamp(Math.round((Number(state.flipBetAmount) || 0) * 2), FLIP_MIN_BET_CLIENT, Math.min(state.account.balance, FLIP_MAX_BET_CLIENT ?? Infinity));
     render();
   });
 
@@ -3115,7 +3576,8 @@ function renderFlipGame() {
 
 /* ---------- casino : slots ---------- */
 
-const SLOTS_MIN_BET_CLIENT = 10; // doit correspondre à SLOTS_MIN_BET côté serveur
+let SLOTS_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let SLOTS_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 const SLOTS_SYMBOL_EMOJI = { cherry: "🍒", lemon: "🍋", grape: "🍇", bell: "🔔", star: "⭐", diamond: "💎", seven: "7️⃣" };
 const SLOTS_SPIN_SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "⭐", "💎", "7️⃣"]; // pour l'animation de défilement
 const SLOTS_MULT_LABEL = { triple: "triple", pair: "paire" };
@@ -3135,7 +3597,7 @@ async function openSlots() {
 
 function slotsStart() {
   if (state.slotsBusy || state.slotsSpinning) return;
-  const amount = clamp(Math.round(Number(state.slotsBetAmount) || 0), SLOTS_MIN_BET_CLIENT, state.account.balance || SLOTS_MIN_BET_CLIENT);
+  const amount = clamp(Math.round(Number(state.slotsBetAmount) || 0), SLOTS_MIN_BET_CLIENT, Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity) || SLOTS_MIN_BET_CLIENT);
   state.slotsBetAmount = amount;
   state.slotsBusy = true; state.slotsError = ""; render();
 
@@ -3202,7 +3664,7 @@ function renderSlotsGame() {
             <span class="bj-panel-label-sub">💎 fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="slBetInput" min="${SLOTS_MIN_BET_CLIENT}" max="${state.account.balance}"
+            <input type="number" id="slBetInput" min="${SLOTS_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.slotsBetAmount}" ${busy || spinning ? "disabled" : ""} />
             <button class="bj-mini-btn" id="slHalfBtn" ${busy || spinning ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="slDblBetBtn" ${busy || spinning ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -3264,12 +3726,12 @@ function renderSlotsGame() {
   if (betInput) betInput.addEventListener("input", e => { state.slotsBetAmount = e.target.value; render(); });
   const halfBtn = document.getElementById("slHalfBtn");
   if (halfBtn) halfBtn.addEventListener("click", () => {
-    state.slotsBetAmount = clamp(Math.round((Number(state.slotsBetAmount) || 0) / 2), SLOTS_MIN_BET_CLIENT, state.account.balance);
+    state.slotsBetAmount = clamp(Math.round((Number(state.slotsBetAmount) || 0) / 2), SLOTS_MIN_BET_CLIENT, Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity));
     render();
   });
   const dblBtn = document.getElementById("slDblBetBtn");
   if (dblBtn) dblBtn.addEventListener("click", () => {
-    state.slotsBetAmount = clamp(Math.round((Number(state.slotsBetAmount) || 0) * 2), SLOTS_MIN_BET_CLIENT, state.account.balance);
+    state.slotsBetAmount = clamp(Math.round((Number(state.slotsBetAmount) || 0) * 2), SLOTS_MIN_BET_CLIENT, Math.min(state.account.balance, SLOTS_MAX_BET_CLIENT ?? Infinity));
     render();
   });
 
@@ -3294,7 +3756,8 @@ function renderSlotsGame() {
 
 /* ---------- casino : aviator (manche partagée en temps réel) ---------- */
 
-const AVIATOR_MIN_BET_CLIENT = 10; // doit correspondre à AVIATOR_MIN_BET côté serveur
+let AVIATOR_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let AVIATOR_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 const AVIATOR_GROWTH_K_CLIENT = Math.log(2) / 6; // doit être identique à AVIATOR_GROWTH_K côté serveur
 const AVIATOR_POLL_MS = 350; // fréquence de rafraîchissement de l'état de la manche (joueurs, phase, historique)
 
@@ -3420,7 +3883,7 @@ async function aviatorAction(path, body) {
 }
 
 function aviatorBet() {
-  const amount = clamp(Math.round(Number(state.aviatorBetAmount) || 0), AVIATOR_MIN_BET_CLIENT, state.account.balance || AVIATOR_MIN_BET_CLIENT);
+  const amount = clamp(Math.round(Number(state.aviatorBetAmount) || 0), AVIATOR_MIN_BET_CLIENT, Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity) || AVIATOR_MIN_BET_CLIENT);
   const body = { amount };
   if (state.aviatorAutoOn) {
     const auto = Number(state.aviatorAutoValue);
@@ -3560,7 +4023,7 @@ function renderAviatorGame() {
             <span class="bj-panel-label-sub">💎 fictif</span>
           </div>
           <div class="bj-panel-input-row">
-            <input type="number" id="avBetInput" min="${AVIATOR_MIN_BET_CLIENT}" max="${state.account.balance}"
+            <input type="number" id="avBetInput" min="${AVIATOR_MIN_BET_CLIENT}" max="${Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity)}"
               value="${state.aviatorBetAmount}" ${betLocked ? "disabled" : ""} />
             <button class="bj-mini-btn" id="avHalfBtn" ${betLocked ? "disabled" : ""} title="Diviser la mise par 2">½</button>
             <button class="bj-mini-btn" id="avDblBtn" ${betLocked ? "disabled" : ""} title="Doubler la mise">2×</button>
@@ -3619,12 +4082,12 @@ function renderAviatorGame() {
   if (betInput) betInput.addEventListener("input", e => { state.aviatorBetAmount = e.target.value; });
   const halfBtn = document.getElementById("avHalfBtn");
   if (halfBtn) halfBtn.addEventListener("click", () => {
-    state.aviatorBetAmount = clamp(Math.round((Number(state.aviatorBetAmount) || 0) / 2), AVIATOR_MIN_BET_CLIENT, state.account.balance);
+    state.aviatorBetAmount = clamp(Math.round((Number(state.aviatorBetAmount) || 0) / 2), AVIATOR_MIN_BET_CLIENT, Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity));
     render();
   });
   const dblBtn = document.getElementById("avDblBtn");
   if (dblBtn) dblBtn.addEventListener("click", () => {
-    state.aviatorBetAmount = clamp(Math.round((Number(state.aviatorBetAmount) || 0) * 2), AVIATOR_MIN_BET_CLIENT, state.account.balance);
+    state.aviatorBetAmount = clamp(Math.round((Number(state.aviatorBetAmount) || 0) * 2), AVIATOR_MIN_BET_CLIENT, Math.min(state.account.balance, AVIATOR_MAX_BET_CLIENT ?? Infinity));
     render();
   });
   const autoCheck = document.getElementById("avAutoCheck");
@@ -3638,7 +4101,8 @@ function renderAviatorGame() {
 
 /* ---------- casino : roulette ---------- */
 
-const ROULETTE_MIN_BET_CLIENT = 10; // doit correspondre à ROULETTE_MIN_BET côté serveur
+let ROULETTE_MIN_BET_CLIENT = 10; // valeur par défaut, écrasée par /api/casino/status au chargement du casino
+let ROULETTE_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 const ROULETTE_RED_CLIENT = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const ROULETTE_CHIPS = [10, 50, 100, 500, 1000];
 
@@ -4287,7 +4751,7 @@ function renderAdmin() {
   app.innerHTML = `
     <div class="topnav">
       <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
-        <div class="logo"><div class="logo-badge">💎</div> ParaBet <span class="admin-tag" style="margin-left:6px;">Admin</span></div>
+        <div class="logo">${ingotIcon(32)} ${logoWordmark()} <span class="admin-tag" style="margin-left:6px;">Admin</span></div>
         <div style="flex:1;"></div>
         <button class="text-btn" id="backBtn">← Retour au marché</button>
         <button class="text-btn" id="logoutBtn">Déconnexion</button>
@@ -4345,6 +4809,28 @@ function renderAdmin() {
             ` : ""}
           </div>
         `).join("")}
+      </div>
+
+      <div class="admin-section">
+        <h3>Limites de mise — casino</h3>
+        <p class="admin-row-meta" style="margin-bottom:10px;">Mise minimum et maximum par jeu. Laisse le champ maximum vide pour ne mettre aucun plafond.</p>
+        ${CASINO_GAMES_LIST.map(g => {
+          const lim = state.adminCasinoLimits[g] || { minBet: 10, maxBet: null };
+          return `
+            <div class="admin-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+              <div class="admin-row-title" style="min-width:150px;">${CASINO_GAME_LABEL[g] || g}</div>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+                Min
+                <input type="number" min="1" data-limit-min="${g}" value="${lim.minBet}" style="width:90px;" />
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+                Max
+                <input type="number" min="1" data-limit-max="${g}" value="${lim.maxBet == null ? "" : lim.maxBet}" placeholder="aucun" style="width:90px;" />
+              </label>
+              <button class="mini-btn" data-save-limit="${g}" ${state.adminBusy ? "disabled" : ""}>Enregistrer</button>
+            </div>
+          `;
+        }).join("")}
       </div>
 
       <div class="admin-section">
@@ -4603,6 +5089,14 @@ function renderAdmin() {
     const value = input ? input.value : "";
     adminSetBalance(id, "delta", value);
   }));
+  document.querySelectorAll("[data-save-limit]").forEach(b => b.addEventListener("click", () => {
+    const game = b.dataset.saveLimit;
+    const minInput = document.querySelector(`[data-limit-min="${game}"]`);
+    const maxInput = document.querySelector(`[data-limit-max="${game}"]`);
+    const minBet = minInput ? minInput.value : "";
+    const maxBet = maxInput ? maxInput.value : "";
+    adminSetCasinoLimit(game, minBet, maxBet);
+  }));
   document.querySelectorAll("[data-toggle-account]").forEach(el => el.addEventListener("click", () => {
     toggleAccountBets(el.dataset.toggleAccount);
   }));
@@ -4612,6 +5106,13 @@ function renderAdmin() {
 }
 
 /* ---------- boot ---------- */
+
+// Bandeau de prévention jeu responsable : fermable pour la session en cours
+// (il n'est pas dans #app donc pas touché par render(), un seul listener suffit).
+const jisBannerClose = document.getElementById("jisBannerClose");
+if (jisBannerClose) jisBannerClose.addEventListener("click", () => {
+  document.body.classList.add("jis-banner-hidden");
+});
 
 boot();
 </script>

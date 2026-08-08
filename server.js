@@ -517,6 +517,46 @@ app.get("/api/referrals", authRequired, async (req, res) => {
   });
 });
 
+/* ================= CASINO : LIMITES DE MISE (réglables depuis l'admin) ================= */
+// Chaque jeu a une mise min et (optionnellement) une mise max, stockées en
+// base (table casino_limits) et gardées en cache mémoire pour ne pas requêter
+// la DB à chaque mise. Le cache est rechargé après chaque modif admin.
+
+const CASINO_GAMES_LIST = ["blackjack", "mines", "chicken", "flip", "roulette", "slots", "aviator"];
+let casinoLimits = {}; // game -> { minBet, maxBet: number|null }
+
+async function loadCasinoLimits() {
+  const [rows] = await pool.query("SELECT game, min_bet, max_bet FROM casino_limits");
+  const map = {};
+  for (const r of rows) map[r.game] = { minBet: r.min_bet, maxBet: r.max_bet == null ? null : r.max_bet };
+  for (const g of CASINO_GAMES_LIST) {
+    if (!map[g]) map[g] = { minBet: 10, maxBet: null };
+  }
+  casinoLimits = map;
+}
+loadCasinoLimits().catch(e => console.error("Erreur chargement des limites de mise casino :", e));
+
+function limitsFor(game) {
+  return casinoLimits[game] || { minBet: 10, maxBet: null };
+}
+
+// Valide un montant de mise par rapport aux limites admin + solde du compte.
+// Renvoie null si le montant est valide, sinon un message d'erreur prêt à
+// être renvoyé tel quel au client.
+function validateBetAmount(game, amount, balance) {
+  const { minBet, maxBet } = limitsFor(game);
+  if (!Number.isFinite(amount) || amount < minBet) {
+    return `Mise invalide : minimum ${minBet} 💎.`;
+  }
+  if (maxBet != null && amount > maxBet) {
+    return `Mise invalide : maximum ${maxBet} 💎 sur ce jeu.`;
+  }
+  if (amount > balance) {
+    return `Mise invalide : tu n'as pas assez de solde.`;
+  }
+  return null;
+}
+
 /* ================= CASINO : BLACKJACK ================= */
 // Parties en cours stockées en mémoire (une seule partie active par compte à
 // la fois) — pas besoin de table en base : le solde, lui, est débité/crédité
@@ -525,7 +565,6 @@ app.get("/api/referrals", authRequired, async (req, res) => {
 // gagner d'émeraudes injustement, au pire la partie en cours est à relancer.
 const blackjackGames = new Map(); // accountId -> { deck, player, dealer, bet, doubled, status, result, payout }
 
-const BJ_MIN_BET = 10;
 const BJ_RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const BJ_SUITS = ["♠", "♥", "♦", "♣"];
 
@@ -647,10 +686,9 @@ app.post("/api/casino/blackjack/start", authRequired, async (req, res) => {
     const account = arows[0];
     if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
-    const bet = clamp(Math.round(Number(req.body?.amount) || 0), BJ_MIN_BET, Math.max(BJ_MIN_BET, account.balance));
-    if (bet < BJ_MIN_BET || bet > account.balance) {
-      return res.status(400).json({ error: `Mise invalide : entre ${BJ_MIN_BET} 💎 et ton solde.` });
-    }
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("blackjack", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
     await addWageringProgress(pool, req.user.id, bet);
@@ -757,7 +795,7 @@ const CASINO_MAINTENANCE = {
 };
 
 app.get("/api/casino/status", authRequired, (req, res) => {
-  res.json({ maintenance: CASINO_MAINTENANCE });
+  res.json({ maintenance: CASINO_MAINTENANCE, limits: casinoLimits });
 });
 
 /* ================= CASINO : MINES ================= */
@@ -769,7 +807,6 @@ app.get("/api/casino/status", authRequired, (req, res) => {
 // des cases déjà révélées et le multiplicateur courant le sont.
 const minesGames = new Map(); // accountId -> { mines: Set<number>, revealed: Set<number>, bet, minesCount, status, payout }
 
-const MINES_MIN_BET = 10;
 const MINES_GRID_SIZE = 25;
 const MINES_HOUSE_EDGE = 0.92; // 8% de marge maison
 const minesLocks = new Set(); // accountId en cours de traitement, anti double-reveal en parallèle
@@ -826,10 +863,9 @@ app.post("/api/casino/mines/start", authRequired, async (req, res) => {
     const account = arows[0];
     if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
-    const bet = clamp(Math.round(Number(req.body?.amount) || 0), MINES_MIN_BET, Math.max(MINES_MIN_BET, account.balance));
-    if (bet < MINES_MIN_BET || bet > account.balance) {
-      return res.status(400).json({ error: `Mise invalide : entre ${MINES_MIN_BET} 💎 et ton solde.` });
-    }
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("mines", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
     const minesCount = clamp(Math.round(Number(req.body?.mines) || 3), 1, 24);
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
@@ -952,7 +988,6 @@ app.post("/api/casino/mines/cashout", authRequired, async (req, res) => {
 // (percuté, toutes les lignes franchies, ou retrait manuel).
 const chickenGames = new Map(); // accountId -> { bet, difficulty, step, status, payout }
 
-const CHICKEN_MIN_BET = 10;
 const CHICKEN_HOUSE_EDGE = 0.97; // 3% de marge maison
 
 // Chaque palier de difficulté définit : la probabilité de se faire renverser
@@ -1023,10 +1058,9 @@ app.post("/api/casino/chicken/start", authRequired, async (req, res) => {
     const account = arows[0];
     if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
-    const bet = clamp(Math.round(Number(req.body?.amount) || 0), CHICKEN_MIN_BET, Math.max(CHICKEN_MIN_BET, account.balance));
-    if (bet < CHICKEN_MIN_BET || bet > account.balance) {
-      return res.status(400).json({ error: `Mise invalide : entre ${CHICKEN_MIN_BET} 💎 et ton solde.` });
-    }
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("chicken", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
     const difficulty = ["facile", "moyen", "difficile", "hardcore"].includes(req.body?.difficulty) ? req.body.difficulty : "moyen";
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
@@ -1134,7 +1168,6 @@ app.post("/api/casino/chicken/cashout", authRequired, async (req, res) => {
 // lancers pour l'affichage côté client (le plus récent en tête).
 const flipHistory = new Map(); // accountId -> [{ result, win, bet, payout, ts }, ...]
 
-const FLIP_MIN_BET = 10;
 const FLIP_MULTIPLIER = 1.98; // ~1% de marge maison sur un jeu à 50/50, comme les autres jeux du casino
 
 app.get("/api/casino/flip/state", authRequired, (req, res) => {
@@ -1148,10 +1181,9 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
     const account = arows[0];
     if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
-    const bet = clamp(Math.round(Number(req.body?.amount) || 0), FLIP_MIN_BET, Math.max(FLIP_MIN_BET, account.balance));
-    if (bet < FLIP_MIN_BET || bet > account.balance) {
-      return res.status(400).json({ error: `Mise invalide : entre ${FLIP_MIN_BET} 💎 et ton solde.` });
-    }
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("flip", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
     const side = req.body?.side === "pile" ? "pile" : "face";
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
@@ -1202,7 +1234,6 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
 // l'avantage à la maison, exactement comme dans un vrai casino).
 const rouletteHistory = new Map(); // accountId -> [{ pocket, color, ts, net }, ...]
 
-const ROULETTE_MIN_BET = 10;
 const ROULETTE_MAX_BETS = 12; // nombre max de mises différentes sur un même lancer
 const ROULETTE_RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
@@ -1253,12 +1284,13 @@ function rouletteBetLabel(bet) {
 // bornes) pour que l'appelant rejette toute la requête d'un bloc.
 function rouletteValidateBets(rawBets, balance) {
   if (!Array.isArray(rawBets) || rawBets.length === 0 || rawBets.length > ROULETTE_MAX_BETS) return null;
+  const { minBet, maxBet } = limitsFor("roulette");
   const bets = [];
   let total = 0;
   for (const raw of rawBets) {
     const type = raw?.type;
     const amount = Math.round(Number(raw?.amount) || 0);
-    if (amount < ROULETTE_MIN_BET) return null;
+    if (amount < minBet || (maxBet != null && amount > maxBet)) return null;
     let value = null;
     if (type === "straight") {
       value = Math.round(Number(raw?.value));
@@ -1292,7 +1324,9 @@ app.post("/api/casino/roulette/play", authRequired, async (req, res) => {
 
     const validated = rouletteValidateBets(req.body?.bets, account.balance);
     if (!validated) {
-      return res.status(400).json({ error: `Mises invalides : chaque mise doit être d'au moins ${ROULETTE_MIN_BET} 💎 et le total ne peut pas dépasser ton solde.` });
+      const { minBet, maxBet } = limitsFor("roulette");
+      const maxMsg = maxBet != null ? ` (max ${maxBet} 💎 par mise)` : "";
+      return res.status(400).json({ error: `Mises invalides : chaque mise doit être entre ${minBet} 💎${maxMsg} et le total ne peut pas dépasser ton solde.` });
     }
     const { bets, total } = validated;
 
@@ -1350,7 +1384,6 @@ app.post("/api/casino/roulette/play", authRequired, async (req, res) => {
 // compte pour l'affichage côté client (le plus récent en tête).
 const slotsHistory = new Map(); // accountId -> [{ reels, win, kind, multiplier, bet, payout, ts }, ...]
 
-const SLOTS_MIN_BET = 10;
 
 // Symboles pondérés (poids sur 100) + table de gains :
 //  - "triple" : multiplicateur si les 3 rouleaux affichent le même symbole
@@ -1413,10 +1446,9 @@ app.post("/api/casino/slots/play", authRequired, async (req, res) => {
     const account = arows[0];
     if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
-    const bet = clamp(Math.round(Number(req.body?.amount) || 0), SLOTS_MIN_BET, Math.max(SLOTS_MIN_BET, account.balance));
-    if (bet < SLOTS_MIN_BET || bet > account.balance) {
-      return res.status(400).json({ error: `Mise invalide : entre ${SLOTS_MIN_BET} 💎 et ton solde.` });
-    }
+    const bet = Math.round(Number(req.body?.amount) || 0);
+    const betErr = validateBetAmount("slots", bet, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
 
     await pool.query("UPDATE accounts SET balance = balance - ? WHERE id = ?", [bet, req.user.id]);
     await addWageringProgress(pool, req.user.id, bet);
@@ -1477,7 +1509,6 @@ app.post("/api/casino/slots/play", authRequired, async (req, res) => {
 // l'avance et encaisser juste avant à coup sûr). Le client ne reçoit que le
 // multiplicateur courant, recalculé indépendamment côté serveur.
 
-const AVIATOR_MIN_BET = 10;
 const AVIATOR_WAITING_MS = 7000; // durée de la phase de mise
 const AVIATOR_CRASHED_MS = 4000; // durée d'affichage du résultat avant la manche suivante
 // Vitesse de montée du multiplicateur : m(t) = e^(K*t), t en secondes.
@@ -1668,9 +1699,8 @@ app.post("/api/casino/aviator/bet", authRequired, async (req, res) => {
     if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
     const amount = Math.round(Number(req.body?.amount) || 0);
-    if (amount < AVIATOR_MIN_BET || amount > account.balance) {
-      return res.status(400).json({ error: `Mise invalide : entre ${AVIATOR_MIN_BET} 💎 et ton solde.` });
-    }
+    const betErr = validateBetAmount("aviator", amount, account.balance);
+    if (betErr) return res.status(400).json({ error: betErr });
     let autoCashout = req.body?.autoCashout != null ? Math.round(Number(req.body.autoCashout) * 100) : null;
     if (!Number.isFinite(autoCashout) || autoCashout < 101) autoCashout = null;
 
@@ -1868,6 +1898,39 @@ app.get("/api/admin/casino-bets", authRequired, adminRequired, async (req, res) 
     detail: c.detail,
     ts: new Date(c.created_at).getTime(),
   })));
+});
+
+app.get("/api/admin/casino-limits", authRequired, adminRequired, (req, res) => {
+  res.json(casinoLimits);
+});
+
+app.post("/api/admin/casino-limits", authRequired, adminRequired, async (req, res) => {
+  const { game } = req.body || {};
+  if (!CASINO_GAMES_LIST.includes(game)) {
+    return res.status(400).json({ error: "Jeu inconnu." });
+  }
+  const minBet = Math.round(Number(req.body?.minBet));
+  if (!Number.isFinite(minBet) || minBet < 1) {
+    return res.status(400).json({ error: "Mise minimum invalide (doit être un nombre >= 1)." });
+  }
+  let maxBet = req.body?.maxBet;
+  if (maxBet === null || maxBet === "" || maxBet === undefined) {
+    maxBet = null;
+  } else {
+    maxBet = Math.round(Number(maxBet));
+    if (!Number.isFinite(maxBet) || maxBet < minBet) {
+      return res.status(400).json({ error: "Mise maximum invalide (doit être >= mise minimum, ou vide pour aucun plafond)." });
+    }
+  }
+
+  await pool.query(
+    `INSERT INTO casino_limits (game, min_bet, max_bet) VALUES (?, ?, ?)
+     ON CONFLICT (game) DO UPDATE SET min_bet = EXCLUDED.min_bet, max_bet = EXCLUDED.max_bet
+     RETURNING game`,
+    [game, minBet, maxBet]
+  );
+  await loadCasinoLimits();
+  res.json(casinoLimits);
 });
 
 /* ================= ADMIN : MARCHÉS ================= */

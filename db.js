@@ -57,6 +57,15 @@ async function init() {
   await pool.query(
     "CREATE INDEX IF NOT EXISTS idx_accounts_referred_by ON accounts(referred_by)"
   );
+
+  // Valeurs par défaut des limites de mise casino (min 10, pas de plafond),
+  // pour chaque jeu qui n'a pas encore de ligne — ne touche jamais aux
+  // lignes déjà réglées depuis l'admin.
+  const defaultGames = ["blackjack", "mines", "chicken", "flip", "roulette", "slots", "aviator"];
+  const values = defaultGames.map(g => `('${g}', 10, NULL)`).join(", ");
+  await pool.query(
+    `INSERT INTO casino_limits (game, min_bet, max_bet) VALUES ${values} ON CONFLICT (game) DO NOTHING`
+  );
 }
 
 const ready = init().catch((err) => {

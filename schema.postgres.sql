@@ -88,6 +88,13 @@ CREATE TABLE IF NOT EXISTS casino_bets (
   FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
+-- Limites de mise par jeu de casino, réglables depuis l'admin (max_bet NULL = pas de plafond).
+CREATE TABLE IF NOT EXISTS casino_limits (
+  game    VARCHAR(20) PRIMARY KEY,
+  min_bet INTEGER NOT NULL DEFAULT 10,
+  max_bet INTEGER DEFAULT NULL
+);
+
 -- Index utiles
 CREATE INDEX IF NOT EXISTS idx_bets_market ON bets(market_id);
 CREATE INDEX IF NOT EXISTS idx_bets_account ON bets(account_id);
