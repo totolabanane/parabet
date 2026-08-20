@@ -65,6 +65,19 @@ async function init() {
     await pool.query(stmt);
   }
 
+  // Bonus quotidien : passe last_bonus_date de DATE (jour calendaire) à un
+  // timestamp epoch en millisecondes, pour permettre un cooldown glissant de
+  // 24h (au lieu d'un simple changement de date). Idempotent : ne touche à
+  // la colonne que si elle n'est pas déjà au bon type.
+  const bonusColResult = await pool.query(
+    "SELECT data_type FROM information_schema.columns WHERE table_name = 'accounts' AND column_name = 'last_bonus_date'"
+  );
+  if (bonusColResult.rows[0] && bonusColResult.rows[0].data_type !== "bigint") {
+    await pool.query(
+      "ALTER TABLE accounts ALTER COLUMN last_bonus_date TYPE BIGINT USING (EXTRACT(EPOCH FROM last_bonus_date::timestamp) * 1000)::bigint"
+    );
+  }
+
   await pool.query(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_referral_code ON accounts(referral_code)"
   );

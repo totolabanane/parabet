@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   password_hash     VARCHAR(255) NOT NULL,
   balance           INTEGER NOT NULL DEFAULT 500,
   is_admin          INTEGER NOT NULL DEFAULT 0,
-  last_bonus_date   DATE DEFAULT NULL,
+  last_bonus_date   BIGINT DEFAULT NULL, -- timestamp epoch (ms) de la dernière réclamation du bonus quotidien
   referral_code     VARCHAR(12) UNIQUE,
   referred_by       INTEGER DEFAULT NULL,
   referral_earnings INTEGER NOT NULL DEFAULT 0,

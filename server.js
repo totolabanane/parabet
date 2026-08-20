@@ -30,6 +30,7 @@ if (!JWT_SECRET) {
 
 const START_BAL = Number(START_BALANCE);
 const DAILY_BON = Number(DAILY_BONUS);
+const BONUS_COOLDOWN_MS = 24 * 60 * 60 * 1000; // le bonus quotidien redevient disponible 24h après la dernière réclamation
 const DEP_MIN = Number(DEPOSIT_MIN_AMOUNT);
 const WD_MIN = Number(WITHDRAW_MIN_AMOUNT);
 const REF_BONUS_REFERRER = Number(REFERRAL_BONUS_REFERRER);
@@ -190,6 +191,14 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+// Le bonus quotidien redevient disponible 24h pile après la dernière réclamation
+// (et non au changement de date calendaire). last_bonus_date est stocké en base
+// comme un timestamp epoch (ms) — voir /api/bonus.
+function computeNextBonusAt(account) {
+  const last = account && account.last_bonus_date != null ? Number(account.last_bonus_date) : null;
+  return last != null && Number.isFinite(last) ? last + BONUS_COOLDOWN_MS : null;
+}
 
 // Exigence de mise ("wagering requirement") : chaque dépôt approuvé ajoute son
 // montant à wagering_required (voir /api/admin/deposits/:id/approve). Chaque
@@ -365,7 +374,7 @@ app.post("/api/register", async (req, res) => {
     // faire valider son 1er dépôt par le staff (voir approveDeposit()). On se
     // contente ici de "verrouiller" les montants de bonus (utile si une offre
     // boostée expire entre-temps) sur le compte du filleul.
-    const startBalance = START_BAL;
+    const startBalance = appSettings.startingBalance;
 
     const [result] = await pool.query(
       "INSERT INTO accounts (pseudo, pseudo_lower, password_hash, balance, is_admin, referral_code, referred_by, referral_bonus_referrer, referral_bonus_referee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -381,7 +390,7 @@ app.post("/api/register", async (req, res) => {
 
     const account = { id: result.insertId, pseudo, is_admin: isAdmin };
     setAuthCookie(res, signToken(account));
-    res.json({ pseudo, balance: startBalance, isAdmin: !!isAdmin, lastBonusDate: null, referralCode, wageringRequired: 0, wageringProgress: 0 });
+    res.json({ pseudo, balance: startBalance, isAdmin: !!isAdmin, nextBonusAt: null, referralCode, wageringRequired: 0, wageringProgress: 0 });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur lors de l'inscription." });
@@ -408,7 +417,7 @@ app.post("/api/login", async (req, res) => {
       pseudo: account.pseudo,
       balance: account.balance,
       isAdmin: !!account.is_admin,
-      lastBonusDate: account.last_bonus_date,
+      nextBonusAt: computeNextBonusAt(account),
       referralCode,
       wageringRequired: account.wagering_required,
       wageringProgress: account.wagering_progress,
@@ -433,7 +442,7 @@ app.get("/api/me", authRequired, async (req, res) => {
     pseudo: account.pseudo,
     balance: account.balance,
     isAdmin: !!account.is_admin,
-    lastBonusDate: account.last_bonus_date,
+    nextBonusAt: computeNextBonusAt(account),
     referralCode,
     wageringRequired: account.wagering_required,
     wageringProgress: account.wagering_progress,
@@ -445,12 +454,16 @@ app.post("/api/bonus", authRequired, async (req, res) => {
   const account = rows[0];
   if (!account) return res.status(401).json({ error: "Compte introuvable." });
 
-  const last = account.last_bonus_date ? new Date(account.last_bonus_date).toISOString().slice(0, 10) : null;
-  if (last === todayStr()) return res.status(400).json({ error: "Bonus déjà réclamé aujourd'hui." });
+  const nextBonusAt = computeNextBonusAt(account);
+  if (nextBonusAt != null && Date.now() < nextBonusAt) {
+    return res.status(400).json({ error: "Bonus déjà réclamé, reviens plus tard.", nextBonusAt });
+  }
 
-  const newBalance = account.balance + DAILY_BON;
-  await pool.query("UPDATE accounts SET balance = ?, last_bonus_date = CURDATE() WHERE id = ?", [newBalance, account.id]);
-  res.json({ balance: newBalance, bonus: DAILY_BON });
+  const bonusAmount = appSettings.dailyBonusAmount;
+  const claimedAt = Date.now();
+  const newBalance = account.balance + bonusAmount;
+  await pool.query("UPDATE accounts SET balance = ?, last_bonus_date = ? WHERE id = ?", [newBalance, claimedAt, account.id]);
+  res.json({ balance: newBalance, bonus: bonusAmount, nextBonusAt: claimedAt + BONUS_COOLDOWN_MS });
 });
 
 /* ================= MARCHÉS & FEED ================= */
@@ -724,7 +737,15 @@ const SETTINGS_DEFAULTS = {
   usdPerDiamond: 0.80,       // 1 💎 = X $
   withdrawTaxPercent: 10,    // taxe prélevée sur les retraits, en %
   depositPayPseudo: "totolabanane", // pseudo en jeu à qui envoyer /pay
+  dailyBonusAmount: DAILY_BON, // montant du bonus quotidien, en 💎
+  showBonusReminder: true,   // afficher ou non le rappel de bonus quotidien sur la page d'accueil
+  startingBalance: START_BAL, // solde de départ offert à l'inscription, en 💎
+  casinoEdgeMultiplier: 1.96, // rentabilité globale du casino : 1.96 = casino gagnant, 2.00 = neutre, 2.02 = joueurs gagnants
+  featuredMarketId: null,    // id du marché mis en avant ("marché du jour") choisi manuellement par l'admin ; null = choix automatique (plus gros volume)
 };
+
+// Valeurs autorisées pour le curseur de rentabilité globale du casino (voir plus bas).
+const CASINO_EDGE_OPTIONS = [1.96, 2.00, 2.02];
 let appSettings = { ...SETTINGS_DEFAULTS };
 
 async function loadSettings() {
@@ -735,8 +756,19 @@ async function loadSettings() {
     usdPerDiamond: map.usdPerDiamond != null && Number(map.usdPerDiamond) > 0 ? Number(map.usdPerDiamond) : SETTINGS_DEFAULTS.usdPerDiamond,
     withdrawTaxPercent: map.withdrawTaxPercent != null ? Number(map.withdrawTaxPercent) : SETTINGS_DEFAULTS.withdrawTaxPercent,
     depositPayPseudo: map.depositPayPseudo || SETTINGS_DEFAULTS.depositPayPseudo,
+    dailyBonusAmount: map.dailyBonusAmount != null && Number(map.dailyBonusAmount) >= 0 ? Number(map.dailyBonusAmount) : SETTINGS_DEFAULTS.dailyBonusAmount,
+    showBonusReminder: map.showBonusReminder != null ? map.showBonusReminder === "true" : SETTINGS_DEFAULTS.showBonusReminder,
+    startingBalance: map.startingBalance != null && Number(map.startingBalance) >= 0 ? Number(map.startingBalance) : SETTINGS_DEFAULTS.startingBalance,
+    casinoEdgeMultiplier: CASINO_EDGE_OPTIONS.includes(Number(map.casinoEdgeMultiplier)) ? Number(map.casinoEdgeMultiplier) : SETTINGS_DEFAULTS.casinoEdgeMultiplier,
+    featuredMarketId: map.featuredMarketId || null,
   };
 }
+
+// Ratio appliqué aux marges maison des jeux "instant" (Flip, Dice, Mines,
+// Chicken, Plinko) à partir du curseur de rentabilité globale : 2.00 = base
+// de référence (comme aujourd'hui), 1.96 = marge maison renforcée d'~2%,
+// 2.02 = marge maison réduite (le joueur devient légèrement favori).
+function casinoEdgeRatio() { return appSettings.casinoEdgeMultiplier / 2.00; }
 loadSettings().catch(e => console.error("Erreur chargement des paramètres :", e));
 
 async function setSetting(key, value) {
@@ -774,7 +806,7 @@ app.get("/api/admin/settings", authRequired, adminRequired, async (req, res) => 
 });
 
 app.post("/api/admin/settings", authRequired, adminRequired, async (req, res) => {
-  const { usdPerDiamond, withdrawTaxPercent, depositPayPseudo } = req.body || {};
+  const { usdPerDiamond, withdrawTaxPercent, depositPayPseudo, dailyBonusAmount, showBonusReminder, startingBalance, casinoEdgeMultiplier, featuredMarketId } = req.body || {};
 
   if (usdPerDiamond !== undefined) {
     const v = Number(usdPerDiamond);
@@ -790,6 +822,34 @@ app.post("/api/admin/settings", authRequired, adminRequired, async (req, res) =>
     const v = String(depositPayPseudo).trim();
     if (!v || v.length > 20) return res.status(400).json({ error: "Pseudo invalide (1 à 20 caractères)." });
     await setSetting("depositPayPseudo", v);
+  }
+  if (dailyBonusAmount !== undefined) {
+    const v = Math.round(Number(dailyBonusAmount));
+    if (!Number.isFinite(v) || v < 0) return res.status(400).json({ error: "Montant du bonus quotidien invalide (doit être un nombre ≥ 0)." });
+    await setSetting("dailyBonusAmount", v);
+  }
+  if (showBonusReminder !== undefined) {
+    await setSetting("showBonusReminder", showBonusReminder ? "true" : "false");
+  }
+  if (startingBalance !== undefined) {
+    const v = Math.round(Number(startingBalance));
+    if (!Number.isFinite(v) || v < 0) return res.status(400).json({ error: "Solde de départ invalide (doit être un nombre ≥ 0)." });
+    await setSetting("startingBalance", v);
+  }
+  if (casinoEdgeMultiplier !== undefined) {
+    const v = Number(casinoEdgeMultiplier);
+    if (!CASINO_EDGE_OPTIONS.includes(v)) return res.status(400).json({ error: `Rentabilité invalide (valeurs autorisées : ${CASINO_EDGE_OPTIONS.join(", ")}).` });
+    await setSetting("casinoEdgeMultiplier", v);
+  }
+  if (featuredMarketId !== undefined) {
+    const v = String(featuredMarketId || "").trim();
+    if (!v) {
+      await setSetting("featuredMarketId", "");
+    } else {
+      const [rows] = await pool.query("SELECT id FROM markets WHERE id = ? AND status = 'open'", [v]);
+      if (!rows[0]) return res.status(400).json({ error: "Marché introuvable ou non ouvert." });
+      await setSetting("featuredMarketId", v);
+    }
   }
 
   res.json(publicSettings());
@@ -993,7 +1053,8 @@ function validateBetAmount(game, amount, balance) {
 // mettant à l'échelle toute la table pour que l'espérance de gain soit fixe.
 const PLINKO_ROWS_OPTIONS = [8, 9, 10, 11, 12, 13, 14, 15, 16];
 const PLINKO_RISK_EXPONENT = { low: 0.35, medium: 0.62, high: 1.0 };
-const PLINKO_HOUSE_EDGE = 0.97; // 3% de marge maison, cohérent avec les autres jeux "instant"
+const PLINKO_HOUSE_EDGE_BASE = 0.97; // 3% de marge maison de référence (à x2.00), ajustée par le curseur de rentabilité admin
+function plinkoHouseEdge() { return PLINKO_HOUSE_EDGE_BASE * casinoEdgeRatio(); }
 
 function plinkoBinomialCoeffs(rows) {
   const c = [1];
@@ -1009,7 +1070,7 @@ function plinkoMultiplierTable(rows, risk) {
   const exponent = PLINKO_RISK_EXPONENT[risk] || PLINKO_RISK_EXPONENT.medium;
   const raw = probs.map(p => (centerProb / p) ** exponent);
   const ev = raw.reduce((sum, m, k) => sum + m * probs[k], 0);
-  const scale = PLINKO_HOUSE_EDGE / ev;
+  const scale = plinkoHouseEdge() / ev;
   return raw.map(m => Math.max(0.1, Math.round(m * scale * 10) / 10));
 }
 
@@ -1350,7 +1411,8 @@ app.get("/api/casino/status", authRequired, (req, res) => {
 const minesGames = new Map(); // accountId -> { mines: Set<number>, revealed: Set<number>, bet, minesCount, status, payout }
 
 const MINES_GRID_SIZE = 25;
-const MINES_HOUSE_EDGE = 0.92; // 8% de marge maison
+const MINES_HOUSE_EDGE_BASE = 0.92; // 8% de marge maison de référence (à x2.00), ajustée par le curseur de rentabilité admin
+function minesHouseEdge() { return MINES_HOUSE_EDGE_BASE * casinoEdgeRatio(); }
 const minesLocks = new Set(); // accountId en cours de traitement, anti double-reveal en parallèle
 
 // Multiplicateur "juste" (sans marge) pour avoir révélé `revealedCount` cases
@@ -1365,7 +1427,7 @@ function minesFairMultiplier(minesCount, revealedCount) {
 }
 function minesMultiplier(minesCount, revealedCount) {
   if (revealedCount <= 0) return 1;
-  return minesFairMultiplier(minesCount, revealedCount) * MINES_HOUSE_EDGE;
+  return minesFairMultiplier(minesCount, revealedCount) * minesHouseEdge();
 }
 
 function minesPublicState(game) {
@@ -1530,7 +1592,8 @@ app.post("/api/casino/mines/cashout", authRequired, async (req, res) => {
 // (percuté, toutes les lignes franchies, ou retrait manuel).
 const chickenGames = new Map(); // accountId -> { bet, difficulty, step, status, payout }
 
-const CHICKEN_HOUSE_EDGE = 0.97; // 3% de marge maison
+const CHICKEN_HOUSE_EDGE_BASE = 0.97; // 3% de marge maison de référence (à x2.00), ajustée par le curseur de rentabilité admin
+function chickenHouseEdge() { return CHICKEN_HOUSE_EDGE_BASE * casinoEdgeRatio(); }
 
 // Chaque palier de difficulté définit : la probabilité de se faire renverser
 // à la 1ère ligne (base), l'augmentation de cette probabilité à chaque ligne
@@ -1554,7 +1617,7 @@ function chickenDeathProb(diff, step) {
 function chickenMultiplier(diffKey, step) {
   const diff = CHICKEN_DIFFICULTIES[diffKey];
   if (!diff || step <= 0) return 1;
-  let mult = CHICKEN_HOUSE_EDGE;
+  let mult = chickenHouseEdge();
   for (let i = 1; i <= step; i++) {
     mult *= 1 / (1 - chickenDeathProb(diff, i));
   }
@@ -1710,7 +1773,9 @@ app.post("/api/casino/chicken/cashout", authRequired, async (req, res) => {
 // lancers pour l'affichage côté client (le plus récent en tête).
 const flipHistory = new Map(); // accountId -> [{ result, win, bet, payout, ts }, ...]
 
-const FLIP_MULTIPLIER = 1.98; // ~1% de marge maison sur un jeu à 50/50, comme les autres jeux du casino
+// Multiplicateur de gain sur Flip (jeu 50/50) : c'est exactement le curseur
+// de rentabilité globale réglé dans le panel admin (1.96 / 2.00 / 2.02).
+function flipMultiplier() { return appSettings.casinoEdgeMultiplier; }
 
 app.get("/api/casino/flip/state", authRequired, (req, res) => {
   const history = flipHistory.get(req.user.id) || [];
@@ -1733,7 +1798,7 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
 
     const result = Math.random() < 0.5 ? "face" : "pile";
     const win = result === side;
-    const payout = win ? Math.round(bet * FLIP_MULTIPLIER) : 0;
+    const payout = win ? Math.round(bet * flipMultiplier()) : 0;
     if (payout > 0) {
       await pool.query("UPDATE accounts SET balance = balance + ? WHERE id = ?", [payout, req.user.id]);
     }
@@ -1775,7 +1840,9 @@ app.post("/api/casino/flip/play", authRequired, async (req, res) => {
 // (~1% : 99 / winChance, comme 99/50 = 1.98x sur une pièce 50/50).
 const diceHistory = new Map(); // accountId -> [{ target, direction, roll, win, multiplier, bet, payout, ts }, ...]
 
-const DICE_HOUSE_EDGE = 99;
+// Même marge que Flip, généralisée : à winChance=50 on retrouve
+// flipMultiplier() (ex: 99/50 = 1.98 comme avant), suit donc le même curseur.
+function diceHouseEdge() { return flipMultiplier() * 50; }
 const DICE_TARGET_MIN = 2;
 const DICE_TARGET_MAX = 98;
 
@@ -1792,7 +1859,7 @@ function diceWinChance(target, direction) {
 }
 function diceMultiplier(target, direction) {
   const winChance = diceWinChance(target, direction);
-  return Math.round((DICE_HOUSE_EDGE / winChance) * 100) / 100;
+  return Math.round((diceHouseEdge() / winChance) * 100) / 100;
 }
 
 app.get("/api/casino/dice/state", authRequired, (req, res) => {
@@ -2722,6 +2789,7 @@ app.post("/api/admin/markets", authRequired, adminRequired, async (req, res) => 
 
 app.delete("/api/admin/markets/:id", authRequired, adminRequired, async (req, res) => {
   await pool.query("DELETE FROM markets WHERE id = ?", [req.params.id]);
+  if (appSettings.featuredMarketId === req.params.id) await setSetting("featuredMarketId", "");
   res.json({ ok: true });
 });
 
@@ -2818,6 +2886,7 @@ app.post("/api/admin/markets/:id/resolve", authRequired, adminRequired, async (r
     );
 
     await conn.commit();
+    if (appSettings.featuredMarketId === req.params.id) await setSetting("featuredMarketId", "");
     res.json({ paid: paidCount, refunded: refundedCount });
   } catch (e) {
     await conn.rollback();

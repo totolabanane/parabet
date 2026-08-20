@@ -198,6 +198,21 @@
   .offer-banner-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
   .offer-banner-meta { font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
 
+  /* bandeau "parrainage boosté" dans la modale de parrainage */
+  .ref-boost-banner {
+    display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; margin-bottom: 14px;
+    border: 1.5px solid var(--amber); background: linear-gradient(175deg, rgba(238,182,84,0.14), rgba(238,182,84,0.04));
+  }
+  .ref-boost-banner-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+  .ref-boost-badge {
+    display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-weight: 800; font-size: 11px;
+    letter-spacing: 0.04em; color: #1a1206; background: var(--amber); border-radius: 999px; padding: 2px 9px; margin-bottom: 6px;
+  }
+  .ref-boost-title { font-size: 12.5px; color: var(--text); line-height: 1.45; }
+  .ref-boost-timer { font-size: 11px; color: var(--amber); font-weight: 700; margin-top: 7px; font-family: var(--font-mono); }
+  .ref-amount-boosted { color: var(--amber); font-weight: 800; }
+  .ref-amount-strike { color: var(--text-faint); text-decoration: line-through; font-weight: 500; }
+
   /* casino promo strip */
   .promo-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 40px 0 14px; gap: 10px; }
   .promo-head h2 { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
@@ -1235,8 +1250,7 @@
 <div class="toast" id="toast"></div>
 
 <div class="jis-banner" id="jisBanner">
-  <b>Les jeux d'argent et de hasard peuvent être dangereux :</b> pertes d'argent, conflits familiaux, addiction…
-  Retrouvez nos conseils sur <a href="https://www.joueurs-info-service.fr" target="_blank" rel="noopener">joueurs-info-service.fr</a> (09 74 75 13 13 — appel non surtaxé)
+  <b>Jeu fictif sur Paladium :</b> aucune mise ni aucun gain en argent réel. Ce contenu n'encourage pas les jeux d'argent réels.
   <button class="jis-banner-close" id="jisBannerClose" title="Fermer" aria-label="Fermer le bandeau">✕</button>
 </div>
 
@@ -1265,6 +1279,8 @@ let WITHDRAW_MIN_AMOUNT = 15000;
 let EMERALD_USD_RATE = 0.80; // 1 💎 = X $ (dépôts et retraits)
 let WITHDRAW_TAX_PERCENT = 10; // taxe prélevée sur les retraits, en %
 let DEPOSIT_PAY_PSEUDO = "totolabanane"; // pseudo en jeu à qui envoyer le /pay
+let FEATURED_MARKET_ID = null; // marché mis en avant choisi par l'admin ("marché du jour") ; null = choix automatique
+let SHOW_BONUS_REMINDER = true; // afficher le bandeau de rappel du bonus quotidien sur la page d'accueil
 
 function diamondsPerDollar() { return 1 / EMERALD_USD_RATE; }
 function usdToDiamonds(usd) { return Math.round((Number(usd) || 0) * diamondsPerDollar()); }
@@ -1388,7 +1404,7 @@ const state = {
   authBusy: false,
   authError: "",
 
-  account: null,         // { pseudo, balance, isAdmin, lastBonusDate, referralCode }
+  account: null,         // { pseudo, balance, isAdmin, nextBonusAt, referralCode }
   markets: [],
   feed: [],
   mybets: [],
@@ -1425,7 +1441,10 @@ const state = {
   withdrawForm: { amount: 100, minecraftPseudo: "" },
   withdrawBusy: false,
 
-  adminSettings: { usdPerDiamond: EMERALD_USD_RATE, withdrawTaxPercent: WITHDRAW_TAX_PERCENT, depositPayPseudo: DEPOSIT_PAY_PSEUDO }, // paramètres $ / taxe (admin)
+  adminSettings: { usdPerDiamond: EMERALD_USD_RATE, withdrawTaxPercent: WITHDRAW_TAX_PERCENT, depositPayPseudo: DEPOSIT_PAY_PSEUDO, dailyBonusAmount: 50, showBonusReminder: true, startingBalance: 500, casinoEdgeMultiplier: 1.96, featuredMarketId: null }, // paramètres $ / taxe / bonus quotidien / solde de départ / rentabilité casino / marché du jour (admin)
+  adminPlayerSearch: "",       // recherche par pseudo dans la liste des joueurs (admin)
+  adminPlayerSort: "recent",   // tri de la liste des joueurs (admin)
+  adminPlayerShowCount: 20,    // nombre de joueurs affichés (admin, "voir plus" pour étendre)
 
   offers: [],             // offres du moment actuellement actives (affichées en haut de l'accueil)
   adminOffers: [],        // toutes les offres, actives ou non (admin)
@@ -1591,6 +1610,22 @@ function wageringBarHtml(account) {
 }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+// Le bonus quotidien est prêt s'il n'a jamais été réclamé, ou si 24h se sont
+// écoulées depuis la dernière réclamation (nextBonusAt vient du serveur).
+function isBonusReady(account) {
+  return !account || account.nextBonusAt == null || Date.now() >= account.nextBonusAt;
+}
+
+// Formatte le temps restant avant le prochain bonus, ex: "2h13" ou "48min".
+function formatBonusCountdown(nextBonusAt) {
+  const remainingMs = Math.max(0, nextBonusAt - Date.now());
+  const totalMinutes = Math.ceil(remainingMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h${String(minutes).padStart(2, "0")}`;
+  return `${minutes} min`;
+}
+
 // Valeur "maintenant" au format attendu par <input type="datetime-local">
 // (heure locale du navigateur, sans fuseau), ex: "2026-08-04T21:15"
 function nowLocalInputValue() {
@@ -1726,6 +1761,8 @@ function applySettings(s) {
   if (Number.isFinite(s.usdPerDiamond) && s.usdPerDiamond > 0) EMERALD_USD_RATE = s.usdPerDiamond;
   if (Number.isFinite(s.withdrawTaxPercent)) WITHDRAW_TAX_PERCENT = s.withdrawTaxPercent;
   if (s.depositPayPseudo) DEPOSIT_PAY_PSEUDO = s.depositPayPseudo;
+  FEATURED_MARKET_ID = s.featuredMarketId || null;
+  if (typeof s.showBonusReminder === "boolean") SHOW_BONUS_REMINDER = s.showBonusReminder;
   if (Number.isFinite(s.depositMinAmount)) DEPOSIT_MIN_AMOUNT = s.depositMinAmount;
   if (Number.isFinite(s.withdrawMinAmount)) WITHDRAW_MIN_AMOUNT = s.withdrawMinAmount;
 }
@@ -1806,7 +1843,7 @@ async function claimBonus() {
   try {
     const r = await api("/api/bonus", { method: "POST" });
     state.account.balance = r.balance;
-    state.account.lastBonusDate = todayStr();
+    state.account.nextBonusAt = r.nextBonusAt;
     showToast(`+${r.bonus} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> de bonus quotidien !`);
   } catch (e) {
     showToast(e.message);
@@ -1946,10 +1983,35 @@ async function submitWithdraw() {
 function openReferralModal() {
   state.referralModalOpen = true;
   renderModal();
+  // rafraîchit les offres au moment de l'ouverture, pour être sûr d'afficher
+  // un boost qui vient d'être activé/désactivé par le staff sans recharger la page.
+  api("/api/offers").then(offers => {
+    state.offers = offers;
+    if (state.referralModalOpen) renderModal();
+  }).catch(() => {});
 }
 function closeReferralModal() {
   state.referralModalOpen = false;
+  stopReferralBoostTimer();
   renderModal();
+}
+
+/* ---------- décompte du parrainage boosté (dans la modale de parrainage) ---------- */
+let referralBoostTimerId = null;
+function stopReferralBoostTimer() {
+  if (referralBoostTimerId) { clearInterval(referralBoostTimerId); referralBoostTimerId = null; }
+}
+// Formate un nombre de ms restants en "1j 04h 12m 33s" (unités nulles en tête omises).
+function formatCountdown(ms) {
+  if (ms <= 0) return "Terminé";
+  let s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); s -= m * 60;
+  const pad = n => String(n).padStart(2, "0");
+  if (d > 0) return `${d}j ${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+  if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
+  return `${m}m ${pad(s)}s`;
 }
 
 function referralLink() {
@@ -2131,19 +2193,51 @@ async function loadAdminSettings() {
   state.adminSettings = await api("/api/admin/settings");
 }
 
-async function adminSaveSettings(usdPerDiamond, withdrawTaxPercent, depositPayPseudo) {
+async function adminSaveSettings(usdPerDiamond, withdrawTaxPercent, depositPayPseudo, dailyBonusAmount, showBonusReminder, startingBalance) {
   state.adminBusy = true; render();
   try {
     state.adminSettings = await api("/api/admin/settings", {
       method: "POST",
-      body: { usdPerDiamond, withdrawTaxPercent, depositPayPseudo },
+      body: { usdPerDiamond, withdrawTaxPercent, depositPayPseudo, dailyBonusAmount, showBonusReminder, startingBalance },
     });
     applySettings({
       usdPerDiamond: state.adminSettings.usdPerDiamond,
       withdrawTaxPercent: state.adminSettings.withdrawTaxPercent,
       depositPayPseudo: state.adminSettings.depositPayPseudo,
+      showBonusReminder: state.adminSettings.showBonusReminder,
     });
     showToast("Paramètres enregistrés.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminSaveCasinoEdge(casinoEdgeMultiplier) {
+  state.adminBusy = true; render();
+  try {
+    state.adminSettings = await api("/api/admin/settings", {
+      method: "POST",
+      body: { casinoEdgeMultiplier: Number(casinoEdgeMultiplier) },
+    });
+    showToast("Rentabilité du casino mise à jour.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  state.adminBusy = false;
+  render();
+}
+
+async function adminSaveFeaturedMarket(featuredMarketId) {
+  state.adminBusy = true; render();
+  try {
+    state.adminSettings = await api("/api/admin/settings", {
+      method: "POST",
+      body: { featuredMarketId },
+    });
+    applySettings(state.adminSettings);
+    showToast(featuredMarketId ? "Marché du jour mis à jour." : "Retour au choix automatique.");
   } catch (e) {
     showToast(e.message);
   }
@@ -2515,8 +2609,10 @@ function renderApp() {
   const app = document.getElementById("app");
   const totalVolume = state.markets.reduce((s, m) => s + m.volume, 0);
   const markets = visibleMarkets();
-  const heroMarket = state.markets.filter(m => m.status === "open").sort((a, b) => b.volume - a.volume)[0];
-  const bonusReady = state.account.lastBonusDate !== todayStr();
+  const heroMarket = state.markets.find(m => m.status === "open" && m.id === FEATURED_MARKET_ID)
+    || state.markets.filter(m => m.status === "open").sort((a, b) => b.volume - a.volume)[0];
+  const bonusReady = isBonusReady(state.account);
+  const bonusReminderVisible = bonusReady && SHOW_BONUS_REMINDER;
   const myDeposits = state.deposits.slice(0, 10);
   const myWithdrawals = state.withdrawals.slice(0, 10);
 
@@ -2535,7 +2631,7 @@ function renderApp() {
             <span><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /></span>
             <span class="wallet-balance">${state.account.balance}</span>
           </div>
-          <button class="icon-btn" id="bonusBtn" title="Bonus quotidien" ${bonusReady ? "" : "style='opacity:0.4;'"}><img src='/icons/gift.png' alt='🎁' style='width:16px;height:16px;object-fit:contain;vertical-align:-3px;' /></button>
+          <button class="icon-btn" id="bonusBtn" title="${bonusReady ? "Bonus quotidien" : `Prochain bonus dans ${formatBonusCountdown(state.account.nextBonusAt)}`}" ${bonusReady ? "" : "style='opacity:0.4;'"}><img src='/icons/gift.png' alt='🎁' style='width:16px;height:16px;object-fit:contain;vertical-align:-3px;' /></button>
           <div class="nav-primary-actions">
             <button class="text-btn" id="casinoBtn"><img src='/icons/casino.png' alt='🎰' style='width:18px;height:18px;object-fit:contain;vertical-align:-4px;' /> Casino</button>
             <button class="text-btn deposit" id="depositBtn"><img src='/icons/deposit.png' alt='💳' style='width:16px;height:16px;object-fit:contain;vertical-align:-3px;' /> Déposer</button>
@@ -2562,6 +2658,18 @@ function renderApp() {
     </div>
 
     <div class="max-w" style="padding-top:20px;">
+      ${bonusReminderVisible ? `
+      <div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--amber-bg); border:1px solid var(--amber);">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <img src='/icons/gift.png' alt='🎁' style='width:26px;height:26px;object-fit:contain;' />
+          <div>
+            <div style="font-weight:700;">Ton bonus quotidien t'attend !</div>
+            <div class="admin-row-meta">Récupère tes 💎 gratuits maintenant, disponible toutes les 24h.</div>
+          </div>
+        </div>
+        <button class="mini-btn" id="bonusReminderBtn">Récupérer le bonus</button>
+      </div>
+      ` : ""}
       ${state.offers.length > 0 ? `<div class="offers-strip">${state.offers.map(offerBannerHtml).join("")}</div>` : ""}
       ${heroMarket ? heroMarketHtml(heroMarket) : ""}
 
@@ -2599,23 +2707,15 @@ function renderApp() {
         ${myWithdrawals.map(withdrawalLineHtml).join("")}
       </div>` : ""}
 
-      <h2 class="section-title">Activité récente</h2>
-      <div class="feed-box" id="feedBox">
-        ${state.feed.length === 0
-          ? `<p class="feed-empty">Aucune mise pour l'instant. Sois le premier à parier.</p>`
-          : state.feed.map(feedLineHtml).join("")}
-      </div>
-
       <p class="disclaimer"><img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' /> Émeraudes fictives, sans valeur en dehors de ParaBet — pour le fun uniquement. Le solde vient du départ, du bonus quotidien, d'un dépôt d'émeraudes du serveur Paladium (bouton "Déposer") ou d'un parrainage. Les dépôts et retraits sont crédités/débités après vérification manuelle du staff. Un seul compte par joueur. Le pseudo du compte doit correspondre au pseudo qui reçoit le retrait en jeu. Le staff peut annuler un retrait en cas de doute. Voir les <a href="#" id="legalFooterLink" style="color:var(--text-dim); text-decoration:underline;">mentions légales & CGU</a>.</p>
     </div>
   `;
 
-  const feedBox = document.getElementById("feedBox");
-  if (feedBox) feedBox.scrollTop = feedBox.scrollHeight;
-
   document.getElementById("searchInput").addEventListener("input", e => { state.query = e.target.value; render(); });
   document.getElementById("logoutBtn").addEventListener("click", handleLogout);
   document.getElementById("bonusBtn").addEventListener("click", claimBonus);
+  const bonusReminderBtn = document.getElementById("bonusReminderBtn");
+  if (bonusReminderBtn) bonusReminderBtn.addEventListener("click", claimBonus);
   document.getElementById("casinoBtn").addEventListener("click", openCasino);
   document.getElementById("depositBtn").addEventListener("click", openDepositModal);
   document.getElementById("withdrawBtn").addEventListener("click", openWithdrawModal);
@@ -3667,10 +3767,10 @@ let CHICKEN_MAX_BET_CLIENT = null; // idem — null = pas de plafond
 // base / croissance du risque par ligne, doit correspondre à CHICKEN_DIFFICULTIES côté serveur
 // (dupliqué ici uniquement pour l'affichage informatif "chance de se faire renverser")
 const CHICKEN_DIFFICULTIES_CLIENT = [
-  { id: "facile", label: "Facile", base: 0.05 },
-  { id: "moyen", label: "Moyen", base: 0.10 },
-  { id: "difficile", label: "Difficile", base: 0.16 },
-  { id: "hardcore", label: "Hardcore", base: 0.25 },
+  { id: "facile", label: "Facile", base: 0.10 },
+  { id: "moyen", label: "Moyen", base: 0.20 },
+  { id: "difficile", label: "Difficile", base: 0.32 },
+  { id: "hardcore", label: "Hardcore", base: 0.50 },
 ];
 const CHICKEN_BET_CHIPS = [10, 50, 100, 500, 1000];
 
@@ -6263,13 +6363,38 @@ function renderWithdrawModalContent(overlay, modal) {
 function renderReferralModalContent(overlay, modal) {
   const r = state.referral;
   const link = referralLink();
+  const boost = state.offers.find(o => o.type === "referral_boost" && !o.expired);
+
+  const boostedReferrer = boost ? (boost.referrerBonus ?? r.bonusReferrer) : null;
+  const boostedReferee = boost ? (boost.refereeBonus ?? r.bonusReferee) : null;
+
+  // montants affichés dans la phrase d'intro : si boost actif, on montre le
+  // montant boosté en couleur + l'ancien montant barré à côté.
+  const referrerAmountHtml = boost
+    ? `<span class="ref-amount-boosted">${boostedReferrer}</span> <span class="ref-amount-strike">${r.bonusReferrer}</span>`
+    : `${r.bonusReferrer}`;
+  const refereeAmountHtml = boost
+    ? `<span class="ref-amount-boosted">${boostedReferee}</span> <span class="ref-amount-strike">${r.bonusReferee}</span>`
+    : `${r.bonusReferee}`;
+
+  const boostBannerHtml = boost ? `
+    <div class="ref-boost-banner">
+      <div class="ref-boost-banner-icon">🚀</div>
+      <div>
+        <div class="ref-boost-badge">⚡ BOOSTÉ</div>
+        <div class="ref-boost-title">${boost.title ? esc(boost.title) : "Parrainage boosté"} — les gains de parrainage sont temporairement augmentés !</div>
+        <div class="ref-boost-timer" id="refBoostTimer">${boost.endsAt ? `⏳ Se termine dans ${formatCountdown(new Date(boost.endsAt).getTime() - Date.now())}` : "⏳ Offre en cours, durée illimitée"}</div>
+      </div>
+    </div>
+  ` : "";
 
   modal.innerHTML = `
     <div class="modal-head">
       <span class="modal-kicker" style="color:var(--green);">Programme de parrainage</span>
       <button class="modal-close" id="refModalClose">✕</button>
     </div>
-    <p class="modal-title">Invite tes amis avec ton code : tu reçois ${r.bonusReferrer} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />, et ton filleul reçoit ${r.bonusReferee} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />, dès que ton filleul effectue et fait valider son 1er dépôt.</p>
+    ${boostBannerHtml}
+    <p class="modal-title">Invite tes amis avec ton code : tu reçois ${referrerAmountHtml} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />, et ton filleul reçoit ${refereeAmountHtml} <img src='/icons/diamond.png' alt='💎' style='width:14px;height:14px;object-fit:contain;vertical-align:-2px;' />, dès que ton filleul effectue et fait valider son 1er dépôt.</p>
     <label class="modal-label">Ton code</label>
     <div class="amount-row">
       <span style="font-family:var(--font-mono); font-size:15px; color:var(--text-faint);">${findiumIcon(18)}</span>
@@ -6302,6 +6427,23 @@ function renderReferralModalContent(overlay, modal) {
   document.getElementById("refCopyBtn").addEventListener("click", copyReferralLink);
   document.getElementById("refCodeField").addEventListener("click", e => e.target.select());
   document.getElementById("refLinkField").addEventListener("click", e => e.target.select());
+
+  // décompte live de la fin du boost, mis à jour chaque seconde sans re-render complet
+  stopReferralBoostTimer();
+  if (boost && boost.endsAt) {
+    const endsAtMs = new Date(boost.endsAt).getTime();
+    referralBoostTimerId = setInterval(() => {
+      const el = document.getElementById("refBoostTimer");
+      if (!el || !state.referralModalOpen) { stopReferralBoostTimer(); return; }
+      const remain = endsAtMs - Date.now();
+      if (remain <= 0) {
+        el.textContent = "⏳ Boost terminé";
+        stopReferralBoostTimer();
+        return;
+      }
+      el.textContent = `⏳ Se termine dans ${formatCountdown(remain)}`;
+    }, 1000);
+  }
 }
 
 function renderFaqModalContent(overlay, modal) {
@@ -6360,6 +6502,17 @@ function renderAdmin() {
   const pendingWithdrawals = [...state.withdrawals].filter(w => w.status === "pending").sort((a, b) => b.ts - a.ts);
   const pastWithdrawals = [...state.withdrawals].filter(w => w.status !== "pending").sort((a, b) => b.ts - a.ts);
 
+  const playerSearch = state.adminPlayerSearch.trim().toLowerCase();
+  const ADMIN_PLAYER_SORTS = {
+    recent: (a, b) => b.createdAt - a.createdAt,
+    balance_desc: (a, b) => b.balance - a.balance,
+    won_desc: (a, b) => b.casinoNet - a.casinoNet,
+    lost_desc: (a, b) => a.casinoNet - b.casinoNet,
+  };
+  const filteredAccounts = state.adminAccounts.filter(a => !playerSearch || a.pseudo.toLowerCase().includes(playerSearch));
+  const sortedAccounts = [...filteredAccounts].sort(ADMIN_PLAYER_SORTS[state.adminPlayerSort] || ADMIN_PLAYER_SORTS.recent);
+  const visibleAccounts = sortedAccounts.slice(0, state.adminPlayerShowCount);
+
   app.innerHTML = `
     <div class="topnav">
       <div class="topnav-row max-w" style="padding-left:0;padding-right:0;">
@@ -6373,7 +6526,19 @@ function renderAdmin() {
     <div class="max-w admin-wrap">
       <div class="admin-section">
         <h3>Joueurs inscrits (${state.adminAccounts.length})</h3>
-        ${state.adminAccounts.length === 0 ? `<p class="admin-row-meta">Aucun joueur inscrit pour l'instant.</p>` : state.adminAccounts.map(a => `
+        <div class="admin-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+          <input id="adminPlayerSearchInput" placeholder="Rechercher un pseudo…" value="${esc(state.adminPlayerSearch)}" style="flex:1; min-width:160px;" />
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Trier par
+            <select id="adminPlayerSortSelect">
+              <option value="recent" ${state.adminPlayerSort === "recent" ? "selected" : ""}>Inscription récente</option>
+              <option value="balance_desc" ${state.adminPlayerSort === "balance_desc" ? "selected" : ""}>Solde le plus élevé</option>
+              <option value="won_desc" ${state.adminPlayerSort === "won_desc" ? "selected" : ""}>A le plus gagné (casino)</option>
+              <option value="lost_desc" ${state.adminPlayerSort === "lost_desc" ? "selected" : ""}>A le plus perdu (casino)</option>
+            </select>
+          </label>
+        </div>
+        ${sortedAccounts.length === 0 ? `<p class="admin-row-meta">${state.adminAccounts.length === 0 ? "Aucun joueur inscrit pour l'instant." : "Aucun joueur ne correspond à cette recherche."}</p>` : visibleAccounts.map(a => `
           <div class="admin-row" style="flex-direction:column; align-items:stretch; gap:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
               <div>
@@ -6434,6 +6599,11 @@ function renderAdmin() {
             ` : ""}
           </div>
         `).join("")}
+        ${sortedAccounts.length > visibleAccounts.length ? `
+          <div class="admin-row" style="justify-content:center;">
+            <button class="mini-btn" id="adminPlayersShowMoreBtn">Voir plus (${sortedAccounts.length - visibleAccounts.length} restants)</button>
+          </div>
+        ` : ""}
       </div>
 
       <div class="admin-section">
@@ -6635,7 +6805,7 @@ function renderAdmin() {
       </div>
 
       <div class="admin-section">
-        <h3>Paramètres — dépôts &amp; retraits</h3>
+        <h3>Paramètres — dépôts, retraits &amp; bonus quotidien</h3>
         <p class="admin-row-meta" style="margin-bottom:10px;">Le taux s'applique aux dépôts (calcul des 💎 reçus pour X $) et aux retraits (calcul des $ versés, moins la taxe).</p>
         <div class="admin-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
           <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
@@ -6650,7 +6820,50 @@ function renderAdmin() {
             Pseudo à payer (/pay)
             <input type="text" maxlength="20" id="setPseudoInput" value="${esc(state.adminSettings.depositPayPseudo ?? DEPOSIT_PAY_PSEUDO)}" style="width:140px;" />
           </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Bonus quotidien
+            <input type="number" min="0" step="1" id="setDailyBonusInput" value="${state.adminSettings.dailyBonusAmount ?? 50}" style="width:90px;" /> 💎
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Solde de départ (inscription)
+            <input type="number" min="0" step="1" id="setStartingBalanceInput" value="${state.adminSettings.startingBalance ?? 500}" style="width:90px;" /> 💎
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim); cursor:pointer;">
+            <input type="checkbox" id="setShowBonusReminderInput" ${state.adminSettings.showBonusReminder !== false ? "checked" : ""} style="width:auto;" />
+            Afficher le rappel de bonus sur la page d'accueil
+          </label>
           <button class="mini-btn" id="saveSettingsBtn" ${state.adminBusy ? "disabled" : ""}>Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3>Rentabilité du casino</h3>
+        <p class="admin-row-meta" style="margin-bottom:10px;">Règle la marge maison globale appliquée à tous les jeux instantanés du casino (Flip, Dice, Mines, Chicken Road, Plinko).</p>
+        <div class="admin-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Multiplicateur de référence
+            <select id="setCasinoEdgeInput" style="width:220px;">
+              <option value="1.96" ${state.adminSettings.casinoEdgeMultiplier == 1.96 ? "selected" : ""}>x1.96 — le casino gagne, les joueurs perdent</option>
+              <option value="2.00" ${state.adminSettings.casinoEdgeMultiplier == 2.00 ? "selected" : ""}>x2.00 — neutre, casino = joueurs</option>
+              <option value="2.02" ${state.adminSettings.casinoEdgeMultiplier == 2.02 ? "selected" : ""}>x2.02 — le casino perd, les joueurs gagnent</option>
+            </select>
+          </label>
+          <button class="mini-btn" id="saveCasinoEdgeBtn" ${state.adminBusy ? "disabled" : ""}>Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3>Marché du jour</h3>
+        <p class="admin-row-meta" style="margin-bottom:10px;">Choisis le marché mis en avant en haut de la page d'accueil. Par défaut (automatique), c'est celui avec le plus gros volume qui est affiché.</p>
+        <div class="admin-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+            Marché mis en avant
+            <select id="setFeaturedMarketInput" style="width:280px;">
+              <option value="">Automatique (plus gros volume)</option>
+              ${openMarkets.map(m => `<option value="${m.id}" ${FEATURED_MARKET_ID === m.id ? "selected" : ""}>${esc(m.title)}</option>`).join("")}
+            </select>
+          </label>
+          <button class="mini-btn" id="saveFeaturedMarketBtn" ${state.adminBusy ? "disabled" : ""}>Enregistrer</button>
         </div>
       </div>
 
@@ -6764,11 +6977,39 @@ function renderAdmin() {
     const input = document.querySelector(`[data-pct-input="${b.dataset.setpct}"]`);
     adminSetPct(b.dataset.setpct, input ? input.value : "");
   }));
+  const adminPlayerSearchInput = document.getElementById("adminPlayerSearchInput");
+  if (adminPlayerSearchInput) adminPlayerSearchInput.addEventListener("input", e => {
+    state.adminPlayerSearch = e.target.value;
+    state.adminPlayerShowCount = 20;
+    render();
+  });
+  const adminPlayerSortSelect = document.getElementById("adminPlayerSortSelect");
+  if (adminPlayerSortSelect) adminPlayerSortSelect.addEventListener("change", e => {
+    state.adminPlayerSort = e.target.value;
+    state.adminPlayerShowCount = 20;
+    render();
+  });
+  const adminPlayersShowMoreBtn = document.getElementById("adminPlayersShowMoreBtn");
+  if (adminPlayersShowMoreBtn) adminPlayersShowMoreBtn.addEventListener("click", () => {
+    state.adminPlayerShowCount += 20;
+    render();
+  });
   document.getElementById("saveSettingsBtn").addEventListener("click", () => {
     const rate = document.getElementById("setRateInput").value;
     const tax = document.getElementById("setTaxInput").value;
     const pseudo = document.getElementById("setPseudoInput").value;
-    adminSaveSettings(rate, tax, pseudo);
+    const dailyBonus = document.getElementById("setDailyBonusInput").value;
+    const showBonusReminder = document.getElementById("setShowBonusReminderInput").checked;
+    const startingBalance = document.getElementById("setStartingBalanceInput").value;
+    adminSaveSettings(rate, tax, pseudo, dailyBonus, showBonusReminder, startingBalance);
+  });
+  document.getElementById("saveCasinoEdgeBtn").addEventListener("click", () => {
+    const casinoEdgeMultiplier = document.getElementById("setCasinoEdgeInput").value;
+    adminSaveCasinoEdge(casinoEdgeMultiplier);
+  });
+  document.getElementById("saveFeaturedMarketBtn").addEventListener("click", () => {
+    const featuredMarketId = document.getElementById("setFeaturedMarketInput").value;
+    adminSaveFeaturedMarket(featuredMarketId);
   });
   const offerTypeInput = document.getElementById("offerTypeInput");
   if (offerTypeInput) offerTypeInput.addEventListener("change", e => { state.adminOfferForm.type = e.target.value; render(); });
