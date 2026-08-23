@@ -116,11 +116,13 @@ CREATE TABLE IF NOT EXISTS casino_limits (
 -- récente, active et non expirée).
 CREATE TABLE IF NOT EXISTS offers (
   id              SERIAL PRIMARY KEY,
-  type            VARCHAR(20) NOT NULL,       -- 'deposit_boost' | 'referral_boost'
+  type            VARCHAR(20) NOT NULL,       -- 'deposit_boost' | 'referral_boost' | 'contest'
   title           VARCHAR(140) DEFAULT NULL,
-  max_bonus       INTEGER DEFAULT NULL,       -- deposit_boost : bonus max en 💎
+  max_bonus       INTEGER DEFAULT NULL,       -- deposit_boost : bonus max en 💎 ; contest : lot en 💎 à gagner
   referrer_bonus  INTEGER DEFAULT NULL,       -- referral_boost : bonus parrain en 💎
   referee_bonus   INTEGER DEFAULT NULL,       -- referral_boost : bonus filleul en 💎
+  min_wager       INTEGER DEFAULT NULL,       -- contest : mise minimum requise en 💎 pour participer (NULL = pas de condition)
+  min_wager_since TIMESTAMP DEFAULT NULL,     -- contest : date à partir de laquelle les mises comptent
   ends_at         TIMESTAMP DEFAULT NULL,     -- NULL = offre permanente
   active          INTEGER NOT NULL DEFAULT 1,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS offers (
   max_bonus      INTEGER DEFAULT NULL,
   referrer_bonus INTEGER DEFAULT NULL,
   referee_bonus  INTEGER DEFAULT NULL,
+  min_wager      INTEGER DEFAULT NULL,
+  min_wager_since TEXT DEFAULT NULL,
   ends_at        TEXT DEFAULT NULL,
   active         INTEGER NOT NULL DEFAULT 1,
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))

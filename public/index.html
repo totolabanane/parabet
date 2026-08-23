@@ -1448,7 +1448,7 @@ const state = {
 
   offers: [],             // offres du moment actuellement actives (affichées en haut de l'accueil)
   adminOffers: [],        // toutes les offres, actives ou non (admin)
-  adminOfferForm: { type: "deposit_boost", title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75 },
+  adminOfferForm: { type: "deposit_boost", title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75, prizeAmount: 50000, minWager: "", minWagerSince: "" },
 
   referral: { code: "", bonusReferrer: 0, bonusReferee: 0, totalEarned: 0, count: 0, validatedCount: 0, referred: [] },
   referralModalOpen: false,
@@ -2265,13 +2265,18 @@ async function adminCreateOffer() {
     endsAt: f.endsAt ? new Date(f.endsAt).toISOString() : null,
   };
   if (f.type === "deposit_boost") body.maxBonus = f.maxBonus;
+  else if (f.type === "contest") {
+    body.maxBonus = f.prizeAmount;
+    body.minWager = f.minWager;
+    body.minWagerSince = f.minWagerSince ? new Date(f.minWagerSince).toISOString() : null;
+  }
   else { body.referrerBonus = f.referrerBonus; body.refereeBonus = f.refereeBonus; }
 
   state.adminBusy = true; render();
   try {
     await api("/api/admin/offers", { method: "POST", body });
     await Promise.all([loadAdminOffers(), reloadOffers()]);
-    state.adminOfferForm = { type: f.type, title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75 };
+    state.adminOfferForm = { type: f.type, title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75, prizeAmount: 50000, minWager: "", minWagerSince: "" };
     showToast("Offre créée et activée.");
   } catch (e) {
     showToast(e.message);
@@ -2768,6 +2773,24 @@ function offerBannerHtml(o) {
           <div class="offer-banner-title">${o.title ? esc(o.title) : "1er dépôt doublé"}</div>
           <div class="offer-banner-desc">Ton tout premier dépôt est doublé automatiquement, jusqu'à ${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎 de bonus offerts.</div>
           <div class="offer-banner-meta">${offerEndsLabel(o)}</div>
+        </div>
+      </div>
+    `;
+  }
+  if (o.type === "contest") {
+    const wagerLineHtml = o.minWager
+      ? `<div class="offer-banner-meta">${o.eligible
+          ? "✅ Tu es éligible pour ce concours"
+          : `🔒 Il te manque ${(Math.max(0, o.minWager - (o.wageredAmount || 0))).toLocaleString("fr-FR")} 💎 misés${o.minWagerSince ? ` depuis le ${new Date(o.minWagerSince).toLocaleDateString("fr-FR")}` : ""} (${(o.wageredAmount || 0).toLocaleString("fr-FR")}/${o.minWager.toLocaleString("fr-FR")} 💎)`}</div>`
+      : "";
+    return `
+      <div class="offer-banner">
+        <div class="offer-banner-icon">🏆</div>
+        <div class="offer-banner-body">
+          <div class="offer-banner-title">${o.title ? esc(o.title) : "Concours en cours"}</div>
+          <div class="offer-banner-desc">${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎 à gagner !</div>
+          ${wagerLineHtml}
+          <div class="offer-banner-meta">${o.endsAt ? `⏳ Tirage le ${new Date(o.endsAt).toLocaleString("fr-FR")}` : "⏳ Date du tirage à venir"}</div>
         </div>
       </div>
     `;
@@ -6653,16 +6676,30 @@ function renderAdmin() {
             <select id="offerTypeInput">
               <option value="deposit_boost" ${state.adminOfferForm.type === "deposit_boost" ? "selected" : ""}>1er dépôt doublé</option>
               <option value="referral_boost" ${state.adminOfferForm.type === "referral_boost" ? "selected" : ""}>Parrainage boosté</option>
+              <option value="contest" ${state.adminOfferForm.type === "contest" ? "selected" : ""}>🏆 Concours</option>
             </select>
           </div>
           <div class="field">
-            <label>Titre (optionnel)</label>
-            <input id="offerTitleInput" placeholder="ex: Weekend spécial" maxlength="140" value="${esc(state.adminOfferForm.title)}" />
+            <label>Titre${state.adminOfferForm.type === "contest" ? "" : " (optionnel)"}</label>
+            <input id="offerTitleInput" placeholder="${state.adminOfferForm.type === "contest" ? "ex: Grand concours de la rentrée" : "ex: Weekend spécial"}" maxlength="140" value="${esc(state.adminOfferForm.title)}" />
           </div>
           ${state.adminOfferForm.type === "deposit_boost" ? `
             <div class="field">
               <label>Bonus max (💎)</label>
               <input id="offerMaxBonusInput" type="number" min="1" value="${state.adminOfferForm.maxBonus}" />
+            </div>
+          ` : state.adminOfferForm.type === "contest" ? `
+            <div class="field">
+              <label>💎 à gagner</label>
+              <input id="offerPrizeAmountInput" type="number" min="1" value="${state.adminOfferForm.prizeAmount}" />
+            </div>
+            <div class="field">
+              <label>Mise minimum requise (optionnel)</label>
+              <input id="offerMinWagerInput" type="number" min="0" placeholder="ex: 15000" value="${esc(state.adminOfferForm.minWager)}" />
+            </div>
+            <div class="field">
+              <label>Mises comptées depuis le (optionnel)</label>
+              <input id="offerMinWagerSinceInput" type="date" value="${esc(state.adminOfferForm.minWagerSince)}" />
             </div>
           ` : `
             <div class="field">
@@ -6675,10 +6712,11 @@ function renderAdmin() {
             </div>
           `}
           <div class="field">
-            <label>Date de fin (optionnelle)</label>
+            <label>${state.adminOfferForm.type === "contest" ? "Date du tirage" : "Date de fin (optionnelle)"}</label>
             <input id="offerEndsAtInput" type="datetime-local" value="${state.adminOfferForm.endsAt}" />
           </div>
         </div>
+        ${state.adminOfferForm.type === "contest" ? `<p class="admin-row-meta" style="margin-top:6px;">Le concours s'affichera en haut de la page d'accueil avec le lot et la date du tirage. Si tu renseignes une mise minimum, seuls les joueurs ayant misé ce montant (marchés + casino) depuis la date choisie (ou depuis la création du concours si tu laisses vide) seront éligibles — ils verront leur progression sur la bannière. Le choix et la remise du/des gagnant(s) se font manuellement par le staff (aucun tirage automatique).</p>` : ""}
         <button class="text-btn amber" id="createOfferBtn" ${state.adminBusy ? "disabled" : ""} style="margin-top:6px;">
           ${state.adminBusy ? "..." : "+ Créer l'offre"}
         </button>
@@ -6689,12 +6727,13 @@ function renderAdmin() {
               <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                 <div>
                   <div class="admin-row-title">
-                    ${o.type === "deposit_boost" ? "🎁 1er dépôt doublé" : "🤝 Parrainage boosté"}${o.title ? ` — ${esc(o.title)}` : ""}
+                    ${o.type === "deposit_boost" ? "🎁 1er dépôt doublé" : o.type === "contest" ? "🏆 Concours" : "🤝 Parrainage boosté"}${o.title ? ` — ${esc(o.title)}` : ""}
                     ${o.active && !o.expired ? `<span class="admin-tag" style="margin-left:6px; background:var(--green-bg); color:var(--green);">En cours</span>` : o.expired ? `<span class="admin-tag" style="margin-left:6px;">Expirée</span>` : `<span class="admin-tag" style="margin-left:6px;">Désactivée</span>`}
                   </div>
                   <div class="admin-row-meta">
-                    ${o.type === "deposit_boost" ? `bonus max : ${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎` : `parrain : +${(o.referrerBonus || 0).toLocaleString("fr-FR")} 💎 · filleul : +${(o.refereeBonus || 0).toLocaleString("fr-FR")} 💎`}
-                    ${o.endsAt ? ` · se termine le ${new Date(o.endsAt).toLocaleString("fr-FR")}` : " · pas de date de fin"}
+                    ${o.type === "deposit_boost" ? `bonus max : ${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎` : o.type === "contest" ? `à gagner : ${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎` : `parrain : +${(o.referrerBonus || 0).toLocaleString("fr-FR")} 💎 · filleul : +${(o.refereeBonus || 0).toLocaleString("fr-FR")} 💎`}
+                    ${o.type === "contest" && o.minWager ? ` · min. ${(o.minWager).toLocaleString("fr-FR")} 💎 misés${o.minWagerSince ? ` depuis le ${new Date(o.minWagerSince).toLocaleDateString("fr-FR")}` : ""}` : ""}
+                    ${o.endsAt ? ` · ${o.type === "contest" ? "tirage le" : "se termine le"} ${new Date(o.endsAt).toLocaleString("fr-FR")}` : " · pas de date de fin"}
                   </div>
                 </div>
                 <div class="admin-actions">
@@ -7017,6 +7056,12 @@ function renderAdmin() {
   if (offerTitleInput) offerTitleInput.addEventListener("input", e => { state.adminOfferForm.title = e.target.value; });
   const offerMaxBonusInput = document.getElementById("offerMaxBonusInput");
   if (offerMaxBonusInput) offerMaxBonusInput.addEventListener("input", e => { state.adminOfferForm.maxBonus = e.target.value; });
+  const offerPrizeAmountInput = document.getElementById("offerPrizeAmountInput");
+  if (offerPrizeAmountInput) offerPrizeAmountInput.addEventListener("input", e => { state.adminOfferForm.prizeAmount = e.target.value; });
+  const offerMinWagerInput = document.getElementById("offerMinWagerInput");
+  if (offerMinWagerInput) offerMinWagerInput.addEventListener("input", e => { state.adminOfferForm.minWager = e.target.value; });
+  const offerMinWagerSinceInput = document.getElementById("offerMinWagerSinceInput");
+  if (offerMinWagerSinceInput) offerMinWagerSinceInput.addEventListener("input", e => { state.adminOfferForm.minWagerSince = e.target.value; });
   const offerReferrerBonusInput = document.getElementById("offerReferrerBonusInput");
   if (offerReferrerBonusInput) offerReferrerBonusInput.addEventListener("input", e => { state.adminOfferForm.referrerBonus = e.target.value; });
   const offerRefereeBonusInput = document.getElementById("offerRefereeBonusInput");

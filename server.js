@@ -856,11 +856,13 @@ app.post("/api/admin/settings", authRequired, adminRequired, async (req, res) =>
 });
 
 /* ================= OFFRES DU MOMENT (réglables depuis l'admin) ================= */
-// Deux types : "deposit_boost" (1er dépôt doublé, jusqu'à max_bonus 💎) et
-// "referral_boost" (montants de parrainage boostés). Le staff peut créer,
-// activer/désactiver, changer la date de fin et supprimer des offres depuis
-// l'admin. Une seule offre par type compte comme "active" côté logique
-// métier : la plus récente parmi celles active=1 et non expirée.
+// Trois types : "deposit_boost" (1er dépôt doublé, jusqu'à max_bonus 💎),
+// "referral_boost" (montants de parrainage boostés) et "contest" (concours /
+// tirage au sort avec un lot en 💎 stocké dans max_bonus et une date de fin
+// qui sert de date du tirage). Le staff peut créer, activer/désactiver,
+// changer la date de fin et supprimer des offres depuis l'admin. Une seule
+// offre par type compte comme "active" côté logique métier : la plus
+// récente parmi celles active=1 et non expirée.
 
 function offerRowToJson(o) {
   const endsAt = o.ends_at || null;
@@ -872,11 +874,31 @@ function offerRowToJson(o) {
     maxBonus: o.max_bonus != null ? Number(o.max_bonus) : null,
     referrerBonus: o.referrer_bonus != null ? Number(o.referrer_bonus) : null,
     refereeBonus: o.referee_bonus != null ? Number(o.referee_bonus) : null,
+    minWager: o.min_wager != null ? Number(o.min_wager) : null,
+    minWagerSince: o.min_wager_since || null,
     endsAt,
     active: !!o.active,
     expired,
     createdAt: o.created_at,
   };
+}
+
+// Total misé (marchés de prédiction + casino) par un joueur depuis une date
+// donnée. Utilisé pour la condition de participation des concours ("il faut
+// avoir misé au moins X 💎 depuis le DD/MM/AAAA"). Les mises remboursées
+// (marché annulé) ne comptent pas.
+async function getWageredSince(accountId, sinceDate) {
+  const [[marketRow], [casinoRow]] = await Promise.all([
+    pool.query(
+      "SELECT COALESCE(SUM(amount), 0) AS total FROM bets WHERE account_id = ? AND refunded = 0 AND created_at >= ?",
+      [accountId, sinceDate]
+    ),
+    pool.query(
+      "SELECT COALESCE(SUM(bet), 0) AS total FROM casino_bets WHERE account_id = ? AND created_at >= ?",
+      [accountId, sinceDate]
+    ),
+  ]);
+  return Number(marketRow[0].total || 0) + Number(casinoRow[0].total || 0);
 }
 
 // Renvoie l'offre active et non expirée la plus récente pour un type donné
@@ -893,11 +915,23 @@ async function getActiveOffer(type) {
 
 app.get("/api/offers", authRequired, async (req, res) => {
   try {
-    const [depositOffer, referralOffer] = await Promise.all([
+    const [depositOffer, referralOffer, contestOffer] = await Promise.all([
       getActiveOffer("deposit_boost"),
       getActiveOffer("referral_boost"),
+      getActiveOffer("contest"),
     ]);
-    const offers = [depositOffer, referralOffer].filter(Boolean).map(offerRowToJson);
+    const offers = [depositOffer, referralOffer, contestOffer].filter(Boolean).map(offerRowToJson);
+
+    // Pour un concours avec condition de mise minimum, on calcule l'éligibilité
+    // du joueur connecté et on l'ajoute à la réponse (affichage côté joueur).
+    const contest = offers.find(o => o.type === "contest");
+    if (contest && contest.minWager != null) {
+      const since = contest.minWagerSince || contest.createdAt;
+      const wagered = await getWageredSince(req.user.id, since);
+      contest.wageredAmount = wagered;
+      contest.eligible = wagered >= contest.minWager;
+    }
+
     res.json(offers);
   } catch (e) {
     console.error(e);
@@ -917,9 +951,9 @@ app.get("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
 
 app.post("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
   try {
-    let { type, title, endsAt, maxBonus, referrerBonus, refereeBonus } = req.body || {};
+    let { type, title, endsAt, maxBonus, referrerBonus, refereeBonus, minWager, minWagerSince } = req.body || {};
     type = String(type || "");
-    if (!["deposit_boost", "referral_boost"].includes(type))
+    if (!["deposit_boost", "referral_boost", "contest"].includes(type))
       return res.status(400).json({ error: "Type d'offre invalide." });
 
     title = title ? String(title).trim().slice(0, 140) : null;
@@ -928,10 +962,11 @@ app.post("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
       return res.status(400).json({ error: "Date de fin invalide." });
 
     let maxBonusVal = null, referrerBonusVal = null, refereeBonusVal = null;
-    if (type === "deposit_boost") {
+    if (type === "deposit_boost" || type === "contest") {
+      // pour "contest", max_bonus sert à stocker le nombre de 💎 à gagner
       maxBonusVal = Number(maxBonus);
       if (!Number.isFinite(maxBonusVal) || maxBonusVal <= 0)
-        return res.status(400).json({ error: "Bonus max invalide (doit être un nombre > 0)." });
+        return res.status(400).json({ error: type === "contest" ? "Le nombre de 💎 à gagner est invalide (doit être un nombre > 0)." : "Bonus max invalide (doit être un nombre > 0)." });
     } else {
       referrerBonusVal = Number(referrerBonus);
       refereeBonusVal = Number(refereeBonus);
@@ -939,10 +974,28 @@ app.post("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
         return res.status(400).json({ error: "Bonus parrain/filleul invalides (doivent être >= 0)." });
     }
 
+    // Condition de mise minimum, uniquement pour les concours. Optionnelle :
+    // si minWager est vide/0, le concours est ouvert à tout le monde.
+    let minWagerVal = null, minWagerSinceVal = null;
+    if (type === "contest") {
+      if (minWager !== undefined && minWager !== null && String(minWager).trim() !== "") {
+        minWagerVal = Number(minWager);
+        if (!Number.isFinite(minWagerVal) || minWagerVal < 0)
+          return res.status(400).json({ error: "Mise minimum invalide (doit être un nombre >= 0)." });
+        if (minWagerVal > 0) {
+          minWagerSinceVal = minWagerSince ? new Date(minWagerSince) : null;
+          if (minWagerSince && (!minWagerSinceVal || Number.isNaN(minWagerSinceVal.getTime())))
+            return res.status(400).json({ error: "Date de début de la mise minimum invalide." });
+        } else {
+          minWagerVal = null; // 0 = pas de condition
+        }
+      }
+    }
+
     const [result] = await pool.query(
-      `INSERT INTO offers (type, title, max_bonus, referrer_bonus, referee_bonus, ends_at, active)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [type, title, maxBonusVal, referrerBonusVal, refereeBonusVal, endsAtVal]
+      `INSERT INTO offers (type, title, max_bonus, referrer_bonus, referee_bonus, min_wager, min_wager_since, ends_at, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [type, title, maxBonusVal, referrerBonusVal, refereeBonusVal, minWagerVal, minWagerSinceVal, endsAtVal]
     );
     const [rows] = await pool.query("SELECT * FROM offers WHERE id = ?", [result.insertId]);
     res.json(offerRowToJson(rows[0]));
@@ -954,7 +1007,7 @@ app.post("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
 
 app.post("/api/admin/offers/:id", authRequired, adminRequired, async (req, res) => {
   try {
-    const { active, endsAt, title, maxBonus, referrerBonus, refereeBonus } = req.body || {};
+    const { active, endsAt, title, maxBonus, referrerBonus, refereeBonus, minWager, minWagerSince } = req.body || {};
     const [rows] = await pool.query("SELECT * FROM offers WHERE id = ?", [req.params.id]);
     const offer = rows[0];
     if (!offer) return res.status(404).json({ error: "Offre introuvable." });
@@ -985,6 +1038,28 @@ app.post("/api/admin/offers/:id", authRequired, adminRequired, async (req, res) 
       const v = Number(refereeBonus);
       if (!Number.isFinite(v) || v < 0) return res.status(400).json({ error: "Bonus filleul invalide." });
       await pool.query("UPDATE offers SET referee_bonus = ? WHERE id = ?", [v, offer.id]);
+    }
+    // minWager: null/0/"" retire la condition de participation ; un nombre > 0
+    // l'active (avec, éventuellement, une date de départ minWagerSince).
+    if (minWager !== undefined) {
+      const raw = String(minWager ?? "").trim();
+      if (raw === "" || Number(raw) <= 0) {
+        await pool.query("UPDATE offers SET min_wager = NULL, min_wager_since = NULL WHERE id = ?", [offer.id]);
+      } else {
+        const v = Number(raw);
+        if (!Number.isFinite(v)) return res.status(400).json({ error: "Mise minimum invalide." });
+        let sinceVal = null;
+        if (minWagerSince) {
+          sinceVal = new Date(minWagerSince);
+          if (Number.isNaN(sinceVal.getTime())) return res.status(400).json({ error: "Date de début de la mise minimum invalide." });
+        }
+        await pool.query("UPDATE offers SET min_wager = ?, min_wager_since = ? WHERE id = ?", [v, sinceVal, offer.id]);
+      }
+    } else if (minWagerSince !== undefined) {
+      const sinceVal = minWagerSince ? new Date(minWagerSince) : null;
+      if (minWagerSince && Number.isNaN(sinceVal.getTime()))
+        return res.status(400).json({ error: "Date de début de la mise minimum invalide." });
+      await pool.query("UPDATE offers SET min_wager_since = ? WHERE id = ?", [sinceVal, offer.id]);
     }
 
     const [updated] = await pool.query("SELECT * FROM offers WHERE id = ?", [offer.id]);

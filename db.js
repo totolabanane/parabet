@@ -61,6 +61,10 @@ async function init() {
     "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS amount_usd NUMERIC(12,2)",
     "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS tax_percent NUMERIC(5,2)",
     "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS reject_reason TEXT",
+    // Concours ("contest") : condition de participation optionnelle basée sur
+    // le montant misé (marchés + casino) depuis une date donnée.
+    "ALTER TABLE offers ADD COLUMN IF NOT EXISTS min_wager INTEGER DEFAULT NULL",
+    "ALTER TABLE offers ADD COLUMN IF NOT EXISTS min_wager_since TIMESTAMP DEFAULT NULL",
   ]) {
     await pool.query(stmt);
   }

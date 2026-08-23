@@ -112,6 +112,8 @@ CREATE TABLE offers (
   max_bonus      INT DEFAULT NULL,
   referrer_bonus INT DEFAULT NULL,
   referee_bonus  INT DEFAULT NULL,
+  min_wager      INT DEFAULT NULL,
+  min_wager_since DATETIME DEFAULT NULL,
   ends_at        DATETIME DEFAULT NULL,
   active         TINYINT NOT NULL DEFAULT 1,
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
