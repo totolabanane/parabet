@@ -130,6 +130,20 @@ CREATE TABLE IF NOT EXISTS offers (
 
 CREATE INDEX IF NOT EXISTS idx_offers_type_active ON offers(type, active);
 
+-- Participations aux concours : un joueur "participe" en cliquant sur le
+-- bouton dédié (au lieu d'être automatiquement inscrit). Une seule
+-- participation par joueur et par concours.
+CREATE TABLE IF NOT EXISTS contest_entries (
+  id         SERIAL PRIMARY KEY,
+  offer_id   INTEGER NOT NULL,
+  account_id INTEGER NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  UNIQUE (offer_id, account_id)
+);
+CREATE INDEX IF NOT EXISTS idx_contest_entries_offer ON contest_entries(offer_id);
+
 -- Index utiles
 CREATE INDEX IF NOT EXISTS idx_bets_market ON bets(market_id);
 CREATE INDEX IF NOT EXISTS idx_bets_account ON bets(account_id);

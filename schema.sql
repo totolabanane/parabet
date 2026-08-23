@@ -119,3 +119,13 @@ CREATE TABLE offers (
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 CREATE INDEX idx_offers_type_active ON offers(type, active);
+
+CREATE TABLE contest_entries (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  offer_id   INT NOT NULL,
+  account_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  UNIQUE (offer_id, account_id)
+) ENGINE=InnoDB;

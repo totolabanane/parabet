@@ -1449,6 +1449,9 @@ const state = {
   offers: [],             // offres du moment actuellement actives (affichées en haut de l'accueil)
   adminOffers: [],        // toutes les offres, actives ou non (admin)
   adminOfferForm: { type: "deposit_boost", title: "", endsAt: "", maxBonus: 5000, referrerBonus: 150, refereeBonus: 75, prizeAmount: 50000, minWager: "", minWagerSince: "" },
+  adminContestEntriesOpenId: null, // id du concours dont la liste des participants est affichée (admin)
+  adminContestEntries: [],         // participants du concours actuellement affiché (admin)
+  adminContestEntriesLoading: false,
 
   referral: { code: "", bonusReferrer: 0, bonusReferee: 0, totalEarned: 0, count: 0, validatedCount: 0, referred: [] },
   referralModalOpen: false,
@@ -2251,10 +2254,63 @@ async function loadAdminOffers() {
   state.adminOffers = await api("/api/admin/offers");
 }
 
+// Affiche/masque la liste des participants d'un concours (admin), pour
+// choisir le(s) gagnant(s) manuellement. Charge la liste à la demande.
+async function toggleContestEntries(offerId) {
+  if (state.adminContestEntriesOpenId === offerId) {
+    state.adminContestEntriesOpenId = null;
+    state.adminContestEntries = [];
+    render();
+    return;
+  }
+  state.adminContestEntriesOpenId = offerId;
+  state.adminContestEntriesLoading = true;
+  render();
+  try {
+    state.adminContestEntries = await api(`/api/admin/offers/${offerId}/entries`);
+  } catch (e) {
+    showToast(e.message);
+    state.adminContestEntries = [];
+  }
+  state.adminContestEntriesLoading = false;
+  render();
+}
+
 // Recharge la liste publique des offres actives, utilisée pour le bandeau
 // d'accueil et le modal de parrainage — appelée après chaque modif admin.
 async function reloadOffers() {
   state.offers = await api("/api/offers");
+}
+
+/* ---------- participation à un concours (joueur) ---------- */
+
+let contestJoinBusy = false;
+async function joinContest(offerId) {
+  if (contestJoinBusy) return;
+  contestJoinBusy = true;
+  try {
+    await api(`/api/offers/${offerId}/join`, { method: "POST" });
+    await reloadOffers();
+    showToast("Tu participes au concours ! 🏆");
+  } catch (e) {
+    showToast(e.message);
+  }
+  contestJoinBusy = false;
+  render();
+}
+
+async function leaveContest(offerId) {
+  if (contestJoinBusy) return;
+  contestJoinBusy = true;
+  try {
+    await api(`/api/offers/${offerId}/join`, { method: "DELETE" });
+    await reloadOffers();
+    showToast("Tu ne participes plus au concours.");
+  } catch (e) {
+    showToast(e.message);
+  }
+  contestJoinBusy = false;
+  render();
 }
 
 async function adminCreateOffer() {
@@ -2737,6 +2793,10 @@ function renderApp() {
     const [marketId, side] = b.dataset.bet.split("|");
     openBetModal(marketId, side);
   }));
+  const joinContestBtn = document.getElementById("joinContestBtn");
+  if (joinContestBtn) joinContestBtn.addEventListener("click", () => joinContest(joinContestBtn.dataset.offerId));
+  const leaveContestBtn = document.getElementById("leaveContestBtn");
+  if (leaveContestBtn) leaveContestBtn.addEventListener("click", () => leaveContest(leaveContestBtn.dataset.offerId));
   const moreMenuBtn = document.getElementById("moreMenuBtn");
   if (moreMenuBtn) moreMenuBtn.addEventListener("click", e => {
     e.stopPropagation();
@@ -2783,6 +2843,12 @@ function offerBannerHtml(o) {
           ? "✅ Tu es éligible pour ce concours"
           : `🔒 Il te manque ${(Math.max(0, o.minWager - (o.wageredAmount || 0))).toLocaleString("fr-FR")} 💎 misés${o.minWagerSince ? ` depuis le ${new Date(o.minWagerSince).toLocaleDateString("fr-FR")}` : ""} (${(o.wageredAmount || 0).toLocaleString("fr-FR")}/${o.minWager.toLocaleString("fr-FR")} 💎)`}</div>`
       : "";
+    const canJoin = o.minWager == null || o.eligible;
+    const joinButtonHtml = o.joined
+      ? `<button class="mini-btn" id="leaveContestBtn" data-offer-id="${o.id}" style="margin-top:8px;">✅ Tu participes — se retirer</button>`
+      : canJoin
+        ? `<button class="text-btn amber" id="joinContestBtn" data-offer-id="${o.id}" style="margin-top:8px;">🏆 Participer</button>`
+        : `<button class="mini-btn" disabled style="margin-top:8px; opacity:0.5;">🏆 Participer</button>`;
     return `
       <div class="offer-banner">
         <div class="offer-banner-icon">🏆</div>
@@ -2790,7 +2856,8 @@ function offerBannerHtml(o) {
           <div class="offer-banner-title">${o.title ? esc(o.title) : "Concours en cours"}</div>
           <div class="offer-banner-desc">${(o.maxBonus || 0).toLocaleString("fr-FR")} 💎 à gagner !</div>
           ${wagerLineHtml}
-          <div class="offer-banner-meta">${o.endsAt ? `⏳ Tirage le ${new Date(o.endsAt).toLocaleString("fr-FR")}` : "⏳ Date du tirage à venir"}</div>
+          <div class="offer-banner-meta">${o.endsAt ? `⏳ Tirage le ${new Date(o.endsAt).toLocaleString("fr-FR")}` : "⏳ Date du tirage à venir"}${o.entryCount != null ? ` · 🎟️ ${o.entryCount} participant${o.entryCount > 1 ? "s" : ""}` : ""}</div>
+          ${joinButtonHtml}
         </div>
       </div>
     `;
@@ -6741,6 +6808,28 @@ function renderAdmin() {
                   <button class="mini-btn" data-delete-offer="${o.id}">Supprimer</button>
                 </div>
               </div>
+              ${o.type === "contest" ? `
+              <div class="admin-actions" style="align-items:center;">
+                <button class="mini-btn" data-view-contest-entries="${o.id}">
+                  ${state.adminContestEntriesOpenId === o.id ? "Masquer" : "Voir"} les participants (${o.entryCount || 0})
+                </button>
+              </div>
+              ${state.adminContestEntriesOpenId === o.id ? `
+                <div class="feed-box" style="height:auto; max-height:220px;">
+                  ${state.adminContestEntriesLoading
+                    ? `<p class="admin-row-meta" style="padding:8px;">Chargement…</p>`
+                    : state.adminContestEntries.length === 0
+                      ? `<p class="admin-row-meta" style="padding:8px;">Aucun participant pour l'instant.</p>`
+                      : state.adminContestEntries.map((p, i) => `
+                        <div class="admin-row" style="padding:6px 10px;">
+                          <span class="admin-row-meta">#${i + 1}</span>
+                          <span class="admin-row-title" style="font-size:13px;">${esc(p.pseudo)}</span>
+                          <span class="admin-row-meta">${new Date(p.joinedAt).toLocaleString("fr-FR")}</span>
+                        </div>
+                      `).join("")}
+                </div>
+              ` : ""}
+              ` : ""}
               <div class="admin-actions" style="align-items:center;">
                 <label class="admin-row-meta" style="margin:0;">Nouvelle date de fin :</label>
                 <input type="datetime-local" data-offer-endsat="${o.id}" value="${msToLocalInputValue(o.endsAt)}" style="width:auto;" />
@@ -7080,6 +7169,9 @@ function renderAdmin() {
   document.querySelectorAll("[data-save-offer-endsat]").forEach(b => b.addEventListener("click", () => {
     const input = document.querySelector(`[data-offer-endsat="${b.dataset.saveOfferEndsat}"]`);
     adminSetOfferEndsAt(b.dataset.saveOfferEndsat, input ? input.value : "");
+  }));
+  document.querySelectorAll("[data-view-contest-entries]").forEach(b => b.addEventListener("click", () => {
+    toggleContestEntries(Number(b.dataset.viewContestEntries));
   }));
   document.querySelectorAll("[data-approve-dep]").forEach(b => b.addEventListener("click", () => {
     if (confirm("Confirmer ce dépôt ? Le montant sera crédité immédiatement sur le compte du joueur.")) {

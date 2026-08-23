@@ -922,14 +922,23 @@ app.get("/api/offers", authRequired, async (req, res) => {
     ]);
     const offers = [depositOffer, referralOffer, contestOffer].filter(Boolean).map(offerRowToJson);
 
-    // Pour un concours avec condition de mise minimum, on calcule l'éligibilité
-    // du joueur connecté et on l'ajoute à la réponse (affichage côté joueur).
+    // Pour un concours, on calcule l'éligibilité du joueur connecté (s'il y a
+    // une condition de mise minimum), s'il a déjà rejoint, et le nombre total
+    // de participants — tout ça pour l'affichage côté joueur.
     const contest = offers.find(o => o.type === "contest");
-    if (contest && contest.minWager != null) {
-      const since = contest.minWagerSince || contest.createdAt;
-      const wagered = await getWageredSince(req.user.id, since);
-      contest.wageredAmount = wagered;
-      contest.eligible = wagered >= contest.minWager;
+    if (contest) {
+      if (contest.minWager != null) {
+        const since = contest.minWagerSince || contest.createdAt;
+        const wagered = await getWageredSince(req.user.id, since);
+        contest.wageredAmount = wagered;
+        contest.eligible = wagered >= contest.minWager;
+      }
+      const [[joinedRow], [countRow]] = await Promise.all([
+        pool.query("SELECT 1 FROM contest_entries WHERE offer_id = ? AND account_id = ?", [contest.id, req.user.id]),
+        pool.query("SELECT COUNT(*) AS n FROM contest_entries WHERE offer_id = ?", [contest.id]),
+      ]);
+      contest.joined = joinedRow.length > 0;
+      contest.entryCount = Number(countRow[0].n || 0);
     }
 
     res.json(offers);
@@ -939,10 +948,84 @@ app.get("/api/offers", authRequired, async (req, res) => {
   }
 });
 
+// Un joueur rejoint un concours. Bloqué si le concours n'est pas actif/est
+// expiré, ou s'il ne remplit pas la condition de mise minimum (le cas
+// échéant). Idempotent : rejoindre deux fois ne crée pas de doublon.
+app.post("/api/offers/:id/join", authRequired, async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM offers WHERE id = ?", [req.params.id]);
+    const offer = rows[0];
+    if (!offer || offer.type !== "contest") return res.status(404).json({ error: "Concours introuvable." });
+
+    const o = offerRowToJson(offer);
+    if (!o.active) return res.status(400).json({ error: "Ce concours n'est plus actif." });
+    if (o.expired) return res.status(400).json({ error: "Ce concours est terminé." });
+
+    if (o.minWager != null) {
+      const since = o.minWagerSince || o.createdAt;
+      const wagered = await getWageredSince(req.user.id, since);
+      if (wagered < o.minWager) {
+        return res.status(400).json({
+          error: `Il te manque ${o.minWager - wagered} 💎 misés depuis le ${new Date(since).toLocaleDateString("fr-FR")} pour participer.`,
+        });
+      }
+    }
+
+    await pool.query(
+      "INSERT INTO contest_entries (offer_id, account_id) VALUES (?, ?) ON CONFLICT (offer_id, account_id) DO NOTHING",
+      [offer.id, req.user.id]
+    );
+    res.json({ ok: true, joined: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors de l'inscription au concours." });
+  }
+});
+
+// Un joueur se retire d'un concours auquel il avait participé.
+app.delete("/api/offers/:id/join", authRequired, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM contest_entries WHERE offer_id = ? AND account_id = ?", [req.params.id, req.user.id]);
+    res.json({ ok: true, joined: false });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du retrait du concours." });
+  }
+});
+
+// Liste des participants d'un concours, pour que le staff puisse choisir le(s)
+// gagnant(s) manuellement.
+app.get("/api/admin/offers/:id/entries", authRequired, adminRequired, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT ce.id, ce.created_at, a.id AS account_id, a.pseudo
+       FROM contest_entries ce
+       JOIN accounts a ON a.id = ce.account_id
+       WHERE ce.offer_id = ?
+       ORDER BY ce.created_at ASC`,
+      [req.params.id]
+    );
+    res.json(rows.map(r => ({ id: r.id, accountId: r.account_id, pseudo: r.pseudo, joinedAt: r.created_at })));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Erreur serveur lors du chargement des participants." });
+  }
+});
+
 app.get("/api/admin/offers", authRequired, adminRequired, async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT * FROM offers ORDER BY created_at DESC");
-    res.json(rows.map(offerRowToJson));
+    const offers = rows.map(offerRowToJson);
+    const contestIds = offers.filter(o => o.type === "contest").map(o => o.id);
+    if (contestIds.length > 0) {
+      const [countRows] = await pool.query(
+        `SELECT offer_id, COUNT(*) AS n FROM contest_entries WHERE offer_id IN (${contestIds.map(() => "?").join(",")}) GROUP BY offer_id`,
+        contestIds
+      );
+      const countByOffer = Object.fromEntries(countRows.map(r => [r.offer_id, Number(r.n)]));
+      offers.forEach(o => { if (o.type === "contest") o.entryCount = countByOffer[o.id] || 0; });
+    }
+    res.json(offers);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erreur serveur lors du chargement des offres." });

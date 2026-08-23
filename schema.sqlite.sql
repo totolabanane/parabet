@@ -117,3 +117,14 @@ CREATE TABLE IF NOT EXISTS offers (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_offers_type_active ON offers(type, active);
+
+CREATE TABLE IF NOT EXISTS contest_entries (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  offer_id   INTEGER NOT NULL,
+  account_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  UNIQUE (offer_id, account_id)
+);
+CREATE INDEX IF NOT EXISTS idx_contest_entries_offer ON contest_entries(offer_id);
