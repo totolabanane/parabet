@@ -2927,6 +2927,7 @@ function playCasinoGame(id) {
     showToast(!g.enabled ? `${g.title} arrive bientôt sur ParaBet 👀` : `${g.title} est en maintenance, reviens plus tard 🔧`);
     return;
   }
+  if (g.external) { window.location.href = g.external; return; }
   state.view = "casino";
   if (g.id === "blackjack") openBlackjack();
   else if (g.id === "mines") openMines();
@@ -3224,6 +3225,7 @@ function renderProfile() {
 
 const CASINO_GAMES = [
   { id: "blackjack", title: "Blackjack", kicker: "Table", poster: "/casino/blackjack-poster.png", gradient: "linear-gradient(165deg,#ff5f70,#a4172c)", enabled: true },
+  { id: "table3d",   title: "Le Chat Noir", kicker: "Table 3D", poster: "/casino/table3d-poster.svg", gradient: "linear-gradient(165deg,#c9a227,#2a1a10)", enabled: true, external: "/casino/blackjack-3d.html", maintenanceKey: "blackjack" },
   { id: "dice",      title: "Dice",      kicker: "Instant", poster: "/casino/dice-poster.png", gradient: "linear-gradient(165deg,#9c6bff,#5b21b6)", enabled: true },
   { id: "mines",     title: "Mines",     kicker: "Instant", poster: "/casino/mines-poster.png", gradient: "linear-gradient(165deg,#f2c14e,#a3690f)", enabled: true },
   { id: "hilo",      title: "Hilo",      kicker: "Instant", poster: "/casino/hilo-poster.png", gradient: "linear-gradient(165deg,#3ee08a,#0a6b40)", enabled: false },
@@ -3242,7 +3244,11 @@ const CASINO_GAMES = [
 // mais avec un libellé et un point de couleur différents.
 function casinoGameStatus(g) {
   if (!g.enabled) return { clickable: false, label: "Bientôt disponible", dotClass: "off" };
-  if (state.casinoMaintenance[g.id]) return { clickable: false, label: "En maintenance", dotClass: "maintenance" };
+  // "Le Chat Noir" (table3d) rejoue les mêmes parties que le blackjack
+  // classique côté serveur : elle doit donc suivre le même statut de
+  // maintenance que "blackjack", pas un statut séparé qui n'existe pas.
+  const maintenanceKey = g.maintenanceKey || g.id;
+  if (state.casinoMaintenance[maintenanceKey]) return { clickable: false, label: "En maintenance", dotClass: "maintenance" };
   return { clickable: true, label: "Disponible", dotClass: "" };
 }
 

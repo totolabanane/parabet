@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Le Chat Noir — Casino</title>
+<style>
+  :root{
+    --felt: #0b3d2e;
+    --felt-dark: #072a20;
+    --gold: #c9a227;
+    --gold-bright: #f0d876;
+    --wine: #4a1220;
+    --cream: #ede3c8;
+    --ink: #0a0a0a;
+  }
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Georgia','Times New Roman',serif;}
+  #app{position:relative;width:100vw;height:100vh;}
+  canvas{display:block;}
+
+  #crosshair{
+    position:absolute;top:50%;left:50%;width:6px;height:6px;
+    background:var(--gold-bright);border-radius:50%;
+    transform:translate(-50%,-50%);
+    box-shadow:0 0 6px var(--gold-bright);
+    pointer-events:none;z-index:20;
+  }
+
+  #startScreen{
+    position:absolute;inset:0;background:radial-gradient(ellipse at center, #1a0a0f 0%, #000 80%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:100;color:var(--cream);text-align:center;
+  }
+  #startScreen h1{
+    font-size:56px;letter-spacing:6px;color:var(--gold-bright);
+    text-shadow:0 0 20px rgba(240,216,118,0.5);margin:0 0 8px;
+    font-weight:400;
+  }
+  #startScreen .sub{color:#9a8a6a;letter-spacing:3px;font-size:13px;text-transform:uppercase;margin-bottom:36px;}
+  #startScreen button{
+    padding:16px 44px;font-size:18px;letter-spacing:2px;background:transparent;
+    border:1px solid var(--gold);color:var(--gold-bright);cursor:pointer;
+    font-family:inherit;transition:all .25s;text-transform:uppercase;
+  }
+  #startScreen button:hover{background:var(--gold);color:#1a0a0f;box-shadow:0 0 24px rgba(201,162,39,0.5);}
+  #startScreen .howto{margin-top:34px;color:#7a6a55;font-size:13px;line-height:1.9;letter-spacing:.5px;}
+  #startScreen .howto b{color:var(--gold);}
+
+  #hud{
+    position:absolute;top:18px;left:18px;color:var(--cream);z-index:20;
+    font-size:12px;letter-spacing:1.5px;text-transform:uppercase;
+    background:rgba(7,42,32,0.55);border:1px solid rgba(201,162,39,0.35);
+    padding:10px 16px;pointer-events:none;transition:opacity .3s;
+  }
+  #hud .chips{color:var(--gold-bright);font-size:20px;letter-spacing:1px;font-family:Georgia,serif;text-transform:none;}
+
+  #prompt{
+    position:absolute;bottom:14%;left:50%;transform:translate(-50%,0);
+    color:var(--cream);background:rgba(10,10,10,0.7);border:1px solid var(--gold);
+    padding:10px 22px;letter-spacing:1px;font-size:15px;z-index:20;
+    opacity:0;transition:opacity .2s;pointer-events:none;
+  }
+  #prompt.show{opacity:1;}
+  #prompt kbd{color:var(--gold-bright);border:1px solid var(--gold-bright);padding:1px 7px;margin:0 3px;font-size:13px;}
+
+  /* ===== Table HUD — slim dock, table stays visible behind it ===== */
+  #tableHud{
+    position:absolute;left:0;right:0;bottom:0;z-index:50;
+    display:flex;flex-direction:column;align-items:center;
+    pointer-events:none;
+    opacity:0;transform:translateY(30px);
+    transition:opacity .45s ease, transform .45s ease;
+  }
+  #tableHud.show{opacity:1;transform:translateY(0);pointer-events:auto;}
+
+  #bjExit{
+    position:absolute;top:20px;right:26px;color:#8fae9c;cursor:pointer;
+    font-size:12px;letter-spacing:2px;text-transform:uppercase;border:1px solid #3a5a4a;
+    padding:8px 14px;z-index:51;background:rgba(0,0,0,0.35);
+    opacity:0;pointer-events:none;transition:opacity .3s;
+  }
+  #bjExit.show{opacity:1;pointer-events:auto;}
+  #bjExit:hover{color:var(--gold-bright);border-color:var(--gold);}
+
+  #dock{
+    width:min(680px,94vw);margin-bottom:18px;
+    background:linear-gradient(180deg, rgba(7,42,32,0.75), rgba(3,18,14,0.92));
+    border:1px solid rgba(201,162,39,0.55);
+    box-shadow:0 -6px 30px rgba(0,0,0,0.55), inset 0 0 30px rgba(0,0,0,0.35);
+    padding:14px 22px 16px;
+    backdrop-filter:blur(2px);
+  }
+  #bjMsg{text-align:center;min-height:20px;color:var(--gold-bright);font-size:14px;letter-spacing:.5px;margin-bottom:12px;}
+  #bjTotals{display:flex;justify-content:space-between;color:#bfd4c4;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+  #bjTotals span b{color:var(--gold-bright);font-size:15px;letter-spacing:0;}
+
+  #bjBetRow{display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:14px;}
+  #bjBetRow .chipBtn{
+    width:46px;height:46px;border-radius:50%;border:2px dashed var(--gold);background:var(--wine);
+    color:var(--gold-bright);cursor:pointer;font-family:inherit;font-size:12px;display:flex;align-items:center;justify-content:center;
+    transition:transform .15s;
+  }
+  #bjBetRow .chipBtn:hover:not(:disabled){transform:scale(1.08);}
+  #bjBetRow .chipBtn:disabled{opacity:.25;cursor:not-allowed;}
+  #bjBetAmt{font-size:20px;color:var(--gold-bright);min-width:84px;text-align:center;}
+
+  #bjControls{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;}
+  #bjControls button{
+    padding:11px 24px;background:transparent;border:1px solid var(--gold);color:var(--cream);
+    font-family:inherit;font-size:13px;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;transition:all .2s;
+  }
+  #bjControls button:hover:not(:disabled){background:var(--gold);color:#1a0a0f;}
+  #bjControls button:disabled{opacity:0.3;cursor:not-allowed;}
+
+  /* ===== Card history panel — shows every card drawn this round ===== */
+  #historyPanel{
+    position:absolute;right:22px;bottom:22px;z-index:50;
+    width:200px;
+    background:linear-gradient(180deg, rgba(7,42,32,0.75), rgba(3,18,14,0.92));
+    border:1px solid rgba(201,162,39,0.55);
+    box-shadow:0 6px 30px rgba(0,0,0,0.55), inset 0 0 24px rgba(0,0,0,0.3);
+    padding:12px 14px 14px;
+    opacity:0;transform:translateY(20px);
+    transition:opacity .4s ease, transform .4s ease;
+    pointer-events:none;
+  }
+  #historyPanel.show{opacity:1;transform:translateY(0);}
+  .histRow{margin-bottom:9px;}
+  .histRow:last-child{margin-bottom:0;}
+  .histLabel{
+    color:#9a8a6a;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .histCards{display:flex;flex-wrap:wrap;gap:5px;}
+  .miniCard{
+    width:26px;height:37px;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    font-family:Georgia,serif;font-weight:bold;font-size:11px;line-height:1;
+    box-shadow:0 2px 5px rgba(0,0,0,0.5);
+    animation:histPop .28s ease;
+  }
+  .miniCard.face{background:var(--cream);border:1px solid #00000022;}
+  .miniCard.face.red{color:#a01313;}
+  .miniCard.face.black{color:#0a0a0a;}
+  .miniCard .suit{font-size:12px;margin-top:1px;}
+  .miniCard.back{
+    background:var(--wine);border:1px solid var(--gold);
+    color:var(--gold-bright);font-size:14px;
+  }
+  @keyframes histPop{ from{ transform:scale(0.3); opacity:0; } to{ transform:scale(1); opacity:1; } }
+
+  #pointerLockMsg{
+    position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#7a6a55;
+    font-size:11px;letter-spacing:1px;z-index:20;pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="startScreen">
+    <h1>LE CHAT NOIR</h1>
+    <div class="sub">Un casino après minuit</div>
+    <button id="playBtn">Entrer</button>
+    <div class="howto">
+      <b>Z Q S D</b> ou <b>flèches</b> pour marcher &nbsp;•&nbsp; <b>souris</b> pour regarder<br>
+      Approchez-vous de la table et appuyez sur <b>E</b> pour vous asseoir et jouer<br>
+      <b>Échap</b> pour libérer la souris
+    </div>
+  </div>
+
+  <div id="hud" style="display:none;">
+    Solde<br><span class="chips" id="chipCount">— 💎</span>
+  </div>
+  <div id="authGate" style="display:none;position:absolute;inset:0;z-index:200;background:rgba(0,0,0,0.92);color:#ede3c8;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:Georgia,serif;">
+    <div style="font-size:22px;letter-spacing:2px;color:#f0d876;margin-bottom:14px;">Connexion requise</div>
+    <div style="max-width:380px;line-height:1.7;color:#bfae8a;margin-bottom:22px;">Connecte-toi sur ParaBet pour t'asseoir à cette table — ton solde 💎 sera relié directement au jeu.</div>
+    <div id="authGateDetail" style="max-width:380px;font-size:11px;color:#6a5c46;margin-bottom:18px;line-height:1.5;"></div>
+    <a href="/" style="padding:12px 30px;border:1px solid #c9a227;color:#f0d876;text-decoration:none;letter-spacing:1px;">Retour à ParaBet</a>
+  </div>
+  <div id="crosshair" style="display:none;"></div>
+  <div id="prompt">Appuyez sur <kbd>E</kbd> pour vous asseoir à la table</div>
+  <div id="pointerLockMsg" style="display:none;">Échap pour libérer la souris</div>
+
+  <div id="bjExit">✕ Quitter la table</div>
+  <div id="historyPanel">
+    <div class="histRow">
+      <div class="histLabel">Vos cartes</div>
+      <div class="histCards" id="histPlayer"></div>
+    </div>
+    <div class="histRow">
+      <div class="histLabel">Croupier</div>
+      <div class="histCards" id="histDealer"></div>
+    </div>
+  </div>
+  <div id="tableHud">
+    <div id="dock">
+      <div id="bjTotals">
+        <span>Croupier&nbsp;<b id="dealerTotal">—</b></span>
+        <span>Vous&nbsp;<b id="playerTotal">—</b></span>
+      </div>
+      <div id="bjMsg">Placez votre mise pour commencer.</div>
+      <div id="bjBetRow">
+        <button class="chipBtn" data-val="10">+10</button>
+        <button class="chipBtn" data-val="25">+25</button>
+        <button class="chipBtn" data-val="100">+100</button>
+        <div id="bjBetAmt">0 💎</div>
+        <button class="chipBtn" id="bjClearBet" data-val="0" style="border-style:solid;">↺</button>
+      </div>
+      <div id="bjControls">
+        <button id="btnDeal">Miser &amp; Distribuer</button>
+        <button id="btnHit" disabled>Tirer</button>
+        <button id="btnStand" disabled>Rester</button>
+        <button id="btnDouble" disabled>Doubler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============ THREE.JS SCENE ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030509);
+scene.fog = new THREE.Fog(0x030509, 9, 30);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.7, 8);
+camera.rotation.order = 'YXZ';
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+document.getElementById('app').appendChild(renderer.domElement);
+renderer.domElement.style.position = 'absolute';
+renderer.domElement.style.inset = '0';
+renderer.domElement.style.zIndex = '1';
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Lighting — cool "live studio" scheme (soft white key + blue rim/back light)
+scene.add(new THREE.AmbientLight(0x3a4a66, 0.32));
+
+const keyLight = new THREE.SpotLight(0xffffff, 1.5, 15, Math.PI/4.2, 0.45);
+keyLight.position.set(0, 5.6, -1.2);
+keyLight.target.position.set(0, 1, -3.2);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024,1024);
+scene.add(keyLight, keyLight.target);
+
+const fillLight = new THREE.PointLight(0xaac4ff, 0.55, 12);
+fillLight.position.set(0, 2.2, 4);
+scene.add(fillLight);
+
+[[-7,-7],[7,-7],[-7,2],[7,2]].forEach(([x,z])=>{
+  const l = new THREE.PointLight(0x3a7bff, 0.9, 10);
+  l.position.set(x, 3.2, z);
+  scene.add(l);
+});
+
+// Floor — warm light wood, like a studio set
+const floorGeo = new THREE.PlaneGeometry(30, 30);
+function makeFloorTexture(){
+  const c = makeCanvas(512,512);
+  const ctx = c.getContext('2d');
+  const tones = ['#b9905d','#a97e4d','#c39c67','#ad8552'];
+  const plankW = 58;
+  for(let x=0;x<512;x+=plankW){
+    ctx.fillStyle = tones[Math.floor(Math.random()*tones.length)];
+    ctx.fillRect(x,0,plankW-3,512);
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+  for(let y=0;y<512;y+=44){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(512,y); ctx.stroke(); }
+  return new THREE.CanvasTexture(c);
+}
+const floorTex = makeFloorTexture();
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+floorTex.repeat.set(7,7);
+const floorMat = new THREE.MeshStandardMaterial({map:floorTex, roughness:0.55});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// rug under table
+const rug = new THREE.Mesh(new THREE.CircleGeometry(4, 32), new THREE.MeshStandardMaterial({color:0x0d1420, roughness:0.9}));
+rug.rotation.x = -Math.PI/2;
+rug.position.set(0, 0.01, -3.2);
+scene.add(rug);
+
+// Ceiling
+const ceiling = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({color:0x05070c}));
+ceiling.rotation.x = Math.PI/2;
+ceiling.position.y = 5;
+scene.add(ceiling);
+
+// Walls (structural, mostly hidden behind the video-wall backdrop below)
+function makeWall(w,h,x,y,z,ry){
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshStandardMaterial({color:0x070a12, roughness:0.9}));
+  wall.position.set(x,y,z);
+  wall.rotation.y = ry;
+  scene.add(wall);
+  return wall;
+}
+makeWall(30,5,0,2.5,-15,0);
+makeWall(30,5,0,2.5,15,Math.PI);
+makeWall(30,5,-15,2.5,0,Math.PI/2);
+makeWall(30,5,15,2.5,0,-Math.PI/2);
+
+// Hexagon-patterned "video wall" backdrop, like a modern live-casino studio set
+function makeHexPatternTexture(w,h,fg,bg){
+  const c = makeCanvas(w,h);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = fg; ctx.lineWidth = 2;
+  const size = 30, hh = size*Math.sqrt(3);
+  for(let row=-1; row*hh < h+hh; row++){
+    for(let col=-1; col*size*1.5 < w+size*2; col++){
+      const cx = col*size*1.5;
+      const cy = row*hh + ((col%2)? hh/2 : 0);
+      ctx.globalAlpha = 0.28 + Math.random()*0.3;
+      ctx.beginPath();
+      for(let i=0;i<6;i++){
+        const a = Math.PI/3*i;
+        const px = cx + size*Math.cos(a), py = cy + size*Math.sin(a);
+        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  return new THREE.CanvasTexture(c);
+}
+const hexTex = makeHexPatternTexture(1024,512,'#2f6fdc','#050b16');
+const backdropMat = new THREE.MeshBasicMaterial({map:hexTex});
+const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(15,6), backdropMat);
+backdrop.position.set(0, 3, -8.9);
+scene.add(backdrop);
+const backdropL = new THREE.Mesh(new THREE.PlaneGeometry(7,6), backdropMat.clone());
+backdropL.position.set(-9.6, 3, -6.6);
+backdropL.rotation.y = Math.PI/3.3;
+scene.add(backdropL);
+const backdropR = backdropL.clone();
+backdropR.position.x = 9.6;
+backdropR.rotation.y = -Math.PI/3.3;
+scene.add(backdropR);
+const marquee = textSprite('LE CHAT NOIR', {fontSize:56, color:'#dce8ff'});
+marquee.position.set(0, 4.7, -8.5);
+marquee.scale.multiplyScalar(1.6);
+scene.add(marquee);
+
+// Pillars — sleek dark metal instead of wood
+function makePillar(x,z){
+  const g = new THREE.CylinderGeometry(0.3,0.3,5,8);
+  const m = new THREE.MeshStandardMaterial({color:0x11151c, roughness:0.3, metalness:0.55});
+  const p = new THREE.Mesh(g,m);
+  p.position.set(x,2.5,z);
+  scene.add(p);
+}
+[[-6,-10],[6,-10],[-6,8],[6,8],[-11,-2],[11,-2]].forEach(([x,z])=>makePillar(x,z));
+
+/* ============ CANVAS TEXTURE HELPERS ============ */
+function makeCanvas(w,h){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+function textSprite(text, {fontSize=64, color='#f0d876', weight='bold', font='Georgia', pad=16, bg=null}={}){
+  const c = makeCanvas(512,128);
+  const ctx = c.getContext('2d');
+  ctx.font = `${weight} ${fontSize}px ${font}`;
+  const w = Math.min(500, ctx.measureText(text).width + pad*2);
+  c.width = w; c.height = fontSize + pad*2;
+  ctx.font = `${weight} ${fontSize}px ${font}`;
+  if(bg){ ctx.fillStyle = bg; ctx.fillRect(0,0,c.width,c.height); }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(text, c.width/2, c.height/2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false});
+  const spr = new THREE.Sprite(mat);
+  const scale = c.height/220;
+  spr.scale.set((c.width/c.height)*scale, scale, 1);
+  spr._canvas = c; spr._ctx = ctx; spr._tex = tex;
+  return spr;
+}
+function updateTextSprite(spr, text, opts={}){
+  const ctx = spr._ctx, c = spr._canvas;
+  ctx.clearRect(0,0,c.width,c.height);
+  const fontSize = opts.fontSize || 44;
+  ctx.font = `bold ${fontSize}px Georgia`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = opts.color || '#f0d876';
+  ctx.fillText(text, c.width/2, c.height/2 + 2);
+  spr._tex.needsUpdate = true;
+}
+
+/* ---- Wood grain material for rim/legs ---- */
+const woodMat = new THREE.MeshStandardMaterial({color:0x0e1015, roughness:0.28, metalness:0.4});
+
+/* ============ BLACKJACK TABLE (real "D" shape, validated geometry) ============ */
+const tableGroup = new THREE.Group();
+tableGroup.position.set(0, 0, -4);
+scene.add(tableGroup);
+
+const TBL = {
+  halfW: 2.3,
+  straightDepth: 0.4,
+  frontRadius: 2.3,
+  topY: 1.0
+};
+TBL.totalDepth = TBL.straightDepth + TBL.frontRadius; // local z from 0 (dealer edge) to +totalDepth (front tip)
+
+function buildTableShape(inset){
+  const hw = TBL.halfW - inset;
+  const sd = TBL.straightDepth;
+  const fr = TBL.frontRadius - inset;
+  const s = new THREE.Shape();
+  const fillet = 0.18;
+  s.moveTo(-hw, 0);
+  s.lineTo(-hw, -(sd-fillet));
+  s.quadraticCurveTo(-hw, -sd, -hw+fillet, -sd);
+  s.lineTo(-fr+fillet, -sd);
+  s.absarc(0, -sd, fr, Math.PI, 0, false);
+  s.lineTo(hw, -(sd-fillet));
+  s.quadraticCurveTo(hw, 0, hw-fillet, 0);
+  s.lineTo(-hw, 0);
+  return s;
+}
+
+// Felt top (flat) — DoubleSide so orientation quirks never cause an invisible/half table
+const feltShape = buildTableShape(0.14);
+const feltGeo = new THREE.ShapeGeometry(feltShape, 48);
+const feltCanvas = makeCanvas(512,512);
+(function paintFelt(){
+  const ctx = feltCanvas.getContext('2d');
+  const g = ctx.createRadialGradient(256,256,40,256,256,360);
+  g.addColorStop(0,'#0f4c8a');
+  g.addColorStop(1,'#051a33');
+  ctx.fillStyle = g; ctx.fillRect(0,0,512,512);
+  ctx.globalAlpha = 0.05;
+  for(let i=0;i<4000;i++){
+    ctx.fillStyle = Math.random()>0.5 ? '#ffffff' : '#000000';
+    ctx.fillRect(Math.random()*512, Math.random()*512, 1, 1);
+  }
+})();
+const feltTex = new THREE.CanvasTexture(feltCanvas);
+const feltMat = new THREE.MeshStandardMaterial({map:feltTex, roughness:0.95, side:THREE.DoubleSide});
+const felt = new THREE.Mesh(feltGeo, feltMat);
+felt.rotation.x = -Math.PI/2;
+felt.position.y = TBL.topY;
+felt.receiveShadow = true;
+tableGroup.add(felt);
+
+// Gold trim ring following the felt outline (outer minus inner shape as a hole)
+const trimOuter = buildTableShape(0.02);
+const trimInner = buildTableShape(0.16);
+const trimPath = new THREE.Path();
+{
+  // reverse inner points so the hole winds correctly
+  const pts = trimInner.getPoints(48).reverse();
+  trimPath.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++) trimPath.lineTo(pts[i].x, pts[i].y);
+}
+trimOuter.holes.push(trimPath);
+const trimGeo = new THREE.ShapeGeometry(trimOuter, 48);
+const trim = new THREE.Mesh(trimGeo, new THREE.MeshBasicMaterial({color:0x4a9bff, side:THREE.DoubleSide}));
+trim.rotation.x = -Math.PI/2;
+trim.position.y = TBL.topY + 0.003;
+tableGroup.add(trim);
+
+// Wooden outer rail (raised bumper) — extruded ring, slightly thicker than trim
+const railOuter = buildTableShape(-0.08);
+const railInnerPath = new THREE.Path();
+{
+  const pts = buildTableShape(0.02).getPoints(48).reverse();
+  railInnerPath.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++) railInnerPath.lineTo(pts[i].x, pts[i].y);
+}
+railOuter.holes.push(railInnerPath);
+const railGeo = new THREE.ExtrudeGeometry(railOuter, {depth:0.07, bevelEnabled:true, bevelThickness:0.012, bevelSize:0.012, bevelSegments:2});
+const rail = new THREE.Mesh(railGeo, woodMat);
+rail.rotation.x = -Math.PI/2;
+rail.position.y = TBL.topY + 0.02;
+rail.castShadow = true;
+tableGroup.add(rail);
+
+// Pedestal
+const pedestalTopY = TBL.topY - 0.06;
+const centerLocalZ = TBL.totalDepth*0.42;
+const pedestalTop = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.34,0.06,16), woodMat);
+pedestalTop.position.set(0, pedestalTopY, centerLocalZ);
+tableGroup.add(pedestalTop);
+const pedestalLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.3,pedestalTopY-0.06,12), woodMat);
+pedestalLeg.position.set(0, (pedestalTopY-0.06)/2, centerLocalZ);
+pedestalLeg.castShadow = true;
+tableGroup.add(pedestalLeg);
+const pedestalBase = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.05,16), woodMat);
+pedestalBase.position.set(0, 0.025, centerLocalZ);
+tableGroup.add(pedestalBase);
+
+// Felt signage (flat decals laid on top — positioned directly, no UV guessing)
+const signGroup = new THREE.Group();
+signGroup.rotation.x = -Math.PI/2;
+signGroup.position.y = TBL.topY + 0.004;
+tableGroup.add(signGroup);
+function feltLabel(text, localZ, fontSize){
+  const spr = textSprite(text, {fontSize:fontSize||46, color:'#eaf2ff'});
+  // sprite is billboard by default — swap for a flat plane so it lies on the felt
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(spr.scale.x*0.34, spr.scale.y*0.34), new THREE.MeshBasicMaterial({map:spr.material.map, transparent:true, side:THREE.DoubleSide}));
+  plane.position.set(0, -localZ, 0.001); // local group is rotated, so plane's local y === table's world -z; see below
+  return plane;
+}
+// signGroup is rotated -90 about X same as felt, so within its own local XY plane: local (x,y) -> world (x, topY, -y).
+// We want world local-z = Z  =>  y = -Z.
+function addFeltText(text, worldLocalZ, fontSize){
+  const c = makeCanvas(600,90);
+  const ctx = c.getContext('2d');
+  ctx.font = `bold ${fontSize}px Georgia`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle = 'rgba(234,242,255,0.9)';
+  ctx.fillText(text, 300, 45);
+  const tex = new THREE.CanvasTexture(c);
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.3), new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.DoubleSide}));
+  plane.position.set(0, -worldLocalZ, 0);
+  signGroup.add(plane);
+}
+addFeltText('BLACKJACK PAIE 3 CONTRE 2', TBL.totalDepth*0.62, 34);
+addFeltText('LE CROUPIER S\u2019ARR\u00caTE \u00c0 17', TBL.totalDepth*0.78, 26);
+
+// Betting spot ring
+const betSpotLocalZ = TBL.totalDepth*0.78;
+const betRing = new THREE.Mesh(new THREE.RingGeometry(0.26,0.3,32), new THREE.MeshBasicMaterial({color:0x4a9bff, transparent:true, opacity:0.85, side:THREE.DoubleSide}));
+betRing.rotation.x = -Math.PI/2;
+betRing.position.set(0, TBL.topY+0.005, betSpotLocalZ);
+tableGroup.add(betRing);
+
+// Card shoe near dealer
+const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.22,0.5), new THREE.MeshStandardMaterial({color:0xdfe9f7, roughness:0.2, metalness:0.05}));
+shoe.position.set(TBL.halfW*0.62, TBL.topY+0.13, 0.35);
+shoe.rotation.y = -0.25;
+tableGroup.add(shoe);
+
+/* ---- Dealer character (behind the flat back edge) ---- */
+const dealer = new THREE.Group();
+dealer.position.set(0, 0, -0.55);
+tableGroup.add(dealer);
+
+const skinMat = new THREE.MeshStandardMaterial({color:0x8a5a3c, roughness:0.55});
+const vestMat = new THREE.MeshStandardMaterial({color:0x14151a, roughness:0.45});
+const shirtMat = new THREE.MeshStandardMaterial({color:0xf5f2ea, roughness:0.6});
+const bowMat = new THREE.MeshStandardMaterial({color:0x0a0a0a, roughness:0.3});
+
+const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.32,0.75,20), vestMat);
+torso.position.y = 1.35;
+torso.castShadow = true;
+dealer.add(torso);
+const shirtCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,0.1,10), shirtMat);
+shirtCollar.position.y = 1.74;
+dealer.add(shirtCollar);
+const bow = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.05), bowMat);
+bow.position.set(0,1.72,0.15);
+dealer.add(bow);
+
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.17,24,20), skinMat);
+head.position.y = 1.96;
+head.castShadow = true;
+dealer.add(head);
+const hair = new THREE.Mesh(new THREE.SphereGeometry(0.175,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0x1a1410}));
+hair.position.y = 2.0;
+dealer.add(hair);
+
+// Simple friendly face (canvas-drawn) so the dealer isn't a blank sphere
+(function addFace(){
+  const c = makeCanvas(160,160);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#0a0a0a';
+  ctx.beginPath(); ctx.ellipse(52,66,8,10,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(108,66,8,10,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(80,92,26,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.17,0.17), new THREE.MeshBasicMaterial({map:tex, transparent:true}));
+  face.position.set(0, 1.965, 0.152);
+  dealer.add(face);
+})();
+
+// arms as pivoted groups so they can swing to "deal"
+function makeArm(sign){
+  const pivot = new THREE.Group();
+  pivot.position.set(sign*0.28, 1.62, 0);
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.055,0.34,8), vestMat);
+  upper.position.y = -0.17;
+  pivot.add(upper);
+  const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.045,0.32,8), skinMat);
+  fore.position.y = -0.5;
+  pivot.add(fore);
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055,8,8), skinMat);
+  hand.position.y = -0.68;
+  pivot.add(hand);
+  pivot.rotation.z = sign * 0.12;
+  return pivot;
+}
+const armL = makeArm(-1), armR = makeArm(1);
+dealer.add(armL, armR);
+
+const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.24,0.95,10), new THREE.MeshStandardMaterial({color:0x18100c}));
+legs.position.y = 0.5;
+dealer.add(legs);
+
+dealer.lookAt(0, 1.5, tableGroup.position.z + TBL.totalDepth); // face the players (approx; corrected below)
+dealer.rotation.set(0,0,0); // dealer already built facing +Z locally; keep neutral (table's +Z is toward players)
+
+// Dealer speech bubble
+const dealerSpeech = textSprite('Faites vos jeux !', {fontSize:40});
+dealerSpeech.position.set(0, 2.35, 0);
+dealer.add(dealerSpeech);
+dealerSpeech.visible = false;
+function dealerSay(text, ms){
+  updateTextSprite(dealerSpeech, text, {fontSize:38});
+  const c = dealerSpeech._canvas;
+  const scale = c.height/220;
+  dealerSpeech.scale.set((c.width/c.height)*scale, scale, 1);
+  dealerSpeech.visible = true;
+  clearTimeout(dealerSpeech._t);
+  if(ms!==0){
+    dealerSpeech._t = setTimeout(()=>{ dealerSpeech.visible = false; }, ms||2200);
+  }
+}
+
+/* ============ FIRST PERSON CONTROLS ============ */
+let yaw = 0, pitch = 0;
+const move = {forward:false, backward:false, left:false, right:false};
+let locked = false;
+const velocity = new THREE.Vector3();
+const clock = new THREE.Clock();
+
+const startScreen = document.getElementById('startScreen');
+const playBtn = document.getElementById('playBtn');
+const hud = document.getElementById('hud');
+const crosshair = document.getElementById('crosshair');
+const promptEl = document.getElementById('prompt');
+const pointerLockMsg = document.getElementById('pointerLockMsg');
+
+playBtn.addEventListener('click', async ()=>{
+  // On vérifie la session ParaBet avant d'entrer : cette table joue en
+  // émeraudes réelles du compte, donc pas d'accès sans être connecté.
+  try {
+    const me = await bjApi('/api/me');
+    balance = me.balance;
+  } catch(e) {
+    const gate = document.getElementById('authGate');
+    gate.style.display = 'flex';
+    const detail = document.getElementById('authGateDetail');
+    if (detail) {
+      detail.textContent = e.status
+        ? `Détail technique : requête refusée (HTTP ${e.status} — ${e.message})`
+        : `Détail technique : la requête vers /api/me n'a pas pu aboutir (${e.message || 'erreur réseau'}). Vérifie que cette page est bien servie par ton serveur ParaBet (pas ouverte en fichier local, pas de proxy/CDN qui bloque /api).`;
+    }
+    return;
+  }
+  startScreen.style.display = 'none';
+  hud.style.display = 'block';
+  crosshair.style.display = 'block';
+  pointerLockMsg.style.display = 'block';
+  updateChips();
+  renderer.domElement.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', ()=>{
+  locked = document.pointerLockElement === renderer.domElement;
+  pointerLockMsg.style.opacity = locked ? '1' : '0';
+});
+
+document.addEventListener('mousemove', (e)=>{
+  if(!locked || blackjackOpen) return;
+  yaw -= e.movementX * 0.0022;
+  pitch -= e.movementY * 0.0022;
+  pitch = Math.max(-1.3, Math.min(1.3, pitch));
+});
+
+document.addEventListener('keydown', (e)=>{
+  if(blackjackOpen){
+    if(e.code === 'Escape') closeBlackjack();
+    return;
+  }
+  switch(e.code){
+    case 'KeyW': case 'ArrowUp': move.forward = true; break;
+    case 'KeyS': case 'ArrowDown': move.backward = true; break;
+    case 'KeyA': case 'ArrowLeft': move.left = true; break;
+    case 'KeyD': case 'ArrowRight': move.right = true; break;
+    case 'KeyE': tryOpenBlackjack(); break;
+  }
+});
+document.addEventListener('keyup', (e)=>{
+  switch(e.code){
+    case 'KeyW': case 'ArrowUp': move.forward = false; break;
+    case 'KeyS': case 'ArrowDown': move.backward = false; break;
+    case 'KeyA': case 'ArrowLeft': move.left = false; break;
+    case 'KeyD': case 'ArrowRight': move.right = false; break;
+  }
+});
+
+renderer.domElement.addEventListener('click', ()=>{
+  if(!blackjackOpen && startScreen.style.display === 'none') renderer.domElement.requestPointerLock();
+});
+
+const bounds = 14;
+function updateMovement(dt){
+  if(blackjackOpen) return;
+  const speed = 3.6;
+  const dir = new THREE.Vector3();
+  const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  if(move.forward) dir.add(forward);
+  if(move.backward) dir.sub(forward);
+  if(move.right) dir.add(right);
+  if(move.left) dir.sub(right);
+  if(dir.lengthSq() > 0){
+    dir.normalize().multiplyScalar(speed*dt);
+    camera.position.x += dir.x;
+    camera.position.z += dir.z;
+    camera.position.x = Math.max(-bounds, Math.min(bounds, camera.position.x));
+    camera.position.z = Math.max(-bounds, Math.min(bounds, camera.position.z));
+  }
+  camera.rotation.set(pitch, yaw, 0, 'YXZ');
+}
+
+const tableFrontWorld = new THREE.Vector3(tableGroup.position.x, 0, tableGroup.position.z + TBL.totalDepth*0.7);
+function nearTable(){
+  const d2 = camera.position.distanceTo(new THREE.Vector3(tableFrontWorld.x, camera.position.y, tableFrontWorld.z));
+  return d2 < 3.2;
+}
+
+/* ============ CAMERA TRANSITION (walk up to / away from the table) ============ */
+const camTransition = {active:false, t:0, duration:0.85, fromPos:new THREE.Vector3(), fromQuat:new THREE.Quaternion(), toPos:new THREE.Vector3(), toQuat:new THREE.Quaternion(), onDone:null};
+const _lookMatrix = new THREE.Matrix4();
+const _worldUp = new THREE.Vector3(0,1,0);
+function easeInOut(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+function startCameraTransition(toPos, toLookAt, duration, onDone){
+  camTransition.fromPos.copy(camera.position);
+  camTransition.fromQuat.copy(camera.quaternion);
+  _lookMatrix.lookAt(toPos, toLookAt, _worldUp);
+  camTransition.toPos.copy(toPos);
+  camTransition.toQuat.setFromRotationMatrix(_lookMatrix);
+  camTransition.t = 0;
+  camTransition.duration = duration || 0.85;
+  camTransition.active = true;
+  camTransition.onDone = onDone || null;
+}
+function seatWorldPos(){
+  return new THREE.Vector3(tableGroup.position.x, 2.35, tableGroup.position.z + TBL.totalDepth + 1.15);
+}
+function seatLookAtPos(){
+  return new THREE.Vector3(tableGroup.position.x, TBL.topY + 0.05, tableGroup.position.z + TBL.totalDepth*0.42);
+}
+
+/* ============ BLACKJACK GAME ============ */
+let blackjackOpen = false;
+const bjExitBtn = document.getElementById('bjExit');
+const tableHud = document.getElementById('tableHud');
+const historyPanel = document.getElementById('historyPanel');
+const histPlayerEl = document.getElementById('histPlayer');
+const histDealerEl = document.getElementById('histDealer');
+const dealerTotalEl = document.getElementById('dealerTotal');
+const playerTotalEl = document.getElementById('playerTotal');
+const bjMsg = document.getElementById('bjMsg');
+const btnDeal = document.getElementById('btnDeal');
+const btnHit = document.getElementById('btnHit');
+const btnStand = document.getElementById('btnStand');
+const btnDouble = document.getElementById('btnDouble');
+const bjBetAmt = document.getElementById('bjBetAmt');
+const chipCountEl = document.getElementById('chipCount');
+const authGateEl = document.getElementById('authGate');
+
+/* ============ CONNEXION AU BACKEND PARABET ============ */
+/* Le solde et le résultat de chaque main sont entièrement gérés côté
+   serveur (mêmes routes que le blackjack "classique" du site) : cette page
+   ne fait que rejouer visuellement ce que l'API renvoie, elle ne calcule et
+   ne décide jamais elle-même d'un gain. */
+async function bjApi(path, options = {}) {
+  const res = await fetch(path, {
+    method: options.method || 'GET',
+    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    credentials: 'include',
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) {
+    const err = new Error((data && data.error) || `Erreur réseau (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+let balance = 0;
+let bet = 0;
+let playerHand = [], dealerHand = [];
+let roundActive = false;
+let doubled = false;
+let playerCardMeshes = [], dealerCardMeshes = [];
+let chipStackMeshes = [];
+const anims = []; // active tweens: {obj, from{pos,rot}, to{pos,rot}, t, dur, onDone}
+
+function tween(obj, toPos, toRotY, dur, onDone){
+  anims.push({
+    obj,
+    fromPos: obj.position.clone(),
+    toPos: toPos.clone(),
+    fromRotY: obj.rotation.y,
+    toRotY: toRotY,
+    t: 0, dur: dur||0.45,
+    onDone: onDone||null
+  });
+}
+
+async function tryOpenBlackjack(){
+  if(!nearTable() || blackjackOpen) return;
+  blackjackOpen = true;
+  document.exitPointerLock();
+  bjExitBtn.classList.add('show');
+  resetTableUI();
+  dealerSay('Faites vos jeux !', 2400);
+  startCameraTransition(seatWorldPos(), seatLookAtPos(), 0.85, ()=>{
+    tableHud.classList.add('show');
+    historyPanel.classList.add('show');
+  });
+  await resumeIfActiveGame();
+}
+
+/* Si le joueur avait laissé une partie en cours (page rechargée, table
+   quittée avant la fin...), on la retrouve telle quelle côté serveur — son
+   solde n'est jamais recalculé localement. */
+async function resumeIfActiveGame(){
+  try {
+    const state = await bjApi('/api/casino/blackjack/state');
+    if (!state.active || state.status !== 'playing') return;
+    bet = state.bet;
+    doubled = !!state.doubled;
+    playerHand = state.player;
+    dealerHand = state.dealer;
+    bjBetAmt.textContent = bet + ' 💎';
+    btnDeal.disabled = true;
+    btnHit.disabled = false;
+    btnStand.disabled = false;
+    btnDouble.disabled = true;
+    playerHand.forEach((c,i)=>{
+      const mesh = makeCardMesh(c, true);
+      mesh.position.copy(slotPos(i, playerHand.length, playerRowZ));
+      tableGroup.add(mesh);
+      playerCardMeshes.push(mesh);
+    });
+    dealerHand.forEach((c,i)=>{
+      const faceUp = !c.hidden;
+      const mesh = makeCardMesh(faceUp ? c : {hidden:true}, faceUp);
+      mesh.position.copy(slotPos(i, dealerHand.length, dealerRowZ));
+      tableGroup.add(mesh);
+      dealerCardMeshes.push(mesh);
+    });
+    refreshTotals(false);
+    bjMsg.textContent = 'Partie en cours reprise.';
+  } catch(e) {
+    // pas de partie en cours, ou erreur réseau bénigne : on repart d'une table vide
+  }
+}
+function closeBlackjack(){
+  if(!blackjackOpen) return;
+  tableHud.classList.remove('show');
+  bjExitBtn.classList.remove('show');
+  historyPanel.classList.remove('show');
+  clearCardMeshes();
+  clearChipStack();
+  const savedPos = camera.position.clone().add(new THREE.Vector3(0,0,2.6));
+  const backAwayPos = new THREE.Vector3(tableFrontWorld.x, 1.7, tableFrontWorld.z + 3.2);
+  startCameraTransition(backAwayPos, new THREE.Vector3(tableGroup.position.x,1,tableGroup.position.z), 0.7, ()=>{
+    const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+    yaw = Math.atan2(-dir.x, -dir.z);
+    pitch = Math.asin(THREE.MathUtils.clamp(dir.y,-1,1));
+    blackjackOpen = false;
+    renderer.domElement.requestPointerLock();
+  });
+}
+bjExitBtn.addEventListener('click', closeBlackjack);
+
+function resetTableUI(){
+  dealerTotalEl.textContent = '—';
+  playerTotalEl.textContent = '—';
+  bjMsg.textContent = 'Placez votre mise pour commencer.';
+  btnDeal.disabled = false;
+  btnHit.disabled = true;
+  btnStand.disabled = true;
+  btnDouble.disabled = true;
+  bet = 0;
+  doubled = false;
+  playerHand = []; dealerHand = [];
+  bjBetAmt.textContent = bet + ' 💎';
+  refreshBalance();
+  histPlayerEl.innerHTML = '';
+  histDealerEl.innerHTML = '';
+}
+function updateChips(){ chipCountEl.textContent = balance.toLocaleString('fr-FR') + ' 💎'; }
+async function refreshBalance(){
+  try {
+    const me = await bjApi('/api/me');
+    balance = me.balance;
+    updateChips();
+  } catch(e) {
+    // session expirée pendant la partie : on renvoie vers le site principal
+    if (e.status === 401) { window.location.href = '/'; }
+  }
+}
+
+function miniCardHTML(card){
+  const isRed = card.s==='♥'||card.s==='♦';
+  return `<div class="miniCard face ${isRed?'red':'black'}"><div>${card.r}</div><div class="suit">${card.s}</div></div>`;
+}
+function renderHistory(revealDealer){
+  histPlayerEl.innerHTML = playerHand.map(c=>miniCardHTML(c)).join('');
+  histDealerEl.innerHTML = dealerHand.map((c,i)=>{
+    if(i===1 && !revealDealer) return '<div class="miniCard back">?</div>';
+    return miniCardHTML(c);
+  }).join('');
+}
+
+document.querySelectorAll('.chipBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(roundActive) return;
+    const val = parseInt(btn.dataset.val);
+    if(val === 0){ bet = 0; } else { if(bet + val > balance) return; bet += val; }
+    bjBetAmt.textContent = bet + ' 💎';
+    updateChipStack();
+  });
+});
+
+/* ---- chip stack visual on the betting spot ---- */
+const chipColors = [[100,0xc9a227],[25,0x4a1220],[10,0x0b3d2e]];
+function clearChipStack(){ chipStackMeshes.forEach(m=>tableGroup.remove(m)); chipStackMeshes = []; }
+function updateChipStack(){
+  clearChipStack();
+  let remaining = bet, h = 0;
+  const denomCounts = [];
+  for(const [val,color] of chipColors){
+    const n = Math.min(8, Math.floor(remaining/val));
+    for(let i=0;i<n;i++) denomCounts.push(color);
+    remaining -= n*val;
+  }
+  denomCounts.forEach((color,i)=>{
+    const chip = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.03,20), new THREE.MeshStandardMaterial({color, roughness:0.4, metalness:0.15}));
+    chip.position.set(0, TBL.topY+0.01+i*0.032, betSpotLocalZ);
+    chip.rotation.y = Math.random()*0.3;
+    tableGroup.add(chip);
+    chipStackMeshes.push(chip);
+  });
+}
+
+/* ---- deck / cards ---- */
+function freshDeck(){
+  const suits = ['♠','♥','♦','♣'];
+  const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  let d = [];
+  for(const s of suits) for(const r of ranks) d.push({r,s});
+  for(let i=d.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [d[i],d[j]] = [d[j],d[i]];
+  }
+  return d;
+}
+function cardValue(card){
+  if(card.r === 'A') return 11;
+  if(['J','Q','K'].includes(card.r)) return 10;
+  return parseInt(card.r);
+}
+function handTotal(hand){
+  let total = hand.reduce((s,c)=>s+cardValue(c),0);
+  let aces = hand.filter(c=>c.r==='A').length;
+  while(total > 21 && aces > 0){ total -= 10; aces--; }
+  return total;
+}
+
+const cardTexCache = {};
+function cardTexture(card, faceUp){
+  const key = faceUp ? card.r+card.s : 'back';
+  if(cardTexCache[key]) return cardTexCache[key];
+  const S = 3; // supersampling factor for crisp text/edges
+  const W = 256*S, H = 358*S;
+  const c = makeCanvas(W,H);
+  const ctx = c.getContext('2d');
+  if(faceUp){
+    ctx.fillStyle = '#ede3c8';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(0,0,W,H,18*S) : ctx.rect(0,0,W,H);
+    ctx.fill();
+    ctx.strokeStyle = '#00000022'; ctx.lineWidth=3*S; ctx.stroke();
+    const isRed = card.s==='♥'||card.s==='♦';
+    ctx.fillStyle = isRed ? '#a01313' : '#0a0a0a';
+    ctx.font = `bold ${46*S}px Georgia`;
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(card.r, 16*S, 10*S);
+    ctx.font = `${40*S}px Georgia`;
+    ctx.fillText(card.s, 16*S, 60*S);
+    ctx.save(); ctx.translate(240*S,348*S); ctx.rotate(Math.PI);
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.font = `bold ${46*S}px Georgia`;
+    ctx.fillText(card.r, 0, 10*S);
+    ctx.font = `${40*S}px Georgia`;
+    ctx.fillText(card.s, 0, 60*S);
+    ctx.restore();
+    ctx.font = `${110*S}px Georgia`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(card.s, 128*S, 195*S);
+  } else {
+    ctx.fillStyle = '#4a1220';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(0,0,W,H,18*S) : ctx.rect(0,0,W,H);
+    ctx.fill();
+    ctx.strokeStyle = '#c9a227'; ctx.lineWidth=6*S;
+    ctx.strokeRect(14*S,14*S,228*S,330*S);
+    ctx.strokeStyle = '#c9a22766'; ctx.lineWidth=2*S;
+    for(let i=-360*S;i<360*S;i+=16*S){
+      ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i+358*S,358*S); ctx.stroke();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.needsUpdate = true;
+  cardTexCache[key] = tex;
+  return tex;
+}
+function makeCardMesh(card, faceUp){
+  const geo = new THREE.PlaneGeometry(0.42,0.60);
+  const mat = new THREE.MeshBasicMaterial({map:cardTexture(card,faceUp), side:THREE.DoubleSide, transparent:true});
+  mat.toneMapped = false;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI/2;
+  mesh._card = card;
+  return mesh;
+}
+function setCardFace(mesh, card, faceUp){
+  mesh.material.map = cardTexture(card, faceUp);
+  mesh.material.needsUpdate = true;
+}
+
+function clearCardMeshes(){
+  [...playerCardMeshes, ...dealerCardMeshes].forEach(m=>tableGroup.remove(m));
+  playerCardMeshes = []; dealerCardMeshes = [];
+}
+
+const playerRowZ = TBL.totalDepth*0.58;
+const dealerRowZ = 0.32;
+function slotPos(index, count, rowZ){
+  const spacing = 0.36;
+  const startX = -((count-1)*spacing)/2;
+  return new THREE.Vector3(startX + index*spacing, TBL.topY + 0.02 + index*0.004, rowZ);
+}
+
+// Anime une carte connue (déjà déterminée par le serveur) depuis le sabot
+// vers sa place sur la table. `card` vient toujours de la réponse de l'API
+// (jamais générée localement), donc l'issue de la partie est déjà fixée
+// avant même que l'animation ne joue.
+function dealCardTo(hand, meshArray, rowZ, card, faceUp, delay){
+  hand.push(card);
+  const mesh = makeCardMesh(faceUp ? card : {hidden:true}, faceUp);
+  mesh.position.copy(shoe.position).add(tableGroup.position).sub(tableGroup.position); // shoe local pos
+  mesh.position.y += 0.05;
+  mesh.rotation.y = 0;
+  tableGroup.add(mesh);
+  meshArray.push(mesh);
+  const target = slotPos(meshArray.length-1, meshArray.length, rowZ);
+  setTimeout(()=>{
+    tween(mesh, target, (Math.random()-0.5)*0.25, 0.4);
+  }, delay);
+  return mesh;
+}
+
+let lastPlayerTotal = 0, lastDealerTotal = null;
+function refreshTotals(revealDealer){
+  playerTotalEl.textContent = lastPlayerTotal;
+  dealerTotalEl.textContent = revealDealer && lastDealerTotal != null ? lastDealerTotal : '?';
+  renderHistory(revealDealer);
+}
+
+// Toutes les actions (miser, tirer, rester, doubler) appellent l'API du
+// serveur — la même que le blackjack classique du site — et se contentent
+// ensuite de rejouer visuellement les cartes qu'elle renvoie. Le solde
+// affiché vient exclusivement de la réponse serveur.
+
+btnDeal.addEventListener('click', async ()=>{
+  if(bet <= 0){ bjMsg.textContent = "Choisissez d'abord une mise."; return; }
+  if(roundActive) return;
+  btnDeal.disabled = true;
+  clearCardMeshes();
+  histPlayerEl.innerHTML = '';
+  histDealerEl.innerHTML = '';
+  playerHand = []; dealerHand = [];
+  bjMsg.textContent = '';
+  dealerSay('Les jeux sont faits.', 1600);
+
+  let r;
+  try {
+    r = await bjApi('/api/casino/blackjack/start', { method:'POST', body:{ amount: bet } });
+  } catch(e){
+    bjMsg.textContent = e.message || 'Erreur : mise refusée.';
+    btnDeal.disabled = false;
+    return;
+  }
+
+  balance = r.balance; updateChips();
+  roundActive = true;
+  lastPlayerTotal = r.playerTotal; lastDealerTotal = r.dealerTotal;
+
+  const p = r.player, d = r.dealer;
+  const seq = [
+    ()=>dealCardTo(playerHand, playerCardMeshes, playerRowZ, p[0], true, 0),
+    ()=>dealCardTo(dealerHand, dealerCardMeshes, dealerRowZ, d[0], true, 0),
+    ()=>dealCardTo(playerHand, playerCardMeshes, playerRowZ, p[1], true, 0),
+    ()=>dealCardTo(dealerHand, dealerCardMeshes, dealerRowZ, d[1], !d[1].hidden, 0),
+  ];
+  seq.forEach((fn,i)=>setTimeout(()=>{ fn(); refreshTotals(false); }, i*380));
+
+  setTimeout(()=>{
+    if (r.status === 'finished') {
+      // blackjack naturel : le serveur a déjà tout résolu
+      finishRound(r);
+    } else {
+      btnHit.disabled = false;
+      btnStand.disabled = false;
+      btnDouble.disabled = false;
+    }
+  }, seq.length*380 + 450);
+});
+
+btnHit.addEventListener('click', async ()=>{
+  if(!roundActive) return;
+  btnHit.disabled = true; btnStand.disabled = true; btnDouble.disabled = true;
+  let r;
+  try {
+    r = await bjApi('/api/casino/blackjack/hit', { method:'POST' });
+  } catch(e){
+    bjMsg.textContent = e.message || 'Erreur serveur.';
+    btnHit.disabled = false; btnStand.disabled = false;
+    return;
+  }
+  balance = r.balance; updateChips();
+  lastPlayerTotal = r.playerTotal; lastDealerTotal = r.dealerTotal;
+  const newCard = r.player[r.player.length-1];
+  dealCardTo(playerHand, playerCardMeshes, playerRowZ, newCard, true, 0);
+  setTimeout(()=>{
+    refreshTotals(false);
+    if (r.status === 'finished') { finishRound(r); }
+    else { btnHit.disabled = false; btnStand.disabled = false; }
+  }, 420);
+});
+
+btnStand.addEventListener('click', async ()=>{
+  if(!roundActive) return;
+  btnHit.disabled = true; btnStand.disabled = true; btnDouble.disabled = true;
+  dealerSay('Le croupier joue.', 1800);
+  let r;
+  try {
+    r = await bjApi('/api/casino/blackjack/stand', { method:'POST' });
+  } catch(e){
+    bjMsg.textContent = e.message || 'Erreur serveur.';
+    return;
+  }
+  balance = r.balance; updateChips();
+  playDealerReveal(r);
+});
+
+btnDouble.addEventListener('click', async ()=>{
+  if(!roundActive) return;
+  btnHit.disabled = true; btnStand.disabled = true; btnDouble.disabled = true;
+  let r;
+  try {
+    r = await bjApi('/api/casino/blackjack/double', { method:'POST' });
+  } catch(e){
+    bjMsg.textContent = e.message || 'Erreur serveur.';
+    btnHit.disabled = false; btnStand.disabled = false; btnDouble.disabled = false;
+    return;
+  }
+  balance = r.balance; updateChips();
+  doubled = true;
+  bet = r.bet;
+  bjBetAmt.textContent = bet + ' 💎';
+  const newCard = r.player[r.player.length-1];
+  dealCardTo(playerHand, playerCardMeshes, playerRowZ, newCard, true, 0);
+  setTimeout(()=>{
+    refreshTotals(false);
+    dealerSay('Le croupier joue.', 1800);
+    playDealerReveal(r);
+  }, 420);
+});
+
+// Une fois "rester" (ou "doubler") joué, le serveur a déjà déterminé toutes
+// les cartes finales du croupier — on les rejoue une par une pour l'effet
+// visuel, dans l'ordre où elles apparaissent dans la réponse.
+function playDealerReveal(r){
+  if(dealerCardMeshes[1]) setCardFace(dealerCardMeshes[1], r.dealer[1], true);
+  dealerHand[1] = r.dealer[1];
+  lastDealerTotal = null; // masqué jusqu'à la fin de la révélation
+  refreshTotals(false);
+
+  const extraCards = r.dealer.slice(dealerHand.length);
+  const step = (i)=>{
+    if (i < extraCards.length) {
+      dealCardTo(dealerHand, dealerCardMeshes, dealerRowZ, extraCards[i], true, 0);
+      setTimeout(()=>{ setTimeout(()=>step(i+1), 550); }, 420);
+    } else {
+      lastPlayerTotal = r.playerTotal; lastDealerTotal = r.dealerTotal;
+      refreshTotals(true);
+      finishRound(r);
+    }
+  };
+  step(0);
+}
+
+function finishRound(r){
+  roundActive = false;
+  btnHit.disabled = true;
+  btnStand.disabled = true;
+  btnDouble.disabled = true;
+  if(dealerCardMeshes[1]) setCardFace(dealerCardMeshes[1], r.dealer[1], true);
+  dealerHand = r.dealer;
+  lastPlayerTotal = r.playerTotal; lastDealerTotal = r.dealerTotal;
+  refreshTotals(true);
+
+  const net = r.payout - r.bet;
+  const labels = {
+    blackjack: ['Blackjack !', 'Blackjack, bien joué !'],
+    win: ['Vous gagnez', 'La maison paie.'],
+    push: ['Égalité — mise remboursée', 'Égalité.'],
+    lose: ['Le croupier gagne', 'La maison gagne.'],
+  };
+  const [msgBase, line] = labels[r.result] || ['Manche terminée', ''];
+  let msg = msgBase;
+  if (r.result === 'blackjack' || r.result === 'win') msg += ` — +${net} 💎`;
+  else if (r.result === 'lose') msg += ` — ${net} 💎`;
+
+  bjMsg.textContent = msg;
+  dealerSay(line, 2200);
+  updateChips();
+
+  setTimeout(()=>{
+    btnDeal.disabled = false;
+    bet = 0;
+    doubled = false;
+    bjBetAmt.textContent = '0 💎';
+    clearChipStack();
+    bjMsg.textContent += ' — Placez une nouvelle mise.';
+  }, 1500);
+}
+
+/* ============ RENDER LOOP ============ */
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.getElapsedTime();
+
+  updateMovement(dt);
+
+  // camera transition
+  if(camTransition.active){
+    camTransition.t += dt/camTransition.duration;
+    const k = easeInOut(Math.min(camTransition.t,1));
+    camera.position.lerpVectors(camTransition.fromPos, camTransition.toPos, k);
+    camera.quaternion.slerpQuaternions(camTransition.fromQuat, camTransition.toQuat, k);
+    if(camTransition.t >= 1){
+      camTransition.active = false;
+      if(camTransition.onDone) camTransition.onDone();
+    }
+  }
+
+  // card tweens
+  for(let i=anims.length-1;i>=0;i--){
+    const a = anims[i];
+    a.t += dt/a.dur;
+    const k = Math.min(a.t,1);
+    a.obj.position.lerpVectors(a.fromPos, a.toPos, k);
+    a.obj.rotation.y = a.fromRotY + (a.toRotY-a.fromRotY)*k;
+    a.obj.position.y = a.fromPos.y + (a.toPos.y-a.fromPos.y)*k + Math.sin(k*Math.PI)*0.25;
+    if(k>=1){ if(a.onDone) a.onDone(); anims.splice(i,1); }
+  }
+
+  // dealer idle sway + subtle arm motion
+  dealer.position.y = Math.sin(t*1.2)*0.01;
+  armL.rotation.x = Math.sin(t*1.1)*0.04;
+  armR.rotation.x = Math.sin(t*1.1+1)*0.04;
+  head.rotation.y = Math.sin(t*0.4)*0.08;
+
+  if(!blackjackOpen){
+    if(nearTable()){ promptEl.classList.add('show'); } else { promptEl.classList.remove('show'); }
+  } else {
+    promptEl.classList.remove('show');
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

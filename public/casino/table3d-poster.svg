@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 300" width="224" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="32%" r="85%">
+      <stop offset="0%" stop-color="#123d2c"/>
+      <stop offset="55%" stop-color="#0a2a1f"/>
+      <stop offset="100%" stop-color="#040c09"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0d876"/>
+      <stop offset="50%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#8a6c16"/>
+    </linearGradient>
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#9dffb0"/>
+      <stop offset="100%" stop-color="#1fae4a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="224" height="300" fill="url(#bg)"/>
+
+  <!-- soft vignette spotlight -->
+  <ellipse cx="112" cy="120" rx="120" ry="110" fill="#ffffff" opacity="0.05"/>
+
+  <!-- ornate gold frame -->
+  <rect x="8" y="8" width="208" height="284" fill="none" stroke="url(#gold)" stroke-width="2.2"/>
+  <rect x="12.5" y="12.5" width="199" height="275" fill="none" stroke="url(#gold)" stroke-width="0.8" opacity="0.6"/>
+  <circle cx="8" cy="8" r="3.2" fill="url(#gold)"/>
+  <circle cx="216" cy="8" r="3.2" fill="url(#gold)"/>
+  <circle cx="8" cy="292" r="3.2" fill="url(#gold)"/>
+  <circle cx="216" cy="292" r="3.2" fill="url(#gold)"/>
+
+  <!-- kicker -->
+  <text x="112" y="34" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="9" letter-spacing="4" fill="#e8d9ab" opacity="0.85">TABLE 3D</text>
+  <line x1="72" y1="42" x2="152" y2="42" stroke="url(#gold)" stroke-width="0.7" opacity="0.7"/>
+
+  <!-- cat silhouette -->
+  <g transform="translate(112,150)">
+    <ellipse cx="0" cy="72" rx="46" ry="9" fill="#000000" opacity="0.35"/>
+    <!-- tail -->
+    <path d="M 34 55 Q 62 30 46 -8 Q 40 -22 26 -16" fill="none" stroke="#050505" stroke-width="9" stroke-linecap="round"/>
+    <!-- body -->
+    <path d="M -34 68 Q -40 8 -18 -6 Q 0 -18 18 -6 Q 40 8 34 68 Z" fill="#070707"/>
+    <!-- head -->
+    <circle cx="0" cy="-30" r="26" fill="#070707"/>
+    <!-- ears -->
+    <path d="M -22 -46 L -30 -66 L -8 -50 Z" fill="#070707"/>
+    <path d="M 22 -46 L 30 -66 L 8 -50 Z" fill="#070707"/>
+    <path d="M -20 -50 L -25 -61 L -12 -51 Z" fill="#150a10"/>
+    <path d="M 20 -50 L 25 -61 L 12 -51 Z" fill="#150a10"/>
+    <!-- eyes -->
+    <circle cx="-9" cy="-30" r="7" fill="url(#eyeGlow)"/>
+    <circle cx="9" cy="-30" r="7" fill="url(#eyeGlow)"/>
+    <ellipse cx="-9" cy="-30" rx="1.6" ry="5" fill="#03150a"/>
+    <ellipse cx="9" cy="-30" rx="1.6" ry="5" fill="#03150a"/>
+    <!-- whiskers -->
+    <g stroke="#e8d9ab" stroke-width="0.6" opacity="0.55">
+      <line x1="-22" y1="-22" x2="-46" y2="-26"/>
+      <line x1="-22" y1="-18" x2="-46" y2="-16"/>
+      <line x1="22" y1="-22" x2="46" y2="-26"/>
+      <line x1="22" y1="-18" x2="46" y2="-16"/>
+    </g>
+    <!-- top hat -->
+    <g transform="translate(0,-58) rotate(-8)">
+      <rect x="-17" y="-24" width="34" height="24" rx="2" fill="#0a0a0a" stroke="url(#gold)" stroke-width="1"/>
+      <rect x="-22" y="-2" width="44" height="6" rx="2" fill="#0a0a0a" stroke="url(#gold)" stroke-width="1"/>
+      <rect x="-17" y="-9" width="34" height="4" fill="url(#gold)"/>
+    </g>
+  </g>
+
+  <!-- bottom nameplate -->
+  <rect x="30" y="248" width="164" height="30" fill="#08170f" stroke="url(#gold)" stroke-width="1"/>
+  <text x="112" y="268" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" letter-spacing="2" fill="url(#gold)">LE CHAT NOIR</text>
+
+  <text x="112" y="288" text-anchor="middle" font-family="Georgia, serif" font-size="8" letter-spacing="1.5" fill="#9fae9c">Blackjack immersif</text>
+</svg>
