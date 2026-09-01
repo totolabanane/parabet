@@ -125,4 +125,4 @@ veux une vraie automatisation (le joueur tape `/deposit 100` en jeu et le
 site le détecte automatiquement), il faudrait un plugin Minecraft qui
 appelle une route sécurisée de cette API (avec une clé secrète partagée)
 pour créditer directement le compte ParaBet correspondant — n'hésite pas à
-demander si tu veux qu'on construise cette partie plus tard.
+demander si tu veux qu'on construise cette partie plus tard. c'est 100% fictif aucune argent réel est utilisé
